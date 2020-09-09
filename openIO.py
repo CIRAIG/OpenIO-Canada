@@ -3,6 +3,8 @@ Class that creates symmetric Input-Output tables based on the Supply and Use eco
 Canada, available here: https://www150.statcan.gc.ca/n1/en/catalogue/15-602-X
 Multiple transformation models are available (industry technology assumption, fixed industry sales structure, etc.) and
 the type of classification (productxproduct, or industryxindustry) can be selected as well.
+Also produces environmental extensions for the symmetric tables generated based on data from the NPRI found here:
+https://open.canada.ca/data/en/dataset/1fb7d8d4-7713-4ec6-b957-4a882a84fed3
 """
 
 import pandas as pd
@@ -11,10 +13,11 @@ import re
 
 
 class IOTables:
-    def __init__(self, supply_use_excel_path, classification, assumption, aggregate_final_demand=True):
+    def __init__(self, supply_use_excel_path, NPRI_excel, classification, assumption, aggregate_final_demand=True):
         """
 
         :param supply_use_excel_path: the path to the SUT excel file (e.g. /../Detail level/CA_SUT_C2016_D.xlsx)
+        :param NPRI_excel: the path to the NPRI excel file (e.g. /../2017_INRP-NPRI.xlsx)
         :param classification: [string] the type of classification to adopt for the symmetric IOT ("product" or "industry")
         :param assumption: [string] the assumption used to create the symmetric IO tables ("industry technology" or
                             "fixed industry sales structure")
@@ -22,6 +25,7 @@ class IOTables:
 
         """
         self.SU_tables = pd.read_excel(supply_use_excel_path, None)
+        self.NPRI = pd.read_excel(NPRI_excel, None)
         self.classification = classification
         self.assumption = assumption
 
@@ -34,12 +38,14 @@ class IOTables:
         self.SY = pd.DataFrame()
         self.g = pd.DataFrame()
         self.q = pd.DataFrame()
+        self.F = pd.DataFrame()
 
         self.format_tables()
         self.gimme_symmetric_iot()
         if aggregate_final_demand:
             self.aggregate_final_demand()
         self.remove_codes()
+        self.produce_environmental_extensions()
 
     def format_tables(self):
         """
@@ -189,3 +195,35 @@ class IOTables:
         for df in [self.A, self.Z, self.S]:
             df.columns = pd.MultiIndex.from_tuples(df.columns)
             df.columns = df.columns.droplevel(0)
+
+    def produce_environmental_extensions(self):
+        """
+        Produces environmental extensions for the symmetric OI tables produced previously
+        :return: the environmental extensions satellite accounts
+        """
+        # Tab name changes with selected year, so identify it using "INRP-NPRI"
+        emissions = self.NPRI[[i for i in self.NPRI.keys() if "INRP-NPRI" in i][0]]
+        emissions.columns = list(zip(emissions.iloc[0].ffill().tolist(), emissions.iloc[2]))
+        emissions = emissions.iloc[3:]
+        emissions = emissions.loc[:, [i for i in emissions.columns if
+                                      (i[1] in ['NAICS 4 Code', 'CAS Number', 'Substance Name (English)', 'Units']
+                                       or i[1] == 'Total' and 'Air' in i[0]
+                                       or i[1] == 'Total' and 'Water' in i[0])]].fillna(0)
+        emissions.columns = ['NAICS 4 Code', 'CAS Number', 'Substance Name', 'Units', 'Emissions to air',
+                             'Emissions to water']
+        emissions.set_index('Substance Name', inplace=True)
+
+        temp_df = emissions.groupby(emissions.index).head(n=1)
+        # separating the metadata for emissions (CAS and units)
+        emission_metadata = pd.DataFrame('', index=pd.MultiIndex.from_product([temp_df.index, ['air', 'water']]),
+                                         columns=['CAS Number', 'Unit'])
+        for emission in temp_df.index:
+            emission_metadata.loc[emission, 'CAS Number'] = temp_df.loc[emission, 'CAS Number']
+            emission_metadata.loc[emission, 'Unit'] = temp_df.loc[emission, 'CAS Number']
+        del temp_df
+
+        self.F = pd.pivot_table(data=emissions, index=[emissions.index], columns=['NAICS 4 Code'],
+                                aggfunc=np.sum).fillna(0)
+        self.F.columns.set_levels(['air', 'water'], level=0, inplace=True)
+        self.F.columns = self.F.columns.rename(['compartment', 'NAICS'])
+        self.F = self.F.T.unstack('compartment').T[self.F.T.unstack('compartment').T != 0].dropna(how='all').fillna(0)
