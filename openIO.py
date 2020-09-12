@@ -60,7 +60,7 @@ class IOTables:
             self.aggregate_final_demand()
         self.remove_codes()
         self.extract_environmental_data()
-        # self.match_environmental_data_to_iots()
+        self.match_environmental_data_to_iots()
 
     def format_tables(self):
         """
@@ -112,6 +112,10 @@ class IOTables:
         # get strings as floats
         Supply_table = Supply_table.astype('float64')
         Use_table = Use_table.astype('float64')
+
+        # tables from M$ to $
+        Supply_table *= 1000000
+        Use_table *= 1000000
 
         # check calculated totals matched displayed totals
         assert np.allclose(Use_table.iloc[:, Use_table.columns.get_loc(('TOTAL', 'Total'))],
@@ -202,10 +206,10 @@ class IOTables:
         Removes the codes from the index to only leave the name.
         :return: Modified summetric dataframes
         """
-        for df in [self.A, self.Z, self.W, self.R, self.Y, self.WY, self.q, self.inv_g, self.inv_q]:
+        for df in [self.A, self.Z, self.W, self.R, self.Y, self.WY, self.q, self.inv_g, self.inv_q, self.V, self.U]:
             df.index = pd.MultiIndex.from_tuples(df.index)
             df.index = df.index.droplevel(0)
-        for df in [self.A, self.Z, self.W, self.R, self.g, self.inv_g, self.inv_q]:
+        for df in [self.A, self.Z, self.W, self.R, self.g, self.inv_g, self.inv_q, self.V, self.U]:
             df.columns = pd.MultiIndex.from_tuples(df.columns)
             df.columns = df.columns.droplevel(0)
 
@@ -248,163 +252,168 @@ class IOTables:
         """
         total_emissions_origin = self.F.sum().sum()
 
+        concordance_table = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/NAICS-IOIC.xlsx'))
+        concordance_table.set_index('NAICS6', inplace=True)
+
+        new_columns = []
+        for i in self.F.columns:
+            if int(i) in concordance_table.index:
+                new_columns.append(concordance_table.loc[int(i), 'IOIC'])
+            else:
+                print('Problem ' + str(i))
+        self.F.columns = new_columns
+        self.F = self.F.groupby(self.F.columns, axis=1).sum()
+
+        # adding the codes that are missing from NPRI but are in Stat Can
+        IOIC_codes = [i[0] for i in self.industries]
+        self.F = self.F.join(pd.DataFrame(0, index=self.F.index, columns=[i for i in IOIC_codes if
+                                                                          i not in self.F.columns]))
+        if self.level_of_detail == 'Detail level':
+            # Animal production and aquaculture split with economic allocation
+            self.F.loc[:, 'BS112A00'] = self.F.loc[:, 'BS112000'] * 0.95
+            self.F.loc[:, 'BS112500'] = self.F.loc[:, 'BS112000'] * 0.05
+        elif self.level_of_detail == 'Summary level':
+            self.F.loc[:, 'BS11A'] = self.F.loc[:, ['BS111A00', 'BS112000']].sum(axis=1)
+            self.F.loc[:, 'BS113'] = self.F.loc[:, 'BS113000']
+            self.F.loc[:, 'BS114'] = self.F.loc[:, 'BS1114A0']
+            self.F.loc[:, 'BS115'] = self.F.loc[:, 'BS115A00']
+            self.F.loc[:, 'BS210'] = self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS21', i)]].sum(axis=1)
+            self.F.loc[:, 'BS220'] = self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS22', i)]].sum(axis=1)
+            self.F.loc[:, 'BS23A'] = self.F.loc[:, 'BS23A000']
+            self.F.loc[:, 'BS3A0'] = self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS3', i)]].sum(axis=1)
+            self.F.loc[:, 'BS410'] = self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS41', i)]].sum(axis=1)
+            self.F.loc[:, 'BS4B0'] = self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS48|^BS49', i)]].sum(axis=1)
+            self.F.loc[:, 'BS510'] = self.F.loc[:, 'BS518000']
+            self.F.loc[:, 'BS5B0'] = self.F.loc[:, 'BS531100']
+            self.F.loc[:, 'BS540'] = self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS54', i)]].sum(axis=1)
+            self.F.loc[:, 'BS560'] = self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS56', i)]].sum(axis=1)
+            self.F.loc[:, 'BS610'] = self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS61', i)]].sum(axis=1)
+            self.F.loc[:, 'BS720'] = self.F.loc[:, 'BS721A00']
+            self.F.loc[:, 'BS810'] = self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS81', i)]].sum(axis=1)
+            self.F.loc[:, 'GS610'] = self.F.loc[:, [i for i in self.F.columns if re.search(r'^GS61', i)]].sum(axis=1)
+            self.F.loc[:, 'GS620'] = self.F.loc[:, 'GS622000']
+            self.F.loc[:, 'GS911'] = self.F.loc[:, [i for i in self.F.columns if re.search(r'^GS911', i)]].sum(axis=1)
+            self.F.loc[:, 'GS913'] = self.F.loc[:, 'GS913000']
+        elif self.level_of_detail == 'Link-1997 level':
+            self.F.loc[:, 'BS211000'] += self.F.loc[:, 'BS211110']
+            self.F.loc[:, 'BS211000'] += self.F.loc[:, 'BS211140']
+            self.F.loc[:, 'BS213000'] += self.F.loc[:, 'BS21311A']
+            self.F.loc[:, 'BS324000'] += self.F.loc[:, 'BS324110']
+            self.F.loc[:, 'BS324000'] += self.F.loc[:, 'BS3241A0']
+            self.F.loc[:, 'BS325B00'] += self.F.loc[:, 'BS325200']
+            self.F.loc[:, 'BS325B00'] += self.F.loc[:, 'BS325500']
+            self.F.loc[:, 'BS333A00'] += self.F.loc[:, 'BS333200']
+            self.F.loc[:, 'BS333A00'] += self.F.loc[:, 'BS333300']
+            self.F.loc[:, 'BS336100'] += self.F.loc[:, 'BS336110']
+            self.F.loc[:, 'BS336100'] += self.F.loc[:, 'BS336120']
+            self.F.loc[:, 'BS336300'] += self.F.loc[:, [i for i in self.F.columns if
+                                                        i not in IOIC_codes and re.search(r'^BS3363',i)]].sum(axis=1)
+            self.F.loc[:, 'BS410000'] += self.F.loc[:, [i for i in self.F.columns if
+                                                        i not in IOIC_codes and re.search(r'^BS41',i)]].sum(axis=1)
+            self.F.loc[:, 'BS541B00'] += self.F.loc[:, 'BS541700']
+            self.F.loc[:, 'BS541B00'] += self.F.loc[:, 'BS541900']
+            self.F.loc[:, 'BS561B00'] += self.F.loc[:, 'BS561A00']
+        elif self.level_of_detail == 'Link-1961 level':
+            self.F.loc[:, 'BS11B00'] += self.F.loc[:, 'BS111A00']
+            self.F.loc[:, 'BS11B00'] += self.F.loc[:, 'BS112000']
+            self.F.loc[:, 'BS11300'] += self.F.loc[:, 'BS113000']
+            self.F.loc[:, 'BS11400'] += self.F.loc[:, 'BS1114A0']
+            self.F.loc[:, 'BS11500'] += self.F.loc[:, 'BS115A00']
+            self.F.loc[:, 'BS21100'] += self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS211', i)]].sum(axis=1)
+            self.F.loc[:, 'BS21210'] += self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS212', i)]].sum(axis=1)
+            self.F.loc[:, 'BS21300'] += self.F.loc[:, 'BS21311A']
+            self.F.loc[:, 'BS22110'] += self.F.loc[:, 'BS221100']
+            self.F.loc[:, 'BS221A0'] += self.F.loc[:, 'BS221200']
+            self.F.loc[:, 'BS221A0'] += self.F.loc[:, 'BS221300']
+            self.F.loc[:, 'BS23A00'] += self.F.loc[:, 'BS23A000']
+            self.F.loc[:, 'BS31110'] += self.F.loc[:, 'BS311100']
+            self.F.loc[:, 'BS31130'] += self.F.loc[:, 'BS311300']
+            self.F.loc[:, 'BS31140'] += self.F.loc[:, 'BS311400']
+            self.F.loc[:, 'BS31150'] += self.F.loc[:, 'BS311500']
+            self.F.loc[:, 'BS31160'] += self.F.loc[:, 'BS311600']
+            self.F.loc[:, 'BS31170'] += self.F.loc[:, 'BS311700']
+            self.F.loc[:, 'BS311A0'] += self.F.loc[:, 'BS311200']
+            self.F.loc[:, 'BS311A0'] += self.F.loc[:, 'BS311800']
+            self.F.loc[:, 'BS311A0'] += self.F.loc[:, 'BS311900']
+            self.F.loc[:, 'BS31211'] += self.F.loc[:, 'BS312110']
+            self.F.loc[:, 'BS31212'] += self.F.loc[:, 'BS312120']
+            self.F.loc[:, 'BS3121A'] += self.F.loc[:, 'BS3121A0']
+            self.F.loc[:, 'BS31220'] += self.F.loc[:, 'BS312200']
+            self.F.loc[:, 'BS31A00'] += self.F.loc[:, 'BS31A000']
+            self.F.loc[:, 'BS31B00'] += self.F.loc[:, 'BS31B000']
+            self.F.loc[:, 'BS32100'] += self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS321', i)]].sum(axis=1)
+            self.F.loc[:, 'BS32210'] += self.F.loc[:, 'BS322100']
+            self.F.loc[:, 'BS32220'] += self.F.loc[:, 'BS322200']
+            self.F.loc[:, 'BS32300'] += self.F.loc[:, 'BS323000']
+            self.F.loc[:, 'BS32400'] += self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS324', i)]].sum(axis=1)
+            self.F.loc[:, 'BS32510'] += self.F.loc[:, 'BS325100']
+            self.F.loc[:, 'BS32530'] += self.F.loc[:, 'BS325300']
+            self.F.loc[:, 'BS32540'] += self.F.loc[:, 'BS325400']
+            self.F.loc[:, 'BS325C0'] += self.F.loc[:, 'BS325200']
+            self.F.loc[:, 'BS325C0'] += self.F.loc[:, 'BS325500']
+            self.F.loc[:, 'BS325C0'] += self.F.loc[:, 'BS325600']
+            self.F.loc[:, 'BS325C0'] += self.F.loc[:, 'BS325900']
+            self.F.loc[:, 'BS32610'] += self.F.loc[:, 'BS326100']
+            self.F.loc[:, 'BS32620'] += self.F.loc[:, 'BS326200']
+            self.F.loc[:, 'BS327A0'] += self.F.loc[:, 'BS327A00']
+            self.F.loc[:, 'BS32730'] += self.F.loc[:, 'BS327300']
+            self.F.loc[:, 'BS33100'] += self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS331', i)]].sum(axis=1)
+            self.F.loc[:, 'BS33200'] += self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS332', i)]].sum(axis=1)
+            self.F.loc[:, 'BS33300'] += self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS333', i)]].sum(axis=1)
+            self.F.loc[:, 'BS33410'] += self.F.loc[:, 'BS334100']
+            self.F.loc[:, 'BS334B0'] += self.F.loc[:, 'BS334200']
+            self.F.loc[:, 'BS334B0'] += self.F.loc[:, 'BS334400']
+            self.F.loc[:, 'BS334B0'] += self.F.loc[:, 'BS334A00']
+            self.F.loc[:, 'BS335A0'] += self.F.loc[:, 'BS335100']
+            self.F.loc[:, 'BS335A0'] += self.F.loc[:, 'BS335300']
+            self.F.loc[:, 'BS335A0'] += self.F.loc[:, 'BS335900']
+            self.F.loc[:, 'BS33520'] += self.F.loc[:, 'BS335200']
+            self.F.loc[:, 'BS33610'] += self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS3361', i)]].sum(axis=1)
+            self.F.loc[:, 'BS33620'] += self.F.loc[:, 'BS336200']
+            self.F.loc[:, 'BS33630'] += self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS3363', i)]].sum(axis=1)
+            self.F.loc[:, 'BS33640'] += self.F.loc[:, 'BS336400']
+            self.F.loc[:, 'BS33650'] += self.F.loc[:, 'BS336500']
+            self.F.loc[:, 'BS33660'] += self.F.loc[:, 'BS336600']
+            self.F.loc[:, 'BS33690'] += self.F.loc[:, 'BS336900']
+            self.F.loc[:, 'BS33700'] += self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS337', i)]].sum(axis=1)
+            self.F.loc[:, 'BS33900'] += self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS339', i)]].sum(axis=1)
+            self.F.loc[:, 'BS41000'] += self.F.loc[:,  [i for i in self.F.columns if re.search(r'^BS41', i)]].sum(axis=1)
+            self.F.loc[:, 'BS48100'] += self.F.loc[:, 'BS481000']
+            self.F.loc[:, 'BS48200'] += self.F.loc[:, 'BS482000']
+            self.F.loc[:, 'BS48400'] += self.F.loc[:, 'BS484000']
+            self.F.loc[:, 'BS48600'] += self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS486', i)]].sum(axis=1)
+            self.F.loc[:, 'BS48B00'] += self.F.loc[:, 'BS488000']
+            self.F.loc[:, 'BS49300'] += self.F.loc[:, 'BS493000']
+            self.F.loc[:, 'BS51B00'] += self.F.loc[:, 'BS518000']
+            self.F.loc[:, 'BS53110'] += self.F.loc[:, 'BS531100']
+            self.F.loc[:, 'BS541C0'] += self.F.loc[:, 'BS541300']
+            self.F.loc[:, 'BS541D0'] += self.F.loc[:, 'BS541700']
+            self.F.loc[:, 'BS541D0'] += self.F.loc[:, 'BS541900']
+            self.F.loc[:, 'BS56100'] += self.F.loc[:, 'BS561A00']
+            self.F.loc[:, 'BS56200'] += self.F.loc[:, 'BS562000']
+            self.F.loc[:, 'BS61000'] += self.F.loc[:, 'BS610000']
+            self.F.loc[:, 'BS72000'] += self.F.loc[:, 'BS721A00']
+            self.F.loc[:, 'BS81100'] += self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS811', i)]].sum(axis=1)
+            self.F.loc[:, 'BS81A00'] += self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS812', i)]].sum(axis=1)
+            self.F.loc[:, 'GS61130'] += self.F.loc[:, 'GS611300']
+            self.F.loc[:, 'GS611B0'] += self.F.loc[:, 'GS611200']
+            self.F.loc[:, 'GS62200'] += self.F.loc[:, 'GS622000']
+            self.F.loc[:, 'GS91100'] += self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS911', i)]].sum(axis=1)
+            self.F.loc[:, 'GS91300'] += self.F.loc[:, 'GS913000']
+
+        self.F = self.F.reindex(IOIC_codes, axis=1)
+        # check the order is the same before replacing codes with names
+        assert all(self.F.columns == [i[0] for i in self.industries])
+        self.F.columns = [i[1] for i in self.industries]
+
         if self.classification == 'industry':
-            concordance_table = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/NAICS-IOIC.xlsx'))
-            concordance_table.set_index('NAICS6', inplace=True)
-
-            new_columns = []
-            for i in self.F.columns:
-                if int(i) in concordance_table.index:
-                    new_columns.append(concordance_table.loc[int(i), 'IOIC'])
-                else:
-                    print('Problem ' + str(i))
-            self.F.columns = new_columns
-            self.F = self.F.groupby(self.F.columns, axis=1).sum()
-
-            # adding the codes that are missing from NPRI but are in Stat Can
-            IOIC_codes = [i[0] for i in self.industries]
-            self.F = self.F.join(pd.DataFrame(0, index=self.F.index, columns=[i for i in IOIC_codes if
-                                                                              i not in self.F.columns]))
-            if self.level_of_detail == 'Detail level':
-                # Animal production and aquaculture split with economic allocation
-                self.F.loc[:, 'BS112A00'] = self.F.loc[:, 'BS112000'] * 0.95
-                self.F.loc[:, 'BS112500'] = self.F.loc[:, 'BS112000'] * 0.05
-            elif self.level_of_detail == 'Summary level':
-                self.F.loc[:, 'BS11A'] = self.F.loc[:, ['BS111A00', 'BS112000']].sum(axis=1)
-                self.F.loc[:, 'BS113'] = self.F.loc[:, 'BS113000']
-                self.F.loc[:, 'BS114'] = self.F.loc[:, 'BS1114A0']
-                self.F.loc[:, 'BS115'] = self.F.loc[:, 'BS115A00']
-                self.F.loc[:, 'BS210'] = self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS21', i)]].sum(axis=1)
-                self.F.loc[:, 'BS220'] = self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS22', i)]].sum(axis=1)
-                self.F.loc[:, 'BS23A'] = self.F.loc[:, 'BS23A000']
-                self.F.loc[:, 'BS3A0'] = self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS3', i)]].sum(axis=1)
-                self.F.loc[:, 'BS410'] = self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS41', i)]].sum(axis=1)
-                self.F.loc[:, 'BS4B0'] = self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS48|^BS49', i)]].sum(axis=1)
-                self.F.loc[:, 'BS510'] = self.F.loc[:, 'BS518000']
-                self.F.loc[:, 'BS5B0'] = self.F.loc[:, 'BS531100']
-                self.F.loc[:, 'BS540'] = self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS54', i)]].sum(axis=1)
-                self.F.loc[:, 'BS560'] = self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS56', i)]].sum(axis=1)
-                self.F.loc[:, 'BS610'] = self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS61', i)]].sum(axis=1)
-                self.F.loc[:, 'BS720'] = self.F.loc[:, 'BS721A00']
-                self.F.loc[:, 'BS810'] = self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS81', i)]].sum(axis=1)
-                self.F.loc[:, 'GS610'] = self.F.loc[:, [i for i in self.F.columns if re.search(r'^GS61', i)]].sum(axis=1)
-                self.F.loc[:, 'GS620'] = self.F.loc[:, 'GS622000']
-                self.F.loc[:, 'GS911'] = self.F.loc[:, [i for i in self.F.columns if re.search(r'^GS911', i)]].sum(axis=1)
-                self.F.loc[:, 'GS913'] = self.F.loc[:, 'GS913000']
-            elif self.level_of_detail == 'Link-1997 level':
-                self.F.loc[:, 'BS211000'] += self.F.loc[:, 'BS211110']
-                self.F.loc[:, 'BS211000'] += self.F.loc[:, 'BS211140']
-                self.F.loc[:, 'BS213000'] += self.F.loc[:, 'BS21311A']
-                self.F.loc[:, 'BS324000'] += self.F.loc[:, 'BS324110']
-                self.F.loc[:, 'BS324000'] += self.F.loc[:, 'BS3241A0']
-                self.F.loc[:, 'BS325B00'] += self.F.loc[:, 'BS325200']
-                self.F.loc[:, 'BS325B00'] += self.F.loc[:, 'BS325500']
-                self.F.loc[:, 'BS333A00'] += self.F.loc[:, 'BS333200']
-                self.F.loc[:, 'BS333A00'] += self.F.loc[:, 'BS333300']
-                self.F.loc[:, 'BS336100'] += self.F.loc[:, 'BS336110']
-                self.F.loc[:, 'BS336100'] += self.F.loc[:, 'BS336120']
-                self.F.loc[:, 'BS336300'] += self.F.loc[:, [i for i in self.F.columns if
-                                                            i not in IOIC_codes and re.search(r'^BS3363',i)]].sum(axis=1)
-                self.F.loc[:, 'BS410000'] += self.F.loc[:, [i for i in self.F.columns if
-                                                            i not in IOIC_codes and re.search(r'^BS41',i)]].sum(axis=1)
-                self.F.loc[:, 'BS541B00'] += self.F.loc[:, 'BS541700']
-                self.F.loc[:, 'BS541B00'] += self.F.loc[:, 'BS541900']
-                self.F.loc[:, 'BS561B00'] += self.F.loc[:, 'BS561A00']
-            elif self.level_of_detail == 'Link-1961 level':
-                self.F.loc[:, 'BS11B00'] += self.F.loc[:, 'BS111A00']
-                self.F.loc[:, 'BS11B00'] += self.F.loc[:, 'BS112000']
-                self.F.loc[:, 'BS11300'] += self.F.loc[:, 'BS113000']
-                self.F.loc[:, 'BS11400'] += self.F.loc[:, 'BS1114A0']
-                self.F.loc[:, 'BS11500'] += self.F.loc[:, 'BS115A00']
-                self.F.loc[:, 'BS21100'] += self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS211', i)]].sum(axis=1)
-                self.F.loc[:, 'BS21210'] += self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS212', i)]].sum(axis=1)
-                self.F.loc[:, 'BS21300'] += self.F.loc[:, 'BS21311A']
-                self.F.loc[:, 'BS22110'] += self.F.loc[:, 'BS221100']
-                self.F.loc[:, 'BS221A0'] += self.F.loc[:, 'BS221200']
-                self.F.loc[:, 'BS221A0'] += self.F.loc[:, 'BS221300']
-                self.F.loc[:, 'BS23A00'] += self.F.loc[:, 'BS23A000']
-                self.F.loc[:, 'BS31110'] += self.F.loc[:, 'BS311100']
-                self.F.loc[:, 'BS31130'] += self.F.loc[:, 'BS311300']
-                self.F.loc[:, 'BS31140'] += self.F.loc[:, 'BS311400']
-                self.F.loc[:, 'BS31150'] += self.F.loc[:, 'BS311500']
-                self.F.loc[:, 'BS31160'] += self.F.loc[:, 'BS311600']
-                self.F.loc[:, 'BS31170'] += self.F.loc[:, 'BS311700']
-                self.F.loc[:, 'BS311A0'] += self.F.loc[:, 'BS311200']
-                self.F.loc[:, 'BS311A0'] += self.F.loc[:, 'BS311800']
-                self.F.loc[:, 'BS311A0'] += self.F.loc[:, 'BS311900']
-                self.F.loc[:, 'BS31211'] += self.F.loc[:, 'BS312110']
-                self.F.loc[:, 'BS31212'] += self.F.loc[:, 'BS312120']
-                self.F.loc[:, 'BS3121A'] += self.F.loc[:, 'BS3121A0']
-                self.F.loc[:, 'BS31220'] += self.F.loc[:, 'BS312200']
-                self.F.loc[:, 'BS31A00'] += self.F.loc[:, 'BS31A000']
-                self.F.loc[:, 'BS31B00'] += self.F.loc[:, 'BS31B000']
-                self.F.loc[:, 'BS32100'] += self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS321', i)]].sum(axis=1)
-                self.F.loc[:, 'BS32210'] += self.F.loc[:, 'BS322100']
-                self.F.loc[:, 'BS32220'] += self.F.loc[:, 'BS322200']
-                self.F.loc[:, 'BS32300'] += self.F.loc[:, 'BS323000']
-                self.F.loc[:, 'BS32400'] += self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS324', i)]].sum(axis=1)
-                self.F.loc[:, 'BS32510'] += self.F.loc[:, 'BS325100']
-                self.F.loc[:, 'BS32530'] += self.F.loc[:, 'BS325300']
-                self.F.loc[:, 'BS32540'] += self.F.loc[:, 'BS325400']
-                self.F.loc[:, 'BS325C0'] += self.F.loc[:, 'BS325200']
-                self.F.loc[:, 'BS325C0'] += self.F.loc[:, 'BS325500']
-                self.F.loc[:, 'BS325C0'] += self.F.loc[:, 'BS325600']
-                self.F.loc[:, 'BS325C0'] += self.F.loc[:, 'BS325900']
-                self.F.loc[:, 'BS32610'] += self.F.loc[:, 'BS326100']
-                self.F.loc[:, 'BS32620'] += self.F.loc[:, 'BS326200']
-                self.F.loc[:, 'BS327A0'] += self.F.loc[:, 'BS327A00']
-                self.F.loc[:, 'BS32730'] += self.F.loc[:, 'BS327300']
-                self.F.loc[:, 'BS33100'] += self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS331', i)]].sum(axis=1)
-                self.F.loc[:, 'BS33200'] += self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS332', i)]].sum(axis=1)
-                self.F.loc[:, 'BS33300'] += self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS333', i)]].sum(axis=1)
-                self.F.loc[:, 'BS33410'] += self.F.loc[:, 'BS334100']
-                self.F.loc[:, 'BS334B0'] += self.F.loc[:, 'BS334200']
-                self.F.loc[:, 'BS334B0'] += self.F.loc[:, 'BS334400']
-                self.F.loc[:, 'BS334B0'] += self.F.loc[:, 'BS334A00']
-                self.F.loc[:, 'BS335A0'] += self.F.loc[:, 'BS335100']
-                self.F.loc[:, 'BS335A0'] += self.F.loc[:, 'BS335300']
-                self.F.loc[:, 'BS335A0'] += self.F.loc[:, 'BS335900']
-                self.F.loc[:, 'BS33520'] += self.F.loc[:, 'BS335200']
-                self.F.loc[:, 'BS33610'] += self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS3361', i)]].sum(axis=1)
-                self.F.loc[:, 'BS33620'] += self.F.loc[:, 'BS336200']
-                self.F.loc[:, 'BS33630'] += self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS3363', i)]].sum(axis=1)
-                self.F.loc[:, 'BS33640'] += self.F.loc[:, 'BS336400']
-                self.F.loc[:, 'BS33650'] += self.F.loc[:, 'BS336500']
-                self.F.loc[:, 'BS33660'] += self.F.loc[:, 'BS336600']
-                self.F.loc[:, 'BS33690'] += self.F.loc[:, 'BS336900']
-                self.F.loc[:, 'BS33700'] += self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS337', i)]].sum(axis=1)
-                self.F.loc[:, 'BS33900'] += self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS339', i)]].sum(axis=1)
-                self.F.loc[:, 'BS41000'] += self.F.loc[:,  [i for i in self.F.columns if re.search(r'^BS41', i)]].sum(axis=1)
-                self.F.loc[:, 'BS48100'] += self.F.loc[:, 'BS481000']
-                self.F.loc[:, 'BS48200'] += self.F.loc[:, 'BS482000']
-                self.F.loc[:, 'BS48400'] += self.F.loc[:, 'BS484000']
-                self.F.loc[:, 'BS48600'] += self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS486', i)]].sum(axis=1)
-                self.F.loc[:, 'BS48B00'] += self.F.loc[:, 'BS488000']
-                self.F.loc[:, 'BS49300'] += self.F.loc[:, 'BS493000']
-                self.F.loc[:, 'BS51B00'] += self.F.loc[:, 'BS518000']
-                self.F.loc[:, 'BS53110'] += self.F.loc[:, 'BS531100']
-                self.F.loc[:, 'BS541C0'] += self.F.loc[:, 'BS541300']
-                self.F.loc[:, 'BS541D0'] += self.F.loc[:, 'BS541700']
-                self.F.loc[:, 'BS541D0'] += self.F.loc[:, 'BS541900']
-                self.F.loc[:, 'BS56100'] += self.F.loc[:, 'BS561A00']
-                self.F.loc[:, 'BS56200'] += self.F.loc[:, 'BS562000']
-                self.F.loc[:, 'BS61000'] += self.F.loc[:, 'BS610000']
-                self.F.loc[:, 'BS72000'] += self.F.loc[:, 'BS721A00']
-                self.F.loc[:, 'BS81100'] += self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS811', i)]].sum(axis=1)
-                self.F.loc[:, 'BS81A00'] += self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS812', i)]].sum(axis=1)
-                self.F.loc[:, 'GS61130'] += self.F.loc[:, 'GS611300']
-                self.F.loc[:, 'GS611B0'] += self.F.loc[:, 'GS611200']
-                self.F.loc[:, 'GS62200'] += self.F.loc[:, 'GS622000']
-                self.F.loc[:, 'GS91100'] += self.F.loc[:, [i for i in self.F.columns if re.search(r'^BS911', i)]].sum(axis=1)
-                self.F.loc[:, 'GS91300'] += self.F.loc[:, 'GS913000']
-
-            self.F = self.F.reindex(IOIC_codes, axis=1)
-            # check the order is the same before replacing codes with names
-            assert all(self.F.columns == [i[0] for i in self.industries])
-            self.F.columns = [i[1] for i in self.industries]
-
             self.S = self.F.dot(self.inv_g)
+
+        if self.classification == 'product':
+            self.F = self.F.dot(self.V.dot(self.inv_g).T)
+            self.S = self.F.dot(self.inv_q)
 
         # assert that most of the emissions (>99%) given by the NPRI are present in self.F
         assert self.F.sum().sum() / total_emissions_origin > 0.99
+        assert self.F.sum().sum() / total_emissions_origin < 1.01
 
