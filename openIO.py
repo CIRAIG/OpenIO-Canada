@@ -14,7 +14,7 @@ import pkg_resources
 
 
 class IOTables:
-    def __init__(self, supply_use_excel_path, NPRI_excel, classification, aggregate_final_demand=True):
+    def __init__(self, supply_use_excel_path, classification, aggregate_final_demand=True):
         """
 
         :param supply_use_excel_path: the path to the SUT excel file (e.g. /../Detail level/CA_SUT_C2016_D.xlsx)
@@ -27,7 +27,7 @@ class IOTables:
         """
         self.SU_tables = pd.read_excel(supply_use_excel_path, None)
         self.level_of_detail = self.SU_tables['Supply'].iloc[5, 0]
-        self.NPRI = pd.read_excel(NPRI_excel, None)
+        self.NPRI = pd.read_excel((pkg_resources.resource_stream(__name__, '/Data/2017_INRP-NPRI.xlsx')), None)
         self.classification = classification
 
         if self.classification == "product":
@@ -226,15 +226,17 @@ class IOTables:
         emissions = emissions.loc[:, [i for i in emissions.columns if
                                       (i[1] in ['NAICS 6 Code', 'CAS Number', 'Substance Name (English)', 'Units']
                                        or i[1] == 'Total' and 'Air' in i[0]
-                                       or i[1] == 'Total' and 'Water' in i[0])]].fillna(0)
+                                       or i[1] == 'Total' and 'Water' in i[0]
+                                       or i[1] == 'Total' and 'Land' in i[0])]].fillna(0)
         emissions.columns = ['NAICS 6 Code', 'CAS Number', 'Substance Name', 'Units', 'Emissions to air',
-                             'Emissions to water']
+                             'Emissions to water', 'Emissions to land']
         emissions.set_index('Substance Name', inplace=True)
 
         temp_df = emissions.groupby(emissions.index).head(n=1)
         # separating the metadata for emissions (CAS and units)
-        self.emission_metadata = pd.DataFrame('', index=pd.MultiIndex.from_product([temp_df.index, ['air', 'water']]),
-                                         columns=['CAS Number', 'Unit'])
+        self.emission_metadata = pd.DataFrame('', index=pd.MultiIndex.from_product([temp_df.index,
+                                                                                    ['air', 'water', 'soil']]),
+                                              columns=['CAS Number', 'Unit'])
         for emission in temp_df.index:
             self.emission_metadata.loc[emission, 'CAS Number'] = temp_df.loc[emission, 'CAS Number']
             self.emission_metadata.loc[emission, 'Unit'] = temp_df.loc[emission, 'Units']
@@ -242,7 +244,7 @@ class IOTables:
 
         self.F = pd.pivot_table(data=emissions, index=[emissions.index], columns=['NAICS 6 Code'],
                                 aggfunc=np.sum).fillna(0)
-        self.F.columns.set_levels(['air', 'water'], level=0, inplace=True)
+        self.F.columns.set_levels(['air', 'water', 'soil'], level=0, inplace=True)
         self.F.columns = self.F.columns.rename(['compartment', 'NAICS'])
         self.F = self.F.T.unstack('compartment').T[self.F.T.unstack('compartment').T != 0].fillna(0)
 
@@ -410,27 +412,28 @@ class IOTables:
         assert all(self.F.columns == [i[0] for i in self.industries])
         self.F.columns = [i[1] for i in self.industries]
 
-        # assert that most of the emissions (>99%) given by the NPRI are present in self.F
-        assert self.F.sum().sum() / total_emissions_origin > 0.99
-        assert self.F.sum().sum() / total_emissions_origin < 1.01
+        # assert that most of the emissions (>98%) given by the NPRI are present in self.F
+        assert self.F.sum().sum() / total_emissions_origin > 0.98
+        assert self.F.sum().sum() / total_emissions_origin < 1.02
+
+        GHGs = extract_data_from_csv('GHG_emissions.csv')
+        NRG = extract_data_from_csv('Energy_use.csv')
+        water = extract_data_from_csv('Water_use.csv')
+
+        # households emissions
+        self.FY = pd.DataFrame([[
+            GHGs.loc[[i for i in GHGs.index if 'Households' in i]].sum().loc['VALUE']*1000000, 0, 0, 0, 0, 0],
+            [water.loc[[i for i in water.index if 'Households' in i]].sum().loc['VALUE'], 0, 0, 0, 0, 0],
+            [NRG.loc[[i for i in NRG.index if 'Households' in i]].sum().loc['VALUE'], 0, 0, 0, 0, 0]],
+            index=['GHGs', 'Water use', 'Energy use'],
+            columns=self.Y.columns)
+
+        industries_nrg = select_industries_emissions(NRG)
+        industries_water = select_industries_emissions(water)
+        industries_ghgs = select_industries_emissions(GHGs)
 
         # ---------------------GHGs-------------------------
 
-        GHGs = pd.read_csv(pkg_resources.resource_stream(__name__, '/Data/GHG_emissions.csv'))
-        GHGs = GHGs.loc[[i for i in GHGs.index if GHGs.loc[i, 'GEO'] == 'Canada' and GHGs.loc[i, 'REF_DATE'] == 2017]]
-        GHGs.set_index('Sector', inplace=True)
-
-        # households GHG emissions
-        self.FY = pd.DataFrame([GHGs.loc[[i for i in GHGs.index if 'Households' in i]].sum().loc['VALUE'], 0, 0, 0, 0, 0],
-                          columns=[('GHGs', 'air')], index=self.Y.columns).T
-        self.FY *= 1000000
-
-        industries_ghgs = GHGs.loc[[i for i in GHGs.index if ('Total' not in i
-                                                              and 'Balancing' not in i
-                                                              and 'Households' not in i)],
-                                   'VALUE'].fillna(0)
-
-        industries_ghgs.index = [i.split('[')[1].split(']')[0] for i in industries_ghgs.index]
         if self.level_of_detail == 'Link-1961 level':
             industries_ghgs = industries_ghgs.drop([i for i in industries_ghgs.index if i not in IOIC_codes])
         elif self.level_of_detail == 'Link-1997 level':
@@ -585,7 +588,8 @@ class IOTables:
             industries_ghgs.loc['GS610'] = industries_ghgs.loc[['GS611']].sum()
             industries_ghgs.loc['GS620'] = industries_ghgs.loc[['GS622', 'GS623']].sum()
 
-            industries_ghgs = industries_ghgs.reindex(IOIC_codes)
+            industries_ghgs = industries_ghgs.reindex(IOIC_codes).fillna(0)
+
         elif self.level_of_detail == 'Detail level':
             key_changes = dict.fromkeys(industries_ghgs.index, '')
             for key in key_changes:
@@ -775,12 +779,881 @@ class IOTables:
             industries_ghgs = industries_ghgs.loc[IOIC_codes]
 
         industries_ghgs.index = [i[1] for i in self.industries]
-        industries_ghgs.name = ('GHGs', 'air')
+        industries_ghgs.name = ('GHGs', '')
         industries_ghgs *= 1000000
         self.F = self.F.append(industries_ghgs)
 
-        self.emission_metadata.loc[('GHGs', 'air'), 'CAS Number'] = 'N/A'
-        self.emission_metadata.loc[('GHGs', 'air'), 'Unit'] = 'kgCO2eq'
+        self.emission_metadata.loc[('GHGs', ''), 'CAS Number'] = 'N/A'
+        self.emission_metadata.loc[('GHGs', ''), 'Unit'] = 'kgCO2eq'
+
+        # ---------------------Energy use-------------------------
+
+        if self.level_of_detail == 'Link-1961 level':
+            industries_nrg = industries_nrg.drop([i for i in industries_nrg.index if i not in IOIC_codes])
+        elif self.level_of_detail == 'Link-1997 level':
+            key_changes = dict.fromkeys(industries_nrg.index, '')
+            for key in key_changes:
+                if key + '0' in IOIC_codes:
+                    key_changes[key] = key + '0'
+
+            # economic allocations. Be my guest if you wanna verify :)
+            industries_nrg.loc['BS111A00'] = 0.55 * industries_nrg.loc['BS11B00']
+            industries_nrg.loc['BS1114A0'] = 0.05 * industries_nrg.loc['BS11B00']
+            industries_nrg.loc['BS112000'] = 0.40 * industries_nrg.loc['BS11B00']
+            industries_nrg.loc['BS115A00'] = 0.39 * industries_nrg.loc['BS11500']
+            industries_nrg.loc['BS115300'] = 0.61 * industries_nrg.loc['BS11500']
+            industries_nrg.loc['BS212210'] = 0.15 * industries_nrg.loc['BS21220']
+            industries_nrg.loc['BS212220'] = 0.35 * industries_nrg.loc['BS21220']
+            industries_nrg.loc['BS212230'] = 0.4 * industries_nrg.loc['BS21220']
+            industries_nrg.loc['BS212290'] = 0.1 * industries_nrg.loc['BS21220']
+            industries_nrg.loc['BS212310'] = 0.16 * industries_nrg.loc['BS21230']
+            industries_nrg.loc['BS212320'] = 0.15 * industries_nrg.loc['BS21230']
+            industries_nrg.loc['BS212392'] = 0.18 * industries_nrg.loc['BS21230']
+            industries_nrg.loc['BS21239A'] = 0.13 * industries_nrg.loc['BS21230']
+            industries_nrg.loc['BS212396'] = 0.38 * industries_nrg.loc['BS21230']
+            industries_nrg.loc['BS221200'] = 0.9 * industries_nrg.loc['BS221A0']
+            industries_nrg.loc['BS221300'] = 0.1 * industries_nrg.loc['BS221A0']
+            industries_nrg.loc['BS311200'] = 0.35 * industries_nrg.loc['BS311A0']
+            industries_nrg.loc['BS311800'] = 0.31 * industries_nrg.loc['BS311A0']
+            industries_nrg.loc['BS311900'] = 0.33 * industries_nrg.loc['BS311A0']
+            industries_nrg.loc['BS321100'] = 0.52 * industries_nrg.loc['BS32100']
+            industries_nrg.loc['BS321200'] = 0.22 * industries_nrg.loc['BS32100']
+            industries_nrg.loc['BS321900'] = 0.26 * industries_nrg.loc['BS32100']
+            industries_nrg.loc['BS325B00'] = 0.57 * industries_nrg.loc['BS325C0']
+            industries_nrg.loc['BS325600'] = 0.20 * industries_nrg.loc['BS325C0']
+            industries_nrg.loc['BS325900'] = 0.23 * industries_nrg.loc['BS325C0']
+            industries_nrg.loc['BS331100'] = 0.17 * industries_nrg.loc['BS33100']
+            industries_nrg.loc['BS331200'] = 0.07 * industries_nrg.loc['BS33100']
+            industries_nrg.loc['BS331300'] = 0.18 * industries_nrg.loc['BS33100']
+            industries_nrg.loc['BS331400'] = 0.54 * industries_nrg.loc['BS33100']
+            industries_nrg.loc['BS331500'] = 0.04 * industries_nrg.loc['BS33100']
+            industries_nrg.loc['BS332100'] = 0.04 * industries_nrg.loc['BS33200']
+            industries_nrg.loc['BS332A00'] = 0.16 * industries_nrg.loc['BS33200']
+            industries_nrg.loc['BS332300'] = 0.41 * industries_nrg.loc['BS33200']
+            industries_nrg.loc['BS332400'] = 0.1 * industries_nrg.loc['BS33200']
+            industries_nrg.loc['BS332500'] = 0.05 * industries_nrg.loc['BS33200']
+            industries_nrg.loc['BS332600'] = 0.03 * industries_nrg.loc['BS33200']
+            industries_nrg.loc['BS332700'] = 0.16 * industries_nrg.loc['BS33200']
+            industries_nrg.loc['BS332800'] = 0.06 * industries_nrg.loc['BS33200']
+            industries_nrg.loc['BS333100'] = 0.25 * industries_nrg.loc['BS33300']
+            industries_nrg.loc['BS333A00'] = 0.26 * industries_nrg.loc['BS33300']
+            industries_nrg.loc['BS333400'] = 0.1 * industries_nrg.loc['BS33300']
+            industries_nrg.loc['BS333500'] = 0.12 * industries_nrg.loc['BS33300']
+            industries_nrg.loc['BS333600'] = 0.04 * industries_nrg.loc['BS33300']
+            industries_nrg.loc['BS333900'] = 0.22 * industries_nrg.loc['BS33300']
+            industries_nrg.loc['BS334200'] = 0.25 * industries_nrg.loc['BS334B0']
+            industries_nrg.loc['BS334A00'] = 0.46 * industries_nrg.loc['BS334B0']
+            industries_nrg.loc['BS334400'] = 0.29 * industries_nrg.loc['BS334B0']
+            industries_nrg.loc['BS335100'] = 0.12 * industries_nrg.loc['BS335A0']
+            industries_nrg.loc['BS335300'] = 0.49 * industries_nrg.loc['BS335A0']
+            industries_nrg.loc['BS335900'] = 0.39 * industries_nrg.loc['BS335A0']
+            industries_nrg.loc['BS337100'] = 0.54 * industries_nrg.loc['BS33700']
+            industries_nrg.loc['BS337200'] = 0.36 * industries_nrg.loc['BS33700']
+            industries_nrg.loc['BS337900'] = 0.1 * industries_nrg.loc['BS33700']
+            industries_nrg.loc['BS339100'] = 0.28 * industries_nrg.loc['BS33900']
+            industries_nrg.loc['BS339900'] = 0.72 * industries_nrg.loc['BS33900']
+            industries_nrg.loc['BS486A00'] = 0.51 * industries_nrg.loc['BS48600']
+            industries_nrg.loc['BS486200'] = 0.49 * industries_nrg.loc['BS48600']
+            industries_nrg.loc['BS485100'] = 0.11 * industries_nrg.loc['BS48B00']
+            industries_nrg.loc['BS48A000'] = 0.09 * industries_nrg.loc['BS48B00']
+            industries_nrg.loc['BS485300'] = 0.06 * industries_nrg.loc['BS48B00']
+            industries_nrg.loc['BS488000'] = 0.75 * industries_nrg.loc['BS48B00']
+            industries_nrg.loc['BS5121A0'] = 0.77 * industries_nrg.loc['BS51200']
+            industries_nrg.loc['BS512130'] = 0.14 * industries_nrg.loc['BS51200']
+            industries_nrg.loc['BS512200'] = 0.08 * industries_nrg.loc['BS51200']
+            industries_nrg.loc['BS511100'] = 0.09 * industries_nrg.loc['BS51B00']
+            industries_nrg.loc['BS511200'] = 0.11 * industries_nrg.loc['BS51B00']
+            industries_nrg.loc['BS51A000'] = 0.74 * industries_nrg.loc['BS51B00']
+            industries_nrg.loc['BS518000'] = 0.06 * industries_nrg.loc['BS51B00']
+            industries_nrg.loc['BS521000'] = 0.002 * industries_nrg.loc['BS52B00']
+            industries_nrg.loc['BS5221A0'] = 0.469 * industries_nrg.loc['BS52B00']
+            industries_nrg.loc['BS522130'] = 0.042 * industries_nrg.loc['BS52B00']
+            industries_nrg.loc['BS522A00'] = 0.099 * industries_nrg.loc['BS52B00']
+            industries_nrg.loc['BS52A000'] = 0.306 * industries_nrg.loc['BS52B00']
+            industries_nrg.loc['BS524200'] = 0.082 * industries_nrg.loc['BS52B00']
+            industries_nrg.loc['BS532100'] = 0.28 * industries_nrg.loc['BS53B00']
+            industries_nrg.loc['BS53A000'] = 0.72 * industries_nrg.loc['BS53B00']
+            industries_nrg.loc['BS541A00'] = 0.52 * industries_nrg.loc['BS541C0']
+            industries_nrg.loc['BS541300'] = 0.48 * industries_nrg.loc['BS541C0']
+            industries_nrg.loc['BS541B00'] = 0.48 * industries_nrg.loc['BS541D0']
+            industries_nrg.loc['BS541500'] = 0.52 * industries_nrg.loc['BS541D0']
+            industries_nrg.loc['BS561B00'] = 0.61 * industries_nrg.loc['BS56100']
+            industries_nrg.loc['BS561500'] = 0.06 * industries_nrg.loc['BS56100']
+            industries_nrg.loc['BS561600'] = 0.09 * industries_nrg.loc['BS56100']
+            industries_nrg.loc['BS561700'] = 0.23 * industries_nrg.loc['BS56100']
+            industries_nrg.loc['BS531A00'] = 0.62 * industries_nrg.loc['BS5A000']
+            industries_nrg.loc['BS551113'] = 0.38 * industries_nrg.loc['BS5A000']
+            industries_nrg.loc['BS621100'] = 0.44 * industries_nrg.loc['BS62000']
+            industries_nrg.loc['BS621200'] = 0.21 * industries_nrg.loc['BS62000']
+            industries_nrg.loc['BS621A00'] = 0.17 * industries_nrg.loc['BS62000']
+            industries_nrg.loc['BS623000'] = 0.11 * industries_nrg.loc['BS62000']
+            industries_nrg.loc['BS624000'] = 0.07 * industries_nrg.loc['BS62000']
+            industries_nrg.loc['BS71A000'] = 0.37 * industries_nrg.loc['BS71000']
+            industries_nrg.loc['BS713A00'] = 0.37 * industries_nrg.loc['BS71000']
+            industries_nrg.loc['BS713200'] = 0.26 * industries_nrg.loc['BS71000']
+            industries_nrg.loc['BS721100'] = 0.19 * industries_nrg.loc['BS72000']
+            industries_nrg.loc['BS721A00'] = 0.03 * industries_nrg.loc['BS72000']
+            industries_nrg.loc['BS722000'] = 0.78 * industries_nrg.loc['BS72000']
+            industries_nrg.loc['BS811100'] = 0.53 * industries_nrg.loc['BS81100']
+            industries_nrg.loc['BS811A00'] = 0.47 * industries_nrg.loc['BS81100']
+            industries_nrg.loc['BS812A00'] = 0.59 * industries_nrg.loc['BS81A00']
+            industries_nrg.loc['BS812200'] = 0.11 * industries_nrg.loc['BS81A00']
+            industries_nrg.loc['BS812300'] = 0.12 * industries_nrg.loc['BS81A00']
+            industries_nrg.loc['BS814000'] = 0.18 * industries_nrg.loc['BS81A00']
+            industries_nrg.loc['GS611100'] = 0.83 * industries_nrg.loc['GS611B0']
+            industries_nrg.loc['GS611200'] = 0.16 * industries_nrg.loc['GS611B0']
+            industries_nrg.loc['GS611A00'] = 0.01 * industries_nrg.loc['GS611B0']
+            industries_nrg.loc['GS911100'] = 0.27 * industries_nrg.loc['GS91100']
+            industries_nrg.loc['GS911A00'] = 0.73 * industries_nrg.loc['GS91100']
+
+            new_index = []
+            for code in industries_nrg.index:
+                if code in key_changes:
+                    if key_changes[code] != '':
+                        new_index.append(key_changes[code])
+                    else:
+                        new_index.append(code)
+                else:
+                    new_index.append(code)
+
+            industries_nrg.index = new_index
+            industries_nrg = industries_nrg.loc[IOIC_codes]
+        elif self.level_of_detail == 'Summary level':
+            industries_nrg.index = [i[:-2] for i in industries_nrg.index]
+            industries_nrg = industries_nrg.groupby(industries_nrg.index).sum()
+
+            industries_nrg.loc['BS11A'] += industries_nrg.loc[['BS11B', 'BS111']].sum()
+            industries_nrg.loc['BS210'] = industries_nrg.loc[['BS211', 'BS212', 'BS213']].sum()
+            industries_nrg.loc['BS220'] = industries_nrg.loc[['BS221']].sum()
+            industries_nrg.loc['BS3A0'] = industries_nrg.loc[
+                ['BS311', 'BS312', 'BS31A', 'BS31B', 'BS321', 'BS322', 'BS323',
+                 'BS324', 'BS325', 'BS326', 'BS327', 'BS331', 'BS332', 'BS333',
+                 'BS334', 'BS335', 'BS336', 'BS337', 'BS339']].sum()
+            industries_nrg.loc['BS4A0'] = industries_nrg.loc[['BS4AA', 'BS453']].sum()
+            industries_nrg.loc['BS4B0'] = industries_nrg.loc[
+                ['BS481', 'BS482', 'BS483', 'BS484', 'BS48B', 'BS486', 'BS49A', 'BS493']].sum()
+            industries_nrg.loc['BS510'] = industries_nrg.loc[['BS512', 'BS515', 'BS51B']].sum()
+            industries_nrg.loc['BS5B0'] = industries_nrg.loc[['BS52B', 'BS524', 'BS531', 'BS53B', 'BS5A0']].sum()
+            industries_nrg.loc['BS540'] = industries_nrg.loc[['BS541']].sum()
+            industries_nrg.loc['BS560'] = industries_nrg.loc[['BS561', 'BS562']].sum()
+            industries_nrg.loc['BS810'] = industries_nrg.loc[['BS811', 'BS81A', 'BS813']].sum()
+            industries_nrg.loc['FC100'] = industries_nrg.loc[['FC110', 'FC120', 'FC130']].sum()
+            industries_nrg.loc['NP000'] = industries_nrg.loc[['NP610', 'NP624', 'NP710', 'NP813', 'NPA00']].sum()
+            industries_nrg.loc['GS610'] = industries_nrg.loc[['GS611']].sum()
+            industries_nrg.loc['GS620'] = industries_nrg.loc[['GS622', 'GS623']].sum()
+
+            industries_nrg = industries_nrg.reindex(IOIC_codes).fillna(0)
+        elif self.level_of_detail == 'Detail level':
+            key_changes = dict.fromkeys(industries_nrg.index, '')
+            for key in key_changes:
+                if key + '0' in IOIC_codes:
+                    key_changes[key] = key + '0'
+
+            # economic allocations. Be my guest if you wanna verify :)
+            industries_nrg.loc['BS111A00'] = 0.55 * industries_nrg.loc['BS11B00']
+            industries_nrg.loc['BS1114A0'] = 0.05 * industries_nrg.loc['BS11B00']
+            industries_nrg.loc['BS112A00'] = 0.38 * industries_nrg.loc['BS11B00']
+            industries_nrg.loc['BS112500'] = 0.02 * industries_nrg.loc['BS11B00']
+            industries_nrg.loc['BS115A00'] = 0.39 * industries_nrg.loc['BS11500']
+            industries_nrg.loc['BS115300'] = 0.61 * industries_nrg.loc['BS11500']
+            industries_nrg.loc['BS211110'] = 0.5 * industries_nrg.loc['BS21100']
+            industries_nrg.loc['BS211140'] = 0.5 * industries_nrg.loc['BS21100']
+            industries_nrg.loc['BS212210'] = 0.15 * industries_nrg.loc['BS21220']
+            industries_nrg.loc['BS212220'] = 0.35 * industries_nrg.loc['BS21220']
+            industries_nrg.loc['BS212230'] = 0.4 * industries_nrg.loc['BS21220']
+            industries_nrg.loc['BS212290'] = 0.1 * industries_nrg.loc['BS21220']
+            industries_nrg.loc['BS212310'] = 0.16 * industries_nrg.loc['BS21230']
+            industries_nrg.loc['BS212320'] = 0.15 * industries_nrg.loc['BS21230']
+            industries_nrg.loc['BS212392'] = 0.18 * industries_nrg.loc['BS21230']
+            industries_nrg.loc['BS21239A'] = 0.13 * industries_nrg.loc['BS21230']
+            industries_nrg.loc['BS212396'] = 0.38 * industries_nrg.loc['BS21230']
+            industries_nrg.loc['BS21311A'] = 0.73 * industries_nrg.loc['BS21300']
+            industries_nrg.loc['BS21311B'] = 0.27 * industries_nrg.loc['BS21300']
+            industries_nrg.loc['BS221200'] = 0.9 * industries_nrg.loc['BS221A0']
+            industries_nrg.loc['BS221300'] = 0.1 * industries_nrg.loc['BS221A0']
+            industries_nrg.loc['BS311200'] = 0.35 * industries_nrg.loc['BS311A0']
+            industries_nrg.loc['BS311800'] = 0.31 * industries_nrg.loc['BS311A0']
+            industries_nrg.loc['BS311900'] = 0.33 * industries_nrg.loc['BS311A0']
+            industries_nrg.loc['BS321100'] = 0.52 * industries_nrg.loc['BS32100']
+            industries_nrg.loc['BS321200'] = 0.22 * industries_nrg.loc['BS32100']
+            industries_nrg.loc['BS321900'] = 0.26 * industries_nrg.loc['BS32100']
+            industries_nrg.loc['BS324110'] = 0.91 * industries_nrg.loc['BS32400']
+            industries_nrg.loc['BS3241A0'] = 0.09 * industries_nrg.loc['BS32400']
+            industries_nrg.loc['BS325200'] = 0.43 * industries_nrg.loc['BS325C0']
+            industries_nrg.loc['BS325500'] = 0.13 * industries_nrg.loc['BS325C0']
+            industries_nrg.loc['BS325600'] = 0.20 * industries_nrg.loc['BS325C0']
+            industries_nrg.loc['BS325900'] = 0.23 * industries_nrg.loc['BS325C0']
+            industries_nrg.loc['BS331100'] = 0.17 * industries_nrg.loc['BS33100']
+            industries_nrg.loc['BS331200'] = 0.07 * industries_nrg.loc['BS33100']
+            industries_nrg.loc['BS331300'] = 0.18 * industries_nrg.loc['BS33100']
+            industries_nrg.loc['BS331400'] = 0.54 * industries_nrg.loc['BS33100']
+            industries_nrg.loc['BS331500'] = 0.04 * industries_nrg.loc['BS33100']
+            industries_nrg.loc['BS332100'] = 0.04 * industries_nrg.loc['BS33200']
+            industries_nrg.loc['BS332A00'] = 0.16 * industries_nrg.loc['BS33200']
+            industries_nrg.loc['BS332300'] = 0.41 * industries_nrg.loc['BS33200']
+            industries_nrg.loc['BS332400'] = 0.1 * industries_nrg.loc['BS33200']
+            industries_nrg.loc['BS332500'] = 0.05 * industries_nrg.loc['BS33200']
+            industries_nrg.loc['BS332600'] = 0.03 * industries_nrg.loc['BS33200']
+            industries_nrg.loc['BS332700'] = 0.16 * industries_nrg.loc['BS33200']
+            industries_nrg.loc['BS332800'] = 0.06 * industries_nrg.loc['BS33200']
+            industries_nrg.loc['BS333100'] = 0.25 * industries_nrg.loc['BS33300']
+            industries_nrg.loc['BS333200'] = 0.12 * industries_nrg.loc['BS33300']
+            industries_nrg.loc['BS333300'] = 0.14 * industries_nrg.loc['BS33300']
+            industries_nrg.loc['BS333400'] = 0.10 * industries_nrg.loc['BS33300']
+            industries_nrg.loc['BS333500'] = 0.12 * industries_nrg.loc['BS33300']
+            industries_nrg.loc['BS333600'] = 0.04 * industries_nrg.loc['BS33300']
+            industries_nrg.loc['BS333900'] = 0.22 * industries_nrg.loc['BS33300']
+            industries_nrg.loc['BS334200'] = 0.25 * industries_nrg.loc['BS334B0']
+            industries_nrg.loc['BS334A00'] = 0.46 * industries_nrg.loc['BS334B0']
+            industries_nrg.loc['BS334400'] = 0.29 * industries_nrg.loc['BS334B0']
+            industries_nrg.loc['BS335100'] = 0.12 * industries_nrg.loc['BS335A0']
+            industries_nrg.loc['BS335300'] = 0.49 * industries_nrg.loc['BS335A0']
+            industries_nrg.loc['BS335900'] = 0.39 * industries_nrg.loc['BS335A0']
+            industries_nrg.loc['BS336110'] = 0.96 * industries_nrg.loc['BS33610']
+            industries_nrg.loc['BS336120'] = 0.04 * industries_nrg.loc['BS33610']
+            industries_nrg.loc['BS336310'] = 0.17 * industries_nrg.loc['BS33630']
+            industries_nrg.loc['BS336320'] = 0.05 * industries_nrg.loc['BS33630']
+            industries_nrg.loc['BS336330'] = 0.07 * industries_nrg.loc['BS33630']
+            industries_nrg.loc['BS336340'] = 0.02 * industries_nrg.loc['BS33630']
+            industries_nrg.loc['BS336350'] = 0.13 * industries_nrg.loc['BS33630']
+            industries_nrg.loc['BS336360'] = 0.19 * industries_nrg.loc['BS33630']
+            industries_nrg.loc['BS336370'] = 0.20 * industries_nrg.loc['BS33630']
+            industries_nrg.loc['BS336390'] = 0.17 * industries_nrg.loc['BS33630']
+            industries_nrg.loc['BS337100'] = 0.54 * industries_nrg.loc['BS33700']
+            industries_nrg.loc['BS337200'] = 0.36 * industries_nrg.loc['BS33700']
+            industries_nrg.loc['BS337900'] = 0.1 * industries_nrg.loc['BS33700']
+            industries_nrg.loc['BS339100'] = 0.28 * industries_nrg.loc['BS33900']
+            industries_nrg.loc['BS339900'] = 0.72 * industries_nrg.loc['BS33900']
+            industries_nrg.loc['BS411000'] = 0.02 * industries_nrg.loc['BS41000']
+            industries_nrg.loc['BS412000'] = 0.04 * industries_nrg.loc['BS41000']
+            industries_nrg.loc['BS413000'] = 0.13 * industries_nrg.loc['BS41000']
+            industries_nrg.loc['BS414000'] = 0.17 * industries_nrg.loc['BS41000']
+            industries_nrg.loc['BS415000'] = 0.12 * industries_nrg.loc['BS41000']
+            industries_nrg.loc['BS416000'] = 0.14 * industries_nrg.loc['BS41000']
+            industries_nrg.loc['BS417000'] = 0.23 * industries_nrg.loc['BS41000']
+            industries_nrg.loc['BS418000'] = 0.12 * industries_nrg.loc['BS41000']
+            industries_nrg.loc['BS419000'] = 0.03 * industries_nrg.loc['BS41000']
+            industries_nrg.loc['BS441000'] = 0.16 * industries_nrg.loc['BS4AA00']
+            industries_nrg.loc['BS442000'] = 0.05 * industries_nrg.loc['BS4AA00']
+            industries_nrg.loc['BS443000'] = 0.03 * industries_nrg.loc['BS4AA00']
+            industries_nrg.loc['BS444000'] = 0.08 * industries_nrg.loc['BS4AA00']
+            industries_nrg.loc['BS445000'] = 0.19 * industries_nrg.loc['BS4AA00']
+            industries_nrg.loc['BS446000'] = 0.11 * industries_nrg.loc['BS4AA00']
+            industries_nrg.loc['BS447000'] = 0.06 * industries_nrg.loc['BS4AA00']
+            industries_nrg.loc['BS448000'] = 0.11 * industries_nrg.loc['BS4AA00']
+            industries_nrg.loc['BS451000'] = 0.03 * industries_nrg.loc['BS4AA00']
+            industries_nrg.loc['BS452000'] = 0.1 * industries_nrg.loc['BS4AA00']
+            industries_nrg.loc['BS453A00'] = 0.04 * industries_nrg.loc['BS4AA00']
+            industries_nrg.loc['BS454000'] = 0.04 * industries_nrg.loc['BS4AA00']
+            industries_nrg.loc['BS486A00'] = 0.51 * industries_nrg.loc['BS48600']
+            industries_nrg.loc['BS486200'] = 0.49 * industries_nrg.loc['BS48600']
+            industries_nrg.loc['BS485100'] = 0.11 * industries_nrg.loc['BS48B00']
+            industries_nrg.loc['BS48A000'] = 0.09 * industries_nrg.loc['BS48B00']
+            industries_nrg.loc['BS485300'] = 0.06 * industries_nrg.loc['BS48B00']
+            industries_nrg.loc['BS488000'] = 0.75 * industries_nrg.loc['BS48B00']
+            industries_nrg.loc['BS491000'] = 0.34 * industries_nrg.loc['BS49A00']
+            industries_nrg.loc['BS492000'] = 0.66 * industries_nrg.loc['BS49A00']
+            industries_nrg.loc['BS5121A0'] = 0.77 * industries_nrg.loc['BS51200']
+            industries_nrg.loc['BS512130'] = 0.14 * industries_nrg.loc['BS51200']
+            industries_nrg.loc['BS512200'] = 0.08 * industries_nrg.loc['BS51200']
+            industries_nrg.loc['BS511110'] = 0.04 * industries_nrg.loc['BS51B00']
+            industries_nrg.loc['BS5111A0'] = 0.05 * industries_nrg.loc['BS51B00']
+            industries_nrg.loc['BS511200'] = 0.11 * industries_nrg.loc['BS51B00']
+            industries_nrg.loc['BS515200'] = 0.05 * industries_nrg.loc['BS51B00']
+            industries_nrg.loc['BS517000'] = 0.66 * industries_nrg.loc['BS51B00']
+            industries_nrg.loc['BS518000'] = 0.06 * industries_nrg.loc['BS51B00']
+            industries_nrg.loc['BS519000'] = 0.04 * industries_nrg.loc['BS51B00']
+            industries_nrg.loc['BS521000'] = 0.002 * industries_nrg.loc['BS52B00']
+            industries_nrg.loc['BS5221A0'] = 0.469 * industries_nrg.loc['BS52B00']
+            industries_nrg.loc['BS522130'] = 0.042 * industries_nrg.loc['BS52B00']
+            industries_nrg.loc['BS522200'] = 0.067 * industries_nrg.loc['BS52B00']
+            industries_nrg.loc['BS522300'] = 0.031 * industries_nrg.loc['BS52B00']
+            industries_nrg.loc['BS52A000'] = 0.306 * industries_nrg.loc['BS52B00']
+            industries_nrg.loc['BS524200'] = 0.082 * industries_nrg.loc['BS52B00']
+            industries_nrg.loc['BS532100'] = 0.28 * industries_nrg.loc['BS53B00']
+            industries_nrg.loc['BS532A00'] = 0.56 * industries_nrg.loc['BS53B00']
+            industries_nrg.loc['BS533000'] = 0.16 * industries_nrg.loc['BS53B00']
+            industries_nrg.loc['BS541100'] = 0.26 * industries_nrg.loc['BS541C0']
+            industries_nrg.loc['BS541200'] = 0.26 * industries_nrg.loc['BS541C0']
+            industries_nrg.loc['BS541300'] = 0.48 * industries_nrg.loc['BS541C0']
+            industries_nrg.loc['BS541400'] = 0.03 * industries_nrg.loc['BS541D0']
+            industries_nrg.loc['BS541500'] = 0.52 * industries_nrg.loc['BS541D0']
+            industries_nrg.loc['BS541600'] = 0.21 * industries_nrg.loc['BS541D0']
+            industries_nrg.loc['BS541700'] = 0.08 * industries_nrg.loc['BS541D0']
+            industries_nrg.loc['BS541900'] = 0.16 * industries_nrg.loc['BS541D0']
+            industries_nrg.loc['BS561100'] = 0.18 * industries_nrg.loc['BS56100']
+            industries_nrg.loc['BS561A00'] = 0.16 * industries_nrg.loc['BS56100']
+            industries_nrg.loc['BS561300'] = 0.17 * industries_nrg.loc['BS56100']
+            industries_nrg.loc['BS561400'] = 0.11 * industries_nrg.loc['BS56100']
+            industries_nrg.loc['BS561500'] = 0.07 * industries_nrg.loc['BS56100']
+            industries_nrg.loc['BS561600'] = 0.09 * industries_nrg.loc['BS56100']
+            industries_nrg.loc['BS561700'] = 0.23 * industries_nrg.loc['BS56100']
+            industries_nrg.loc['BS531A00'] = 0.62 * industries_nrg.loc['BS5A000']
+            industries_nrg.loc['BS551113'] = 0.38 * industries_nrg.loc['BS5A000']
+            industries_nrg.loc['BS621100'] = 0.44 * industries_nrg.loc['BS62000']
+            industries_nrg.loc['BS621200'] = 0.21 * industries_nrg.loc['BS62000']
+            industries_nrg.loc['BS621A00'] = 0.17 * industries_nrg.loc['BS62000']
+            industries_nrg.loc['BS623000'] = 0.11 * industries_nrg.loc['BS62000']
+            industries_nrg.loc['BS624000'] = 0.07 * industries_nrg.loc['BS62000']
+            industries_nrg.loc['BS71A000'] = 0.37 * industries_nrg.loc['BS71000']
+            industries_nrg.loc['BS713A00'] = 0.37 * industries_nrg.loc['BS71000']
+            industries_nrg.loc['BS713200'] = 0.26 * industries_nrg.loc['BS71000']
+            industries_nrg.loc['BS721100'] = 0.19 * industries_nrg.loc['BS72000']
+            industries_nrg.loc['BS721A00'] = 0.03 * industries_nrg.loc['BS72000']
+            industries_nrg.loc['BS722000'] = 0.78 * industries_nrg.loc['BS72000']
+            industries_nrg.loc['BS811100'] = 0.53 * industries_nrg.loc['BS81100']
+            industries_nrg.loc['BS811A00'] = 0.47 * industries_nrg.loc['BS81100']
+            industries_nrg.loc['BS812A00'] = 0.59 * industries_nrg.loc['BS81A00']
+            industries_nrg.loc['BS812200'] = 0.11 * industries_nrg.loc['BS81A00']
+            industries_nrg.loc['BS812300'] = 0.12 * industries_nrg.loc['BS81A00']
+            industries_nrg.loc['BS814000'] = 0.18 * industries_nrg.loc['BS81A00']
+            industries_nrg.loc['FC210000'] = 0.5 * industries_nrg.loc['FC20000']
+            industries_nrg.loc['FC220000'] = 0.5 * industries_nrg.loc['FC20000']
+            industries_nrg.loc['NP621000'] = 0.09 * industries_nrg.loc['NPA0000']
+            industries_nrg.loc['NP813A00'] = 0.65 * industries_nrg.loc['NPA0000']
+            industries_nrg.loc['NP999999'] = 0.26 * industries_nrg.loc['NPA0000']
+            industries_nrg.loc['GS611100'] = 0.83 * industries_nrg.loc['GS611B0']
+            industries_nrg.loc['GS611200'] = 0.16 * industries_nrg.loc['GS611B0']
+            industries_nrg.loc['GS611A00'] = 0.01 * industries_nrg.loc['GS611B0']
+            industries_nrg.loc['GS911100'] = 0.27 * industries_nrg.loc['GS91100']
+            industries_nrg.loc['GS911A00'] = 0.73 * industries_nrg.loc['GS91100']
+
+            new_index = []
+            for code in industries_nrg.index:
+                if code in key_changes:
+                    if key_changes[code] != '':
+                        new_index.append(key_changes[code])
+                    else:
+                        new_index.append(code)
+                else:
+                    new_index.append(code)
+
+            industries_nrg.index = new_index
+            industries_nrg = industries_nrg.loc[IOIC_codes]
+
+        industries_nrg.index = [i[1] for i in self.industries]
+        industries_nrg.name = ('Energy use', '')
+        self.F = self.F.append(industries_nrg)
+
+        self.emission_metadata.loc[('Energy use', ''), 'CAS Number'] = 'N/A'
+        self.emission_metadata.loc[('Energy use', ''), 'Unit'] = 'TJ'
+
+        # ---------------------Water use-------------------------
+
+        if self.level_of_detail == 'Link-1961 level':
+            industries_water.loc['BS11B00'] = 0.93 * (industries_water.loc['BS111'] + industries_water.loc['BS112'])
+            industries_water.loc['BS111CL'] = 0.01 * (industries_water.loc['BS111'] + industries_water.loc['BS112'])
+            industries_water.loc['BS111CU'] = 0.06 * (industries_water.loc['BS111'] + industries_water.loc['BS112'])
+            industries_water.loc['BS31110'] = 0.08 * industries_water.loc['BS311']
+            industries_water.loc['BS31130'] = 0.04 * industries_water.loc['BS311']
+            industries_water.loc['BS31140'] = 0.07 * industries_water.loc['BS311']
+            industries_water.loc['BS31150'] = 0.15 * industries_water.loc['BS311']
+            industries_water.loc['BS31160'] = 0.28 * industries_water.loc['BS311']
+            industries_water.loc['BS31170'] = 0.06 * industries_water.loc['BS311']
+            industries_water.loc['BS311A0'] = 0.32 * industries_water.loc['BS311']
+            industries_water.loc['BS31211'] = 0.30 * industries_water.loc['BS312']
+            industries_water.loc['BS31212'] = 0.40 * industries_water.loc['BS312']
+            industries_water.loc['BS3121A'] = 0.16 * industries_water.loc['BS312']
+            industries_water.loc['BS31220'] = 0.14 * industries_water.loc['BS312']
+            industries_water.loc['BS31A00'] = industries_water.loc['BS31A']
+            industries_water.loc['BS31B00'] = industries_water.loc['BS31B']
+            industries_water.loc['BS32100'] = industries_water.loc['BS321']
+            industries_water.loc['BS32210'] = 0.62 * industries_water.loc['BS322']
+            industries_water.loc['BS32220'] = 0.38 * industries_water.loc['BS322']
+            industries_water.loc['BS32300'] = industries_water.loc['BS323']
+            industries_water.loc['BS32400'] = industries_water.loc['BS324']
+            industries_water.loc['BS32510'] = 0.27 * industries_water.loc['BS325']
+            industries_water.loc['BS32530'] = 0.10 * industries_water.loc['BS325']
+            industries_water.loc['BS32540'] = 0.23 * industries_water.loc['BS325']
+            industries_water.loc['BS325C0'] = 0.40 * industries_water.loc['BS325']
+            industries_water.loc['BS32610'] = 0.83 * industries_water.loc['BS326']
+            industries_water.loc['BS32620'] = 0.17 * industries_water.loc['BS326']
+            industries_water.loc['BS327A0'] = 0.38 * industries_water.loc['BS327']
+            industries_water.loc['BS32730'] = 0.62 * industries_water.loc['BS327']
+            industries_water.loc['BS33100'] = industries_water.loc['BS331']
+            industries_water.loc['BS33200'] = industries_water.loc['BS332']
+            industries_water.loc['BS33300'] = industries_water.loc['BS333']
+            industries_water.loc['BS33410'] = 0.05 * industries_water.loc['BS334']
+            industries_water.loc['BS334B0'] = 0.95 * industries_water.loc['BS334']
+            industries_water.loc['BS335A0'] = 0.95 * industries_water.loc['BS335']
+            industries_water.loc['BS33520'] = 0.05 * industries_water.loc['BS335']
+            industries_water.loc['BS33610'] = 0.50 * industries_water.loc['BS336']
+            industries_water.loc['BS33620'] = 0.02 * industries_water.loc['BS336']
+            industries_water.loc['BS33630'] = 0.24 * industries_water.loc['BS336']
+            industries_water.loc['BS33640'] = 0.17 * industries_water.loc['BS336']
+            industries_water.loc['BS33650'] = 0.02 * industries_water.loc['BS336']
+            industries_water.loc['BS33660'] = 0.02 * industries_water.loc['BS336']
+            industries_water.loc['BS33690'] = 0.04 * industries_water.loc['BS336']
+            industries_water.loc['BS33700'] = industries_water.loc['BS337']
+            industries_water.loc['BS33900'] = industries_water.loc['BS339']
+            industries_water.loc['BS4AA00'] = 0.99 * industries_water.loc['BS4A000']
+            industries_water.loc['BS453BL'] = 0 * industries_water.loc['BS4A000']
+            industries_water.loc['BS453BU'] = 0.01 * industries_water.loc['BS4A000']
+
+            industries_water = industries_water.loc[IOIC_codes]
+        elif self.level_of_detail == 'Link-1997 level':
+
+            key_changes = dict.fromkeys(industries_water.index, '')
+            for key in key_changes:
+                if key + '0' in IOIC_codes:
+                    key_changes[key] = key + '0'
+
+            industries_water.loc['BS111A00'] = 0.81 * industries_water.loc['BS111']
+            industries_water.loc['BS1114A0'] = 0.08 * industries_water.loc['BS111']
+            industries_water.loc['BS111CL0'] = 0.01 * industries_water.loc['BS111']
+            industries_water.loc['BS111CU0'] = 0.1 * industries_water.loc['BS111']
+            industries_water.loc['BS112000'] = industries_water.loc['BS112']
+            industries_water.loc['BS212210'] = 0.15 * industries_water.loc['BS21220']
+            industries_water.loc['BS212220'] = 0.35 * industries_water.loc['BS21220']
+            industries_water.loc['BS212230'] = 0.4 * industries_water.loc['BS21220']
+            industries_water.loc['BS212290'] = 0.1 * industries_water.loc['BS21220']
+            industries_water.loc['BS212310'] = 0.16 * industries_water.loc['BS21230']
+            industries_water.loc['BS212320'] = 0.15 * industries_water.loc['BS21230']
+            industries_water.loc['BS212392'] = 0.18 * industries_water.loc['BS21230']
+            industries_water.loc['BS21239A'] = 0.13 * industries_water.loc['BS21230']
+            industries_water.loc['BS212396'] = 0.38 * industries_water.loc['BS21230']
+            industries_water.loc['BS221200'] = 0.9 * industries_water.loc['BS221A0']
+            industries_water.loc['BS221300'] = 0.1 * industries_water.loc['BS221A0']
+            industries_water.loc['BS311100'] = 0.08 * industries_water.loc['BS311']
+            industries_water.loc['BS311200'] = 0.11 * industries_water.loc['BS311']
+            industries_water.loc['BS311300'] = 0.04 * industries_water.loc['BS311']
+            industries_water.loc['BS311400'] = 0.07 * industries_water.loc['BS311']
+            industries_water.loc['BS311500'] = 0.15 * industries_water.loc['BS311']
+            industries_water.loc['BS311600'] = 0.28 * industries_water.loc['BS311']
+            industries_water.loc['BS311700'] = 0.06 * industries_water.loc['BS311']
+            industries_water.loc['BS311800'] = 0.10 * industries_water.loc['BS311']
+            industries_water.loc['BS311900'] = 0.10 * industries_water.loc['BS311']
+            industries_water.loc['BS312110'] = 0.30 * industries_water.loc['BS312']
+            industries_water.loc['BS312120'] = 0.40 * industries_water.loc['BS312']
+            industries_water.loc['BS3121A0'] = 0.16 * industries_water.loc['BS312']
+            industries_water.loc['BS312200'] = 0.14 * industries_water.loc['BS312']
+            industries_water.loc['BS31A000'] = industries_water.loc['BS31A']
+            industries_water.loc['BS31B000'] = industries_water.loc['BS31B']
+            industries_water.loc['BS321100'] = 0.52 * industries_water.loc['BS321']
+            industries_water.loc['BS321200'] = 0.21 * industries_water.loc['BS321']
+            industries_water.loc['BS321900'] = 0.27 * industries_water.loc['BS321']
+            industries_water.loc['BS322100'] = 0.62 * industries_water.loc['BS322']
+            industries_water.loc['BS322200'] = 0.38 * industries_water.loc['BS322']
+            industries_water.loc['BS323000'] = industries_water.loc['BS323']
+            industries_water.loc['BS324000'] = industries_water.loc['BS324']
+            industries_water.loc['BS325100'] = 0.27 * industries_water.loc['BS325']
+            industries_water.loc['BS325B00'] = 0.22 * industries_water.loc['BS325']
+            industries_water.loc['BS325300'] = 0.10 * industries_water.loc['BS325']
+            industries_water.loc['BS325400'] = 0.23 * industries_water.loc['BS325']
+            industries_water.loc['BS325600'] = 0.08 * industries_water.loc['BS325']
+            industries_water.loc['BS325900'] = 0.09 * industries_water.loc['BS325']
+            industries_water.loc['BS326100'] = 0.83 * industries_water.loc['BS326']
+            industries_water.loc['BS326200'] = 0.17 * industries_water.loc['BS326']
+            industries_water.loc['BS327A00'] = 0.38 * industries_water.loc['BS327']
+            industries_water.loc['BS327300'] = 0.62 * industries_water.loc['BS327']
+            industries_water.loc['BS331100'] = 0.17 * industries_water.loc['BS331']
+            industries_water.loc['BS331200'] = 0.07 * industries_water.loc['BS331']
+            industries_water.loc['BS331300'] = 0.18 * industries_water.loc['BS331']
+            industries_water.loc['BS331400'] = 0.54 * industries_water.loc['BS331']
+            industries_water.loc['BS331500'] = 0.04 * industries_water.loc['BS331']
+            industries_water.loc['BS332100'] = 0.04 * industries_water.loc['BS332']
+            industries_water.loc['BS332A00'] = 0.16 * industries_water.loc['BS332']
+            industries_water.loc['BS332300'] = 0.41 * industries_water.loc['BS332']
+            industries_water.loc['BS332400'] = 0.10 * industries_water.loc['BS332']
+            industries_water.loc['BS332500'] = 0.05 * industries_water.loc['BS332']
+            industries_water.loc['BS332600'] = 0.03 * industries_water.loc['BS332']
+            industries_water.loc['BS332700'] = 0.16 * industries_water.loc['BS332']
+            industries_water.loc['BS332800'] = 0.06 * industries_water.loc['BS332']
+            industries_water.loc['BS333100'] = 0.25 * industries_water.loc['BS333']
+            industries_water.loc['BS333A00'] = 0.26 * industries_water.loc['BS333']
+            industries_water.loc['BS333400'] = 0.10 * industries_water.loc['BS333']
+            industries_water.loc['BS333500'] = 0.12 * industries_water.loc['BS333']
+            industries_water.loc['BS333600'] = 0.04 * industries_water.loc['BS333']
+            industries_water.loc['BS333900'] = 0.22 * industries_water.loc['BS333']
+            industries_water.loc['BS334100'] = 0.04 * industries_water.loc['BS334']
+            industries_water.loc['BS334200'] = 0.24 * industries_water.loc['BS334']
+            industries_water.loc['BS334A00'] = 0.44 * industries_water.loc['BS334']
+            industries_water.loc['BS334400'] = 0.27 * industries_water.loc['BS334']
+            industries_water.loc['BS335100'] = 0.11 * industries_water.loc['BS335']
+            industries_water.loc['BS335200'] = 0.05 * industries_water.loc['BS335']
+            industries_water.loc['BS335300'] = 0.46 * industries_water.loc['BS335']
+            industries_water.loc['BS335900'] = 0.37 * industries_water.loc['BS335']
+            industries_water.loc['BS336100'] = 0.50 * industries_water.loc['BS336']
+            industries_water.loc['BS336200'] = 0.02 * industries_water.loc['BS336']
+            industries_water.loc['BS336300'] = 0.24 * industries_water.loc['BS336']
+            industries_water.loc['BS336400'] = 0.17 * industries_water.loc['BS336']
+            industries_water.loc['BS336500'] = 0.02 * industries_water.loc['BS336']
+            industries_water.loc['BS336600'] = 0.02 * industries_water.loc['BS336']
+            industries_water.loc['BS336900'] = 0.04 * industries_water.loc['BS336']
+            industries_water.loc['BS337100'] = 0.54 * industries_water.loc['BS337']
+            industries_water.loc['BS337200'] = 0.36 * industries_water.loc['BS337']
+            industries_water.loc['BS337900'] = 0.10 * industries_water.loc['BS337']
+            industries_water.loc['BS339100'] = 0.28 * industries_water.loc['BS339']
+            industries_water.loc['BS339900'] = 0.72 * industries_water.loc['BS339']
+            industries_water.loc['BS4AA000'] = 0.99 * industries_water.loc['BS4A000']
+            industries_water.loc['BS453BL0'] = 0 * industries_water.loc['BS4A000']
+            industries_water.loc['BS453BU0'] = 0.01 * industries_water.loc['BS4A000']
+            industries_water.loc['BS485100'] = 0.11 * industries_water.loc['BS48B00']
+            industries_water.loc['BS48A000'] = 0.09 * industries_water.loc['BS48B00']
+            industries_water.loc['BS485300'] = 0.06 * industries_water.loc['BS48B00']
+            industries_water.loc['BS488000'] = 0.75 * industries_water.loc['BS48B00']
+            industries_water.loc['BS486A00'] = 0.51 * industries_water.loc['BS48600']
+            industries_water.loc['BS486200'] = 0.49 * industries_water.loc['BS48600']
+            industries_water.loc['BS5121A0'] = 0.77 * industries_water.loc['BS51200']
+            industries_water.loc['BS512130'] = 0.14 * industries_water.loc['BS51200']
+            industries_water.loc['BS512200'] = 0.08 * industries_water.loc['BS51200']
+            industries_water.loc['BS511100'] = 0.09 * industries_water.loc['BS51B00']
+            industries_water.loc['BS511200'] = 0.11 * industries_water.loc['BS51B00']
+            industries_water.loc['BS51A000'] = 0.74 * industries_water.loc['BS51B00']
+            industries_water.loc['BS518000'] = 0.06 * industries_water.loc['BS51B00']
+            industries_water.loc['BS521000'] = 0.002 * industries_water.loc['BS52B00']
+            industries_water.loc['BS5221A0'] = 0.469 * industries_water.loc['BS52B00']
+            industries_water.loc['BS522130'] = 0.042 * industries_water.loc['BS52B00']
+            industries_water.loc['BS522A00'] = 0.099 * industries_water.loc['BS52B00']
+            industries_water.loc['BS52A000'] = 0.306 * industries_water.loc['BS52B00']
+            industries_water.loc['BS524200'] = 0.082 * industries_water.loc['BS52B00']
+            industries_water.loc['BS532100'] = 0.28 * industries_water.loc['BS53B00']
+            industries_water.loc['BS53A000'] = 0.72 * industries_water.loc['BS53B00']
+            industries_water.loc['BS531A00'] = 0.62 * industries_water.loc['BS5A000']
+            industries_water.loc['BS551113'] = 0.38 * industries_water.loc['BS5A000']
+            industries_water.loc['BS541100'] = 0.26 * industries_water.loc['BS541C0']
+            industries_water.loc['BS541200'] = 0.26 * industries_water.loc['BS541C0']
+            industries_water.loc['BS541300'] = 0.48 * industries_water.loc['BS541C0']
+            industries_water.loc['BS541400'] = 0.03 * industries_water.loc['BS541D0']
+            industries_water.loc['BS541500'] = 0.52 * industries_water.loc['BS541D0']
+            industries_water.loc['BS541600'] = 0.21 * industries_water.loc['BS541D0']
+            industries_water.loc['BS541700'] = 0.08 * industries_water.loc['BS541D0']
+            industries_water.loc['BS541900'] = 0.16 * industries_water.loc['BS541D0']
+            industries_water.loc['BS561100'] = 0.18 * industries_water.loc['BS56100']
+            industries_water.loc['BS561A00'] = 0.16 * industries_water.loc['BS56100']
+            industries_water.loc['BS561300'] = 0.17 * industries_water.loc['BS56100']
+            industries_water.loc['BS561400'] = 0.11 * industries_water.loc['BS56100']
+            industries_water.loc['BS561500'] = 0.07 * industries_water.loc['BS56100']
+            industries_water.loc['BS561600'] = 0.09 * industries_water.loc['BS56100']
+            industries_water.loc['BS561700'] = 0.23 * industries_water.loc['BS56100']
+            industries_water.loc['BS621100'] = 0.44 * industries_water.loc['BS62000']
+            industries_water.loc['BS621200'] = 0.21 * industries_water.loc['BS62000']
+            industries_water.loc['BS621A00'] = 0.17 * industries_water.loc['BS62000']
+            industries_water.loc['BS623000'] = 0.11 * industries_water.loc['BS62000']
+            industries_water.loc['BS624000'] = 0.07 * industries_water.loc['BS62000']
+            industries_water.loc['BS71A000'] = 0.37 * industries_water.loc['BS71000']
+            industries_water.loc['BS713A00'] = 0.37 * industries_water.loc['BS71000']
+            industries_water.loc['BS713200'] = 0.26 * industries_water.loc['BS71000']
+            industries_water.loc['BS721100'] = 0.19 * industries_water.loc['BS72000']
+            industries_water.loc['BS721A00'] = 0.03 * industries_water.loc['BS72000']
+            industries_water.loc['BS722000'] = 0.78 * industries_water.loc['BS72000']
+            industries_water.loc['BS811100'] = 0.53 * industries_water.loc['BS81100']
+            industries_water.loc['BS811A00'] = 0.47 * industries_water.loc['BS81100']
+            industries_water.loc['BS812A00'] = 0.59 * industries_water.loc['BS81A00']
+            industries_water.loc['BS812200'] = 0.11 * industries_water.loc['BS81A00']
+            industries_water.loc['BS812300'] = 0.12 * industries_water.loc['BS81A00']
+            industries_water.loc['BS814000'] = 0.18 * industries_water.loc['BS81A00']
+            industries_water.loc['GS611100'] = 0.83 * industries_water.loc['GS611B0']
+            industries_water.loc['GS611200'] = 0.16 * industries_water.loc['GS611B0']
+            industries_water.loc['GS611A00'] = 0.01 * industries_water.loc['GS611B0']
+            industries_water.loc['GS911100'] = 0.27 * industries_water.loc['GS91100']
+            industries_water.loc['GS911A00'] = 0.73 * industries_water.loc['GS91100']
+
+            new_index = []
+            for code in industries_water.index:
+                if code in key_changes:
+                    if key_changes[code] != '':
+                        new_index.append(key_changes[code])
+                    else:
+                        new_index.append(code)
+                else:
+                    new_index.append(code)
+
+            industries_water.index = new_index
+            # add sectors for which water accounts are zero
+            industries_water = pd.concat([industries_water,
+                                          pd.Series(0, [i for i in IOIC_codes if i not in industries_water.index])])
+            industries_water = industries_water.loc[IOIC_codes]
+        elif self.level_of_detail == 'Detail level':
+
+            key_changes = dict.fromkeys(industries_water.index, '')
+            for key in key_changes:
+                if key + '0' in IOIC_codes:
+                    key_changes[key] = key + '0'
+
+            industries_water.loc['BS111A00'] = 0.81 * industries_water.loc['BS111']
+            industries_water.loc['BS1114A0'] = 0.08 * industries_water.loc['BS111']
+            industries_water.loc['BS111CL0'] = 0.01 * industries_water.loc['BS111']
+            industries_water.loc['BS111CU0'] = 0.1 * industries_water.loc['BS111']
+            industries_water.loc['BS112A00'] = 0.95 * industries_water.loc['BS112']
+            industries_water.loc['BS112500'] = 0.05 * industries_water.loc['BS112']
+            industries_water.loc['BS211110'] = 0.5 * industries_water.loc['BS21100']
+            industries_water.loc['BS211140'] = 0.5 * industries_water.loc['BS21100']
+            industries_water.loc['BS212210'] = 0.15 * industries_water.loc['BS21220']
+            industries_water.loc['BS212220'] = 0.35 * industries_water.loc['BS21220']
+            industries_water.loc['BS212230'] = 0.4 * industries_water.loc['BS21220']
+            industries_water.loc['BS212290'] = 0.1 * industries_water.loc['BS21220']
+            industries_water.loc['BS212310'] = 0.16 * industries_water.loc['BS21230']
+            industries_water.loc['BS212320'] = 0.15 * industries_water.loc['BS21230']
+            industries_water.loc['BS212392'] = 0.18 * industries_water.loc['BS21230']
+            industries_water.loc['BS21239A'] = 0.13 * industries_water.loc['BS21230']
+            industries_water.loc['BS212396'] = 0.38 * industries_water.loc['BS21230']
+            industries_water.loc['BS21311A'] = 0.73 * industries_water.loc['BS21300']
+            industries_water.loc['BS21311B'] = 0.27 * industries_water.loc['BS21300']
+            industries_water.loc['BS221200'] = 0.9 * industries_water.loc['BS221A0']
+            industries_water.loc['BS221300'] = 0.1 * industries_water.loc['BS221A0']
+            industries_water.loc['BS311100'] = 0.08 * industries_water.loc['BS311']
+            industries_water.loc['BS311200'] = 0.11 * industries_water.loc['BS311']
+            industries_water.loc['BS311300'] = 0.04 * industries_water.loc['BS311']
+            industries_water.loc['BS311400'] = 0.07 * industries_water.loc['BS311']
+            industries_water.loc['BS311500'] = 0.15 * industries_water.loc['BS311']
+            industries_water.loc['BS311600'] = 0.28 * industries_water.loc['BS311']
+            industries_water.loc['BS311700'] = 0.06 * industries_water.loc['BS311']
+            industries_water.loc['BS311800'] = 0.10 * industries_water.loc['BS311']
+            industries_water.loc['BS311900'] = 0.10 * industries_water.loc['BS311']
+            industries_water.loc['BS312110'] = 0.30 * industries_water.loc['BS312']
+            industries_water.loc['BS312120'] = 0.40 * industries_water.loc['BS312']
+            industries_water.loc['BS3121A0'] = 0.16 * industries_water.loc['BS312']
+            industries_water.loc['BS312200'] = 0.14 * industries_water.loc['BS312']
+            industries_water.loc['BS31A000'] = industries_water.loc['BS31A']
+            industries_water.loc['BS31B000'] = industries_water.loc['BS31B']
+            industries_water.loc['BS321100'] = 0.52 * industries_water.loc['BS321']
+            industries_water.loc['BS321200'] = 0.21 * industries_water.loc['BS321']
+            industries_water.loc['BS321900'] = 0.27 * industries_water.loc['BS321']
+            industries_water.loc['BS322100'] = 0.62 * industries_water.loc['BS322']
+            industries_water.loc['BS322200'] = 0.38 * industries_water.loc['BS322']
+            industries_water.loc['BS323000'] = industries_water.loc['BS323']
+            industries_water.loc['BS324110'] = 0.91 * industries_water.loc['BS324']
+            industries_water.loc['BS3241A0'] = 0.09 * industries_water.loc['BS324']
+            industries_water.loc['BS325100'] = 0.27 * industries_water.loc['BS325']
+            industries_water.loc['BS325200'] = 0.17 * industries_water.loc['BS325']
+            industries_water.loc['BS325300'] = 0.10 * industries_water.loc['BS325']
+            industries_water.loc['BS325400'] = 0.23 * industries_water.loc['BS325']
+            industries_water.loc['BS325500'] = 0.05 * industries_water.loc['BS325']
+            industries_water.loc['BS325600'] = 0.08 * industries_water.loc['BS325']
+            industries_water.loc['BS325900'] = 0.09 * industries_water.loc['BS325']
+            industries_water.loc['BS326100'] = 0.83 * industries_water.loc['BS326']
+            industries_water.loc['BS326200'] = 0.17 * industries_water.loc['BS326']
+            industries_water.loc['BS327A00'] = 0.38 * industries_water.loc['BS327']
+            industries_water.loc['BS327300'] = 0.62 * industries_water.loc['BS327']
+            industries_water.loc['BS331100'] = 0.17 * industries_water.loc['BS331']
+            industries_water.loc['BS331200'] = 0.07 * industries_water.loc['BS331']
+            industries_water.loc['BS331300'] = 0.18 * industries_water.loc['BS331']
+            industries_water.loc['BS331400'] = 0.54 * industries_water.loc['BS331']
+            industries_water.loc['BS331500'] = 0.04 * industries_water.loc['BS331']
+            industries_water.loc['BS332100'] = 0.04 * industries_water.loc['BS332']
+            industries_water.loc['BS332A00'] = 0.16 * industries_water.loc['BS332']
+            industries_water.loc['BS332300'] = 0.41 * industries_water.loc['BS332']
+            industries_water.loc['BS332400'] = 0.10 * industries_water.loc['BS332']
+            industries_water.loc['BS332500'] = 0.05 * industries_water.loc['BS332']
+            industries_water.loc['BS332600'] = 0.03 * industries_water.loc['BS332']
+            industries_water.loc['BS332700'] = 0.16 * industries_water.loc['BS332']
+            industries_water.loc['BS332800'] = 0.06 * industries_water.loc['BS332']
+            industries_water.loc['BS333100'] = 0.25 * industries_water.loc['BS333']
+            industries_water.loc['BS333200'] = 0.12 * industries_water.loc['BS333']
+            industries_water.loc['BS333300'] = 0.14 * industries_water.loc['BS333']
+            industries_water.loc['BS333400'] = 0.10 * industries_water.loc['BS333']
+            industries_water.loc['BS333500'] = 0.12 * industries_water.loc['BS333']
+            industries_water.loc['BS333600'] = 0.04 * industries_water.loc['BS333']
+            industries_water.loc['BS333900'] = 0.22 * industries_water.loc['BS333']
+            industries_water.loc['BS334100'] = 0.04 * industries_water.loc['BS334']
+            industries_water.loc['BS334200'] = 0.24 * industries_water.loc['BS334']
+            industries_water.loc['BS334A00'] = 0.44 * industries_water.loc['BS334']
+            industries_water.loc['BS334400'] = 0.27 * industries_water.loc['BS334']
+            industries_water.loc['BS335100'] = 0.11 * industries_water.loc['BS335']
+            industries_water.loc['BS335200'] = 0.05 * industries_water.loc['BS335']
+            industries_water.loc['BS335300'] = 0.46 * industries_water.loc['BS335']
+            industries_water.loc['BS335900'] = 0.37 * industries_water.loc['BS335']
+            industries_water.loc['BS336110'] = 0.475 * industries_water.loc['BS336']
+            industries_water.loc['BS336120'] = 0.021 * industries_water.loc['BS336']
+            industries_water.loc['BS336200'] = 0.024 * industries_water.loc['BS336']
+            industries_water.loc['BS336310'] = 0.040 * industries_water.loc['BS336']
+            industries_water.loc['BS336320'] = 0.011 * industries_water.loc['BS336']
+            industries_water.loc['BS336330'] = 0.016 * industries_water.loc['BS336']
+            industries_water.loc['BS336340'] = 0.005 * industries_water.loc['BS336']
+            industries_water.loc['BS336350'] = 0.032 * industries_water.loc['BS336']
+            industries_water.loc['BS336360'] = 0.044 * industries_water.loc['BS336']
+            industries_water.loc['BS336370'] = 0.049 * industries_water.loc['BS336']
+            industries_water.loc['BS336390'] = 0.040 * industries_water.loc['BS336']
+            industries_water.loc['BS336400'] = 0.170 * industries_water.loc['BS336']
+            industries_water.loc['BS336500'] = 0.015 * industries_water.loc['BS336']
+            industries_water.loc['BS336600'] = 0.015 * industries_water.loc['BS336']
+            industries_water.loc['BS336900'] = 0.042 * industries_water.loc['BS336']
+            industries_water.loc['BS337100'] = 0.54 * industries_water.loc['BS337']
+            industries_water.loc['BS337200'] = 0.36 * industries_water.loc['BS337']
+            industries_water.loc['BS337900'] = 0.10 * industries_water.loc['BS337']
+            industries_water.loc['BS339100'] = 0.28 * industries_water.loc['BS339']
+            industries_water.loc['BS339900'] = 0.72 * industries_water.loc['BS339']
+            industries_water.loc['BS411000'] = 0.02 * industries_water.loc['BS41000']
+            industries_water.loc['BS412000'] = 0.04 * industries_water.loc['BS41000']
+            industries_water.loc['BS413000'] = 0.13 * industries_water.loc['BS41000']
+            industries_water.loc['BS414000'] = 0.17 * industries_water.loc['BS41000']
+            industries_water.loc['BS415000'] = 0.12 * industries_water.loc['BS41000']
+            industries_water.loc['BS416000'] = 0.14 * industries_water.loc['BS41000']
+            industries_water.loc['BS417000'] = 0.23 * industries_water.loc['BS41000']
+            industries_water.loc['BS418000'] = 0.12 * industries_water.loc['BS41000']
+            industries_water.loc['BS419000'] = 0.03 * industries_water.loc['BS41000']
+            industries_water.loc['BS441000'] = 0.154 * industries_water.loc['BS4A000']
+            industries_water.loc['BS442000'] = 0.050 * industries_water.loc['BS4A000']
+            industries_water.loc['BS443000'] = 0.033 * industries_water.loc['BS4A000']
+            industries_water.loc['BS444000'] = 0.076 * industries_water.loc['BS4A000']
+            industries_water.loc['BS445000'] = 0.186 * industries_water.loc['BS4A000']
+            industries_water.loc['BS446000'] = 0.108 * industries_water.loc['BS4A000']
+            industries_water.loc['BS447000'] = 0.060 * industries_water.loc['BS4A000']
+            industries_water.loc['BS448000'] = 0.107 * industries_water.loc['BS4A000']
+            industries_water.loc['BS451000'] = 0.032 * industries_water.loc['BS4A000']
+            industries_water.loc['BS452000'] = 0.101 * industries_water.loc['BS4A000']
+            industries_water.loc['BS453A00'] = 0.043 * industries_water.loc['BS4A000']
+            industries_water.loc['BS453BL0'] = 0 * industries_water.loc['BS4A000']
+            industries_water.loc['BS453BU0'] = 0.010 * industries_water.loc['BS4A000']
+            industries_water.loc['BS454000'] = 0.039 * industries_water.loc['BS4A000']
+            industries_water.loc['BS485100'] = 0.11 * industries_water.loc['BS48B00']
+            industries_water.loc['BS48A000'] = 0.09 * industries_water.loc['BS48B00']
+            industries_water.loc['BS485300'] = 0.06 * industries_water.loc['BS48B00']
+            industries_water.loc['BS488000'] = 0.75 * industries_water.loc['BS48B00']
+            industries_water.loc['BS486A00'] = 0.51 * industries_water.loc['BS48600']
+            industries_water.loc['BS486200'] = 0.49 * industries_water.loc['BS48600']
+            industries_water.loc['BS491000'] = 0.34 * industries_water.loc['BS49A00']
+            industries_water.loc['BS492000'] = 0.66 * industries_water.loc['BS49A00']
+            industries_water.loc['BS5121A0'] = 0.77 * industries_water.loc['BS51200']
+            industries_water.loc['BS512130'] = 0.14 * industries_water.loc['BS51200']
+            industries_water.loc['BS512200'] = 0.08 * industries_water.loc['BS51200']
+            industries_water.loc['BS511110'] = 0.04 * industries_water.loc['BS51B00']
+            industries_water.loc['BS5111A0'] = 0.05 * industries_water.loc['BS51B00']
+            industries_water.loc['BS511200'] = 0.11 * industries_water.loc['BS51B00']
+            industries_water.loc['BS515200'] = 0.05 * industries_water.loc['BS51B00']
+            industries_water.loc['BS517000'] = 0.66 * industries_water.loc['BS51B00']
+            industries_water.loc['BS518000'] = 0.06 * industries_water.loc['BS51B00']
+            industries_water.loc['BS519000'] = 0.04 * industries_water.loc['BS51B00']
+            industries_water.loc['BS521000'] = 0.002 * industries_water.loc['BS52B00']
+            industries_water.loc['BS5221A0'] = 0.469 * industries_water.loc['BS52B00']
+            industries_water.loc['BS522130'] = 0.042 * industries_water.loc['BS52B00']
+            industries_water.loc['BS522200'] = 0.067 * industries_water.loc['BS52B00']
+            industries_water.loc['BS522300'] = 0.031 * industries_water.loc['BS52B00']
+            industries_water.loc['BS52A000'] = 0.306 * industries_water.loc['BS52B00']
+            industries_water.loc['BS524200'] = 0.082 * industries_water.loc['BS52B00']
+            industries_water.loc['BS532100'] = 0.28 * industries_water.loc['BS53B00']
+            industries_water.loc['BS532A00'] = 0.56 * industries_water.loc['BS53B00']
+            industries_water.loc['BS533000'] = 0.16 * industries_water.loc['BS53B00']
+            industries_water.loc['BS531A00'] = 0.62 * industries_water.loc['BS5A000']
+            industries_water.loc['BS551113'] = 0.38 * industries_water.loc['BS5A000']
+            industries_water.loc['BS541100'] = 0.26 * industries_water.loc['BS541C0']
+            industries_water.loc['BS541200'] = 0.26 * industries_water.loc['BS541C0']
+            industries_water.loc['BS541300'] = 0.48 * industries_water.loc['BS541C0']
+            industries_water.loc['BS541400'] = 0.03 * industries_water.loc['BS541D0']
+            industries_water.loc['BS541500'] = 0.52 * industries_water.loc['BS541D0']
+            industries_water.loc['BS541600'] = 0.21 * industries_water.loc['BS541D0']
+            industries_water.loc['BS541700'] = 0.08 * industries_water.loc['BS541D0']
+            industries_water.loc['BS541900'] = 0.16 * industries_water.loc['BS541D0']
+            industries_water.loc['BS561100'] = 0.18 * industries_water.loc['BS56100']
+            industries_water.loc['BS561A00'] = 0.16 * industries_water.loc['BS56100']
+            industries_water.loc['BS561300'] = 0.17 * industries_water.loc['BS56100']
+            industries_water.loc['BS561400'] = 0.11 * industries_water.loc['BS56100']
+            industries_water.loc['BS561500'] = 0.07 * industries_water.loc['BS56100']
+            industries_water.loc['BS561600'] = 0.09 * industries_water.loc['BS56100']
+            industries_water.loc['BS561700'] = 0.23 * industries_water.loc['BS56100']
+            industries_water.loc['BS621100'] = 0.44 * industries_water.loc['BS62000']
+            industries_water.loc['BS621200'] = 0.21 * industries_water.loc['BS62000']
+            industries_water.loc['BS621A00'] = 0.17 * industries_water.loc['BS62000']
+            industries_water.loc['BS623000'] = 0.11 * industries_water.loc['BS62000']
+            industries_water.loc['BS624000'] = 0.07 * industries_water.loc['BS62000']
+            industries_water.loc['BS71A000'] = 0.37 * industries_water.loc['BS71000']
+            industries_water.loc['BS713A00'] = 0.37 * industries_water.loc['BS71000']
+            industries_water.loc['BS713200'] = 0.26 * industries_water.loc['BS71000']
+            industries_water.loc['BS721100'] = 0.19 * industries_water.loc['BS72000']
+            industries_water.loc['BS721A00'] = 0.03 * industries_water.loc['BS72000']
+            industries_water.loc['BS722000'] = 0.78 * industries_water.loc['BS72000']
+            industries_water.loc['BS811100'] = 0.53 * industries_water.loc['BS81100']
+            industries_water.loc['BS811A00'] = 0.47 * industries_water.loc['BS81100']
+            industries_water.loc['BS812A00'] = 0.59 * industries_water.loc['BS81A00']
+            industries_water.loc['BS812200'] = 0.11 * industries_water.loc['BS81A00']
+            industries_water.loc['BS812300'] = 0.12 * industries_water.loc['BS81A00']
+            industries_water.loc['BS814000'] = 0.18 * industries_water.loc['BS81A00']
+            industries_water.loc['NP621000'] = 0.09 * industries_water.loc['NPA0000']
+            industries_water.loc['NP813A00'] = 0.65 * industries_water.loc['NPA0000']
+            industries_water.loc['NP999999'] = 0.26 * industries_water.loc['NPA0000']
+            industries_water.loc['GS611100'] = 0.83 * industries_water.loc['GS611B0']
+            industries_water.loc['GS611200'] = 0.16 * industries_water.loc['GS611B0']
+            industries_water.loc['GS611A00'] = 0.01 * industries_water.loc['GS611B0']
+            industries_water.loc['GS911100'] = 0.27 * industries_water.loc['GS91100']
+            industries_water.loc['GS911A00'] = 0.73 * industries_water.loc['GS91100']
+
+            new_index = []
+            for code in industries_water.index:
+                if code in key_changes:
+                    if key_changes[code] != '':
+                        new_index.append(key_changes[code])
+                    else:
+                        new_index.append(code)
+                else:
+                    new_index.append(code)
+
+            industries_water.index = new_index
+            # add sectors for which water accounts are zero
+            industries_water = pd.concat([industries_water,
+                                          pd.Series(0, [i for i in IOIC_codes if i not in industries_water.index])])
+            industries_water = industries_water.loc[IOIC_codes]
+        elif self.level_of_detail == 'Summary level':
+            industries_water.loc['BS11A'] = (industries_water.loc['BS111'] + industries_water.loc['BS112'])
+            industries_water.loc['BS113'] = industries_water.loc['BS11300']
+            industries_water.loc['BS114'] = industries_water.loc['BS11400']
+            industries_water.loc['BS115'] = industries_water.loc['BS11500']
+            industries_water.loc['BS210'] = (industries_water.loc['BS21100'] + industries_water.loc['BS21210'] +
+                                             industries_water.loc['BS21230'] + industries_water.loc['BS21300'])
+            industries_water.loc['BS220'] = (industries_water.loc['BS22110'] + industries_water.loc['BS221A0'])
+            industries_water.loc['BS23A'] = industries_water.loc['BS23A00']
+            industries_water.loc['BS23B'] = industries_water.loc['BS23B00']
+            industries_water.loc['BS23C'] = (industries_water.loc['BS23C10'] + industries_water.loc['BS23C20'] +
+                                             industries_water.loc['BS23C30'] + industries_water.loc['BS23C40'] +
+                                             industries_water.loc['BS23C50'])
+            industries_water.loc['BS23D'] = industries_water.loc['BS23D00']
+            industries_water.loc['BS23E'] = industries_water.loc['BS23E00']
+            industries_water.loc['BS3A0'] = (industries_water.loc['BS311'] + industries_water.loc['BS312'] +
+                                             industries_water.loc['BS31A'] + industries_water.loc['BS31B'] +
+                                             industries_water.loc['BS321'] + industries_water.loc['BS322'] +
+                                             industries_water.loc['BS323'] + industries_water.loc['BS324'] +
+                                             industries_water.loc['BS325'] + industries_water.loc['BS326'] +
+                                             industries_water.loc['BS327'] + industries_water.loc['BS331'] +
+                                             industries_water.loc['BS332'] + industries_water.loc['BS333'] +
+                                             industries_water.loc['BS334'] + industries_water.loc['BS335'] +
+                                             industries_water.loc['BS336'] + industries_water.loc['BS337'] +
+                                             industries_water.loc['BS339'])
+            industries_water.loc['BS410'] = industries_water.loc['BS41000']
+            industries_water.loc['BS4A0'] = industries_water.loc['BS4A000']
+            industries_water.loc['BS4B0'] = (industries_water.loc['BS48100'] + industries_water.loc['BS48200'] +
+                                             industries_water.loc['BS48300'] + industries_water.loc['BS48400'] +
+                                             industries_water.loc['BS48B00'] + industries_water.loc['BS48600'] +
+                                             industries_water.loc['BS49A00'] + industries_water.loc['BS49300'])
+            industries_water.loc['BS510'] = (industries_water.loc['BS51200'] + industries_water.loc['BS51510'] +
+                                             industries_water.loc['BS51B00'])
+            industries_water.loc['BS53C'] = industries_water.loc['BS5311A']
+            industries_water.loc['BS5B0'] = (industries_water.loc['BS52B00'] + industries_water.loc['BS52410'] +
+                                             industries_water.loc['BS53110'] + industries_water.loc['BS53B00'] +
+                                             industries_water.loc['BS5A000'])
+            industries_water.loc['BS540'] = (industries_water.loc['BS541C0'] + industries_water.loc['BS541D0'] +
+                                             industries_water.loc['BS54180'])
+            industries_water.loc['BS560'] = (industries_water.loc['BS56100'] + industries_water.loc['BS56200'])
+            industries_water.loc['BS610'] = industries_water.loc['BS61000']
+            industries_water.loc['BS620'] = industries_water.loc['BS62000']
+            industries_water.loc['BS710'] = industries_water.loc['BS71000']
+            industries_water.loc['BS720'] = industries_water.loc['BS72000']
+            industries_water.loc['BS810'] = (industries_water.loc['BS81100'] + industries_water.loc['BS81A00'] +
+                                             industries_water.loc['BS81300'])
+            industries_water.loc['FC100'] = (industries_water.loc['FC11000'] + industries_water.loc['FC12000'] +
+                                             industries_water.loc['FC13000'])
+            industries_water.loc['FC200'] = industries_water.loc['FC20000']
+            industries_water.loc['FC300'] = industries_water.loc['FC30000']
+            industries_water.loc['NP000'] = (industries_water.loc['NP61000'] + industries_water.loc['NP62400'] +
+                                             industries_water.loc['NP71000'] + industries_water.loc['NP81310']
+                                             + industries_water.loc['NPA0000'])
+            industries_water.loc['GS610'] = (industries_water.loc['GS611B0'] + industries_water.loc['GS61130'])
+            industries_water.loc['GS620'] = (industries_water.loc['GS62200'] + industries_water.loc['GS62300'])
+            industries_water.loc['GS910'] = industries_water.loc['GS91100']
+            industries_water.loc['GS920'] = industries_water.loc['GS91200']
+            industries_water.loc['GS930'] = industries_water.loc['GS91300']
+            industries_water.loc['GS940'] = industries_water.loc['GS91400']
+
+            industries_water = pd.concat([industries_water,
+                                          pd.Series(0, [i for i in IOIC_codes if i not in industries_water.index])])
+            industries_water = industries_water.loc[IOIC_codes]
+
+        industries_water.index = [i[1] for i in self.industries]
+        industries_water.name = ('Water use', '')
+        industries_water *= 1000
+        self.F = self.F.append(industries_water)
+
+        self.emission_metadata.loc[('Water use', ''), 'CAS Number'] = 'N/A'
+        self.emission_metadata.loc[('Water use', ''), 'Unit'] = 'm3'
 
         # normalize
         if self.classification == 'industry':
@@ -789,3 +1662,23 @@ class IOTables:
         if self.classification == 'product':
             self.F = self.F.dot(self.V.dot(self.inv_g).T)
             self.S = self.F.dot(self.inv_q)
+
+
+def extract_data_from_csv(file_name):
+    year = 2017
+    if file_name == 'Water_use.csv':
+        year = 2015
+    df = pd.read_csv(pkg_resources.resource_stream(__name__, '/Data/'+file_name))
+    df = df.loc[[i for i in df.index if df.loc[i, 'GEO'] == 'Canada' and df.loc[i, 'REF_DATE'] == year]]
+    df.set_index('Sector', inplace=True)
+    return df
+
+
+def select_industries_emissions(df):
+    industries = df.loc[[i for i in df.index if ('Total' not in i
+                                                 and 'Balancing' not in i
+                                                 and 'Households' not in i)],
+                        'VALUE'].fillna(0)
+
+    industries.index = [i.split('[')[1].split(']')[0] for i in industries.index]
+    return industries
