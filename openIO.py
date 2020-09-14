@@ -49,6 +49,7 @@ class IOTables:
         self.inv_q = pd.DataFrame()
         self.F = pd.DataFrame()
         self.S = pd.DataFrame()
+        self.FY = pd.DataFrame()
 
         self.emission_metadata = pd.DataFrame()
         self.industries = []
@@ -236,7 +237,7 @@ class IOTables:
                                          columns=['CAS Number', 'Unit'])
         for emission in temp_df.index:
             self.emission_metadata.loc[emission, 'CAS Number'] = temp_df.loc[emission, 'CAS Number']
-            self.emission_metadata.loc[emission, 'Unit'] = temp_df.loc[emission, 'CAS Number']
+            self.emission_metadata.loc[emission, 'Unit'] = temp_df.loc[emission, 'Units']
         del temp_df
 
         self.F = pd.pivot_table(data=emissions, index=[emissions.index], columns=['NAICS 6 Code'],
@@ -250,6 +251,9 @@ class IOTables:
         Links raw environmental data to the symmetric IO tables
         :return: self.F and self.S (environmental extensions)
         """
+
+        # ---------------------POLLUTANTS-------------------------
+
         total_emissions_origin = self.F.sum().sum()
 
         concordance_table = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/NAICS-IOIC.xlsx'))
@@ -406,14 +410,382 @@ class IOTables:
         assert all(self.F.columns == [i[0] for i in self.industries])
         self.F.columns = [i[1] for i in self.industries]
 
+        # assert that most of the emissions (>99%) given by the NPRI are present in self.F
+        assert self.F.sum().sum() / total_emissions_origin > 0.99
+        assert self.F.sum().sum() / total_emissions_origin < 1.01
+
+        # ---------------------GHGs-------------------------
+
+        GHGs = pd.read_csv(pkg_resources.resource_stream(__name__, '/Data/GHG_emissions.csv'))
+        GHGs = GHGs.loc[[i for i in GHGs.index if GHGs.loc[i, 'GEO'] == 'Canada' and GHGs.loc[i, 'REF_DATE'] == 2017]]
+        GHGs.set_index('Sector', inplace=True)
+
+        # households GHG emissions
+        self.FY = pd.DataFrame([GHGs.loc[[i for i in GHGs.index if 'Households' in i]].sum().loc['VALUE'], 0, 0, 0, 0, 0],
+                          columns=[('GHGs', 'air')], index=self.Y.columns).T
+        self.FY *= 1000000
+
+        industries_ghgs = GHGs.loc[[i for i in GHGs.index if ('Total' not in i
+                                                              and 'Balancing' not in i
+                                                              and 'Households' not in i)],
+                                   'VALUE'].fillna(0)
+
+        industries_ghgs.index = [i.split('[')[1].split(']')[0] for i in industries_ghgs.index]
+        if self.level_of_detail == 'Link-1961 level':
+            industries_ghgs = industries_ghgs.drop([i for i in industries_ghgs.index if i not in IOIC_codes])
+        elif self.level_of_detail == 'Link-1997 level':
+            key_changes = dict.fromkeys(industries_ghgs.index, '')
+            for key in key_changes:
+                if key + '0' in IOIC_codes:
+                    key_changes[key] = key + '0'
+
+            # economic allocations. Be my guest if you wanna verify :)
+            industries_ghgs.loc['BS111A00'] = 0.55 * industries_ghgs.loc['BS11B00']
+            industries_ghgs.loc['BS1114A0'] = 0.05 * industries_ghgs.loc['BS11B00']
+            industries_ghgs.loc['BS112000'] = 0.40 * industries_ghgs.loc['BS11B00']
+            industries_ghgs.loc['BS115A00'] = 0.39 * industries_ghgs.loc['BS11500']
+            industries_ghgs.loc['BS115300'] = 0.61 * industries_ghgs.loc['BS11500']
+            industries_ghgs.loc['BS212210'] = 0.15 * industries_ghgs.loc['BS21220']
+            industries_ghgs.loc['BS212220'] = 0.35 * industries_ghgs.loc['BS21220']
+            industries_ghgs.loc['BS212230'] = 0.4 * industries_ghgs.loc['BS21220']
+            industries_ghgs.loc['BS212290'] = 0.1 * industries_ghgs.loc['BS21220']
+            industries_ghgs.loc['BS212310'] = 0.16 * industries_ghgs.loc['BS21230']
+            industries_ghgs.loc['BS212320'] = 0.15 * industries_ghgs.loc['BS21230']
+            industries_ghgs.loc['BS212392'] = 0.18 * industries_ghgs.loc['BS21230']
+            industries_ghgs.loc['BS21239A'] = 0.13 * industries_ghgs.loc['BS21230']
+            industries_ghgs.loc['BS212396'] = 0.38 * industries_ghgs.loc['BS21230']
+            industries_ghgs.loc['BS221200'] = 0.9 * industries_ghgs.loc['BS221A0']
+            industries_ghgs.loc['BS221300'] = 0.1 * industries_ghgs.loc['BS221A0']
+            industries_ghgs.loc['BS311200'] = 0.35 * industries_ghgs.loc['BS311A0']
+            industries_ghgs.loc['BS311800'] = 0.31 * industries_ghgs.loc['BS311A0']
+            industries_ghgs.loc['BS311900'] = 0.33 * industries_ghgs.loc['BS311A0']
+            industries_ghgs.loc['BS321100'] = 0.52 * industries_ghgs.loc['BS32100']
+            industries_ghgs.loc['BS321200'] = 0.22 * industries_ghgs.loc['BS32100']
+            industries_ghgs.loc['BS321900'] = 0.26 * industries_ghgs.loc['BS32100']
+            industries_ghgs.loc['BS325B00'] = 0.57 * industries_ghgs.loc['BS325C0']
+            industries_ghgs.loc['BS325600'] = 0.20 * industries_ghgs.loc['BS325C0']
+            industries_ghgs.loc['BS325900'] = 0.23 * industries_ghgs.loc['BS325C0']
+            industries_ghgs.loc['BS331100'] = 0.17 * industries_ghgs.loc['BS33100']
+            industries_ghgs.loc['BS331200'] = 0.07 * industries_ghgs.loc['BS33100']
+            industries_ghgs.loc['BS331300'] = 0.18 * industries_ghgs.loc['BS33100']
+            industries_ghgs.loc['BS331400'] = 0.54 * industries_ghgs.loc['BS33100']
+            industries_ghgs.loc['BS331500'] = 0.04 * industries_ghgs.loc['BS33100']
+            industries_ghgs.loc['BS332100'] = 0.04 * industries_ghgs.loc['BS33200']
+            industries_ghgs.loc['BS332A00'] = 0.16 * industries_ghgs.loc['BS33200']
+            industries_ghgs.loc['BS332300'] = 0.41 * industries_ghgs.loc['BS33200']
+            industries_ghgs.loc['BS332400'] = 0.1 * industries_ghgs.loc['BS33200']
+            industries_ghgs.loc['BS332500'] = 0.05 * industries_ghgs.loc['BS33200']
+            industries_ghgs.loc['BS332600'] = 0.03 * industries_ghgs.loc['BS33200']
+            industries_ghgs.loc['BS332700'] = 0.16 * industries_ghgs.loc['BS33200']
+            industries_ghgs.loc['BS332800'] = 0.06 * industries_ghgs.loc['BS33200']
+            industries_ghgs.loc['BS333100'] = 0.25 * industries_ghgs.loc['BS33300']
+            industries_ghgs.loc['BS333A00'] = 0.26 * industries_ghgs.loc['BS33300']
+            industries_ghgs.loc['BS333400'] = 0.1 * industries_ghgs.loc['BS33300']
+            industries_ghgs.loc['BS333500'] = 0.12 * industries_ghgs.loc['BS33300']
+            industries_ghgs.loc['BS333600'] = 0.04 * industries_ghgs.loc['BS33300']
+            industries_ghgs.loc['BS333900'] = 0.22 * industries_ghgs.loc['BS33300']
+            industries_ghgs.loc['BS334200'] = 0.25 * industries_ghgs.loc['BS334B0']
+            industries_ghgs.loc['BS334A00'] = 0.46 * industries_ghgs.loc['BS334B0']
+            industries_ghgs.loc['BS334400'] = 0.29 * industries_ghgs.loc['BS334B0']
+            industries_ghgs.loc['BS335100'] = 0.12 * industries_ghgs.loc['BS335A0']
+            industries_ghgs.loc['BS335300'] = 0.49 * industries_ghgs.loc['BS335A0']
+            industries_ghgs.loc['BS335900'] = 0.39 * industries_ghgs.loc['BS335A0']
+            industries_ghgs.loc['BS337100'] = 0.54 * industries_ghgs.loc['BS33700']
+            industries_ghgs.loc['BS337200'] = 0.36 * industries_ghgs.loc['BS33700']
+            industries_ghgs.loc['BS337900'] = 0.1 * industries_ghgs.loc['BS33700']
+            industries_ghgs.loc['BS339100'] = 0.28 * industries_ghgs.loc['BS33900']
+            industries_ghgs.loc['BS339900'] = 0.72 * industries_ghgs.loc['BS33900']
+            industries_ghgs.loc['BS486A00'] = 0.51 * industries_ghgs.loc['BS48600']
+            industries_ghgs.loc['BS486200'] = 0.49 * industries_ghgs.loc['BS48600']
+            industries_ghgs.loc['BS485100'] = 0.11 * industries_ghgs.loc['BS48B00']
+            industries_ghgs.loc['BS48A000'] = 0.09 * industries_ghgs.loc['BS48B00']
+            industries_ghgs.loc['BS485300'] = 0.06 * industries_ghgs.loc['BS48B00']
+            industries_ghgs.loc['BS488000'] = 0.75 * industries_ghgs.loc['BS48B00']
+            industries_ghgs.loc['BS5121A0'] = 0.77 * industries_ghgs.loc['BS51200']
+            industries_ghgs.loc['BS512130'] = 0.14 * industries_ghgs.loc['BS51200']
+            industries_ghgs.loc['BS512200'] = 0.08 * industries_ghgs.loc['BS51200']
+            industries_ghgs.loc['BS511100'] = 0.09 * industries_ghgs.loc['BS51B00']
+            industries_ghgs.loc['BS511200'] = 0.11 * industries_ghgs.loc['BS51B00']
+            industries_ghgs.loc['BS51A000'] = 0.74 * industries_ghgs.loc['BS51B00']
+            industries_ghgs.loc['BS518000'] = 0.06 * industries_ghgs.loc['BS51B00']
+            industries_ghgs.loc['BS521000'] = 0.002 * industries_ghgs.loc['BS52B00']
+            industries_ghgs.loc['BS5221A0'] = 0.469 * industries_ghgs.loc['BS52B00']
+            industries_ghgs.loc['BS522130'] = 0.042 * industries_ghgs.loc['BS52B00']
+            industries_ghgs.loc['BS522A00'] = 0.099 * industries_ghgs.loc['BS52B00']
+            industries_ghgs.loc['BS52A000'] = 0.306 * industries_ghgs.loc['BS52B00']
+            industries_ghgs.loc['BS524200'] = 0.082 * industries_ghgs.loc['BS52B00']
+            industries_ghgs.loc['BS532100'] = 0.28 * industries_ghgs.loc['BS53B00']
+            industries_ghgs.loc['BS53A000'] = 0.72 * industries_ghgs.loc['BS53B00']
+            industries_ghgs.loc['BS541A00'] = 0.52 * industries_ghgs.loc['BS541C0']
+            industries_ghgs.loc['BS541300'] = 0.48 * industries_ghgs.loc['BS541C0']
+            industries_ghgs.loc['BS541B00'] = 0.48 * industries_ghgs.loc['BS541D0']
+            industries_ghgs.loc['BS541500'] = 0.52 * industries_ghgs.loc['BS541D0']
+            industries_ghgs.loc['BS561B00'] = 0.61 * industries_ghgs.loc['BS56100']
+            industries_ghgs.loc['BS561500'] = 0.06 * industries_ghgs.loc['BS56100']
+            industries_ghgs.loc['BS561600'] = 0.09 * industries_ghgs.loc['BS56100']
+            industries_ghgs.loc['BS561700'] = 0.23 * industries_ghgs.loc['BS56100']
+            industries_ghgs.loc['BS531A00'] = 0.62 * industries_ghgs.loc['BS5A000']
+            industries_ghgs.loc['BS551113'] = 0.38 * industries_ghgs.loc['BS5A000']
+            industries_ghgs.loc['BS621100'] = 0.44 * industries_ghgs.loc['BS62000']
+            industries_ghgs.loc['BS621200'] = 0.21 * industries_ghgs.loc['BS62000']
+            industries_ghgs.loc['BS621A00'] = 0.17 * industries_ghgs.loc['BS62000']
+            industries_ghgs.loc['BS623000'] = 0.11 * industries_ghgs.loc['BS62000']
+            industries_ghgs.loc['BS624000'] = 0.07 * industries_ghgs.loc['BS62000']
+            industries_ghgs.loc['BS71A000'] = 0.37 * industries_ghgs.loc['BS71000']
+            industries_ghgs.loc['BS713A00'] = 0.37 * industries_ghgs.loc['BS71000']
+            industries_ghgs.loc['BS713200'] = 0.26 * industries_ghgs.loc['BS71000']
+            industries_ghgs.loc['BS721100'] = 0.19 * industries_ghgs.loc['BS72000']
+            industries_ghgs.loc['BS721A00'] = 0.03 * industries_ghgs.loc['BS72000']
+            industries_ghgs.loc['BS722000'] = 0.78 * industries_ghgs.loc['BS72000']
+            industries_ghgs.loc['BS811100'] = 0.53 * industries_ghgs.loc['BS81100']
+            industries_ghgs.loc['BS811A00'] = 0.47 * industries_ghgs.loc['BS81100']
+            industries_ghgs.loc['BS812A00'] = 0.59 * industries_ghgs.loc['BS81A00']
+            industries_ghgs.loc['BS812200'] = 0.11 * industries_ghgs.loc['BS81A00']
+            industries_ghgs.loc['BS812300'] = 0.12 * industries_ghgs.loc['BS81A00']
+            industries_ghgs.loc['BS814000'] = 0.18 * industries_ghgs.loc['BS81A00']
+            industries_ghgs.loc['GS611100'] = 0.83 * industries_ghgs.loc['GS611B0']
+            industries_ghgs.loc['GS611200'] = 0.16 * industries_ghgs.loc['GS611B0']
+            industries_ghgs.loc['GS611A00'] = 0.01 * industries_ghgs.loc['GS611B0']
+            industries_ghgs.loc['GS911100'] = 0.27 * industries_ghgs.loc['GS91100']
+            industries_ghgs.loc['GS911A00'] = 0.73 * industries_ghgs.loc['GS91100']
+
+            new_index = []
+            for code in industries_ghgs.index:
+                if code in key_changes:
+                    if key_changes[code] != '':
+                        new_index.append(key_changes[code])
+                    else:
+                        new_index.append(code)
+                else:
+                    new_index.append(code)
+
+            industries_ghgs.index = new_index
+            industries_ghgs = industries_ghgs.loc[IOIC_codes]
+        elif self.level_of_detail == 'Summary level':
+            industries_ghgs.index = [i[:-2] for i in industries_ghgs.index]
+            industries_ghgs = industries_ghgs.groupby(industries_ghgs.index).sum()
+
+            industries_ghgs.loc['BS11A'] += industries_ghgs.loc[['BS11B', 'BS111']].sum()
+            industries_ghgs.loc['BS210'] = industries_ghgs.loc[['BS211', 'BS212', 'BS213']].sum()
+            industries_ghgs.loc['BS220'] = industries_ghgs.loc[['BS221']].sum()
+            industries_ghgs.loc['BS3A0'] = industries_ghgs.loc[
+                ['BS311', 'BS312', 'BS31A', 'BS31B', 'BS321', 'BS322', 'BS323',
+                 'BS324', 'BS325', 'BS326', 'BS327', 'BS331', 'BS332', 'BS333',
+                 'BS334', 'BS335', 'BS336', 'BS337', 'BS339']].sum()
+            industries_ghgs.loc['BS4A0'] = industries_ghgs.loc[['BS4AA', 'BS453']].sum()
+            industries_ghgs.loc['BS4B0'] = industries_ghgs.loc[
+                ['BS481', 'BS482', 'BS483', 'BS484', 'BS48B', 'BS486', 'BS49A', 'BS493']].sum()
+            industries_ghgs.loc['BS510'] = industries_ghgs.loc[['BS512', 'BS515', 'BS51B']].sum()
+            industries_ghgs.loc['BS5B0'] = industries_ghgs.loc[['BS52B', 'BS524', 'BS531', 'BS53B', 'BS5A0']].sum()
+            industries_ghgs.loc['BS540'] = industries_ghgs.loc[['BS541']].sum()
+            industries_ghgs.loc['BS560'] = industries_ghgs.loc[['BS561', 'BS562']].sum()
+            industries_ghgs.loc['BS810'] = industries_ghgs.loc[['BS811', 'BS81A', 'BS813']].sum()
+            industries_ghgs.loc['FC100'] = industries_ghgs.loc[['FC110', 'FC120', 'FC130']].sum()
+            industries_ghgs.loc['NP000'] = industries_ghgs.loc[['NP610', 'NP624', 'NP710', 'NP813', 'NPA00']].sum()
+            industries_ghgs.loc['GS610'] = industries_ghgs.loc[['GS611']].sum()
+            industries_ghgs.loc['GS620'] = industries_ghgs.loc[['GS622', 'GS623']].sum()
+
+            industries_ghgs = industries_ghgs.reindex(IOIC_codes)
+        elif self.level_of_detail == 'Detail level':
+            key_changes = dict.fromkeys(industries_ghgs.index, '')
+            for key in key_changes:
+                if key + '0' in IOIC_codes:
+                    key_changes[key] = key + '0'
+
+            # economic allocations. Be my guest if you wanna verify :)
+            industries_ghgs.loc['BS111A00'] = 0.55 * industries_ghgs.loc['BS11B00']
+            industries_ghgs.loc['BS1114A0'] = 0.05 * industries_ghgs.loc['BS11B00']
+            industries_ghgs.loc['BS112A00'] = 0.38 * industries_ghgs.loc['BS11B00']
+            industries_ghgs.loc['BS112500'] = 0.02 * industries_ghgs.loc['BS11B00']
+            industries_ghgs.loc['BS115A00'] = 0.39 * industries_ghgs.loc['BS11500']
+            industries_ghgs.loc['BS115300'] = 0.61 * industries_ghgs.loc['BS11500']
+            industries_ghgs.loc['BS211110'] = 0.5 * industries_ghgs.loc['BS21100']
+            industries_ghgs.loc['BS211140'] = 0.5 * industries_ghgs.loc['BS21100']
+            industries_ghgs.loc['BS212210'] = 0.15 * industries_ghgs.loc['BS21220']
+            industries_ghgs.loc['BS212220'] = 0.35 * industries_ghgs.loc['BS21220']
+            industries_ghgs.loc['BS212230'] = 0.4 * industries_ghgs.loc['BS21220']
+            industries_ghgs.loc['BS212290'] = 0.1 * industries_ghgs.loc['BS21220']
+            industries_ghgs.loc['BS212310'] = 0.16 * industries_ghgs.loc['BS21230']
+            industries_ghgs.loc['BS212320'] = 0.15 * industries_ghgs.loc['BS21230']
+            industries_ghgs.loc['BS212392'] = 0.18 * industries_ghgs.loc['BS21230']
+            industries_ghgs.loc['BS21239A'] = 0.13 * industries_ghgs.loc['BS21230']
+            industries_ghgs.loc['BS212396'] = 0.38 * industries_ghgs.loc['BS21230']
+            industries_ghgs.loc['BS21311A'] = 0.73 * industries_ghgs.loc['BS21300']
+            industries_ghgs.loc['BS21311B'] = 0.27 * industries_ghgs.loc['BS21300']
+            industries_ghgs.loc['BS221200'] = 0.9 * industries_ghgs.loc['BS221A0']
+            industries_ghgs.loc['BS221300'] = 0.1 * industries_ghgs.loc['BS221A0']
+            industries_ghgs.loc['BS311200'] = 0.35 * industries_ghgs.loc['BS311A0']
+            industries_ghgs.loc['BS311800'] = 0.31 * industries_ghgs.loc['BS311A0']
+            industries_ghgs.loc['BS311900'] = 0.33 * industries_ghgs.loc['BS311A0']
+            industries_ghgs.loc['BS321100'] = 0.52 * industries_ghgs.loc['BS32100']
+            industries_ghgs.loc['BS321200'] = 0.22 * industries_ghgs.loc['BS32100']
+            industries_ghgs.loc['BS321900'] = 0.26 * industries_ghgs.loc['BS32100']
+            industries_ghgs.loc['BS324110'] = 0.91 * industries_ghgs.loc['BS32400']
+            industries_ghgs.loc['BS3241A0'] = 0.09 * industries_ghgs.loc['BS32400']
+            industries_ghgs.loc['BS325200'] = 0.43 * industries_ghgs.loc['BS325C0']
+            industries_ghgs.loc['BS325500'] = 0.13 * industries_ghgs.loc['BS325C0']
+            industries_ghgs.loc['BS325600'] = 0.20 * industries_ghgs.loc['BS325C0']
+            industries_ghgs.loc['BS325900'] = 0.23 * industries_ghgs.loc['BS325C0']
+            industries_ghgs.loc['BS331100'] = 0.17 * industries_ghgs.loc['BS33100']
+            industries_ghgs.loc['BS331200'] = 0.07 * industries_ghgs.loc['BS33100']
+            industries_ghgs.loc['BS331300'] = 0.18 * industries_ghgs.loc['BS33100']
+            industries_ghgs.loc['BS331400'] = 0.54 * industries_ghgs.loc['BS33100']
+            industries_ghgs.loc['BS331500'] = 0.04 * industries_ghgs.loc['BS33100']
+            industries_ghgs.loc['BS332100'] = 0.04 * industries_ghgs.loc['BS33200']
+            industries_ghgs.loc['BS332A00'] = 0.16 * industries_ghgs.loc['BS33200']
+            industries_ghgs.loc['BS332300'] = 0.41 * industries_ghgs.loc['BS33200']
+            industries_ghgs.loc['BS332400'] = 0.1 * industries_ghgs.loc['BS33200']
+            industries_ghgs.loc['BS332500'] = 0.05 * industries_ghgs.loc['BS33200']
+            industries_ghgs.loc['BS332600'] = 0.03 * industries_ghgs.loc['BS33200']
+            industries_ghgs.loc['BS332700'] = 0.16 * industries_ghgs.loc['BS33200']
+            industries_ghgs.loc['BS332800'] = 0.06 * industries_ghgs.loc['BS33200']
+            industries_ghgs.loc['BS333100'] = 0.25 * industries_ghgs.loc['BS33300']
+            industries_ghgs.loc['BS333200'] = 0.12 * industries_ghgs.loc['BS33300']
+            industries_ghgs.loc['BS333300'] = 0.14 * industries_ghgs.loc['BS33300']
+            industries_ghgs.loc['BS333400'] = 0.10 * industries_ghgs.loc['BS33300']
+            industries_ghgs.loc['BS333500'] = 0.12 * industries_ghgs.loc['BS33300']
+            industries_ghgs.loc['BS333600'] = 0.04 * industries_ghgs.loc['BS33300']
+            industries_ghgs.loc['BS333900'] = 0.22 * industries_ghgs.loc['BS33300']
+            industries_ghgs.loc['BS334200'] = 0.25 * industries_ghgs.loc['BS334B0']
+            industries_ghgs.loc['BS334A00'] = 0.46 * industries_ghgs.loc['BS334B0']
+            industries_ghgs.loc['BS334400'] = 0.29 * industries_ghgs.loc['BS334B0']
+            industries_ghgs.loc['BS335100'] = 0.12 * industries_ghgs.loc['BS335A0']
+            industries_ghgs.loc['BS335300'] = 0.49 * industries_ghgs.loc['BS335A0']
+            industries_ghgs.loc['BS335900'] = 0.39 * industries_ghgs.loc['BS335A0']
+            industries_ghgs.loc['BS336110'] = 0.96 * industries_ghgs.loc['BS33610']
+            industries_ghgs.loc['BS336120'] = 0.04 * industries_ghgs.loc['BS33610']
+            industries_ghgs.loc['BS336310'] = 0.17 * industries_ghgs.loc['BS33630']
+            industries_ghgs.loc['BS336320'] = 0.05 * industries_ghgs.loc['BS33630']
+            industries_ghgs.loc['BS336330'] = 0.07 * industries_ghgs.loc['BS33630']
+            industries_ghgs.loc['BS336340'] = 0.02 * industries_ghgs.loc['BS33630']
+            industries_ghgs.loc['BS336350'] = 0.13 * industries_ghgs.loc['BS33630']
+            industries_ghgs.loc['BS336360'] = 0.19 * industries_ghgs.loc['BS33630']
+            industries_ghgs.loc['BS336370'] = 0.20 * industries_ghgs.loc['BS33630']
+            industries_ghgs.loc['BS336390'] = 0.17 * industries_ghgs.loc['BS33630']
+            industries_ghgs.loc['BS337100'] = 0.54 * industries_ghgs.loc['BS33700']
+            industries_ghgs.loc['BS337200'] = 0.36 * industries_ghgs.loc['BS33700']
+            industries_ghgs.loc['BS337900'] = 0.1 * industries_ghgs.loc['BS33700']
+            industries_ghgs.loc['BS339100'] = 0.28 * industries_ghgs.loc['BS33900']
+            industries_ghgs.loc['BS339900'] = 0.72 * industries_ghgs.loc['BS33900']
+            industries_ghgs.loc['BS411000'] = 0.02 * industries_ghgs.loc['BS41000']
+            industries_ghgs.loc['BS412000'] = 0.04 * industries_ghgs.loc['BS41000']
+            industries_ghgs.loc['BS413000'] = 0.13 * industries_ghgs.loc['BS41000']
+            industries_ghgs.loc['BS414000'] = 0.17 * industries_ghgs.loc['BS41000']
+            industries_ghgs.loc['BS415000'] = 0.12 * industries_ghgs.loc['BS41000']
+            industries_ghgs.loc['BS416000'] = 0.14 * industries_ghgs.loc['BS41000']
+            industries_ghgs.loc['BS417000'] = 0.23 * industries_ghgs.loc['BS41000']
+            industries_ghgs.loc['BS418000'] = 0.12 * industries_ghgs.loc['BS41000']
+            industries_ghgs.loc['BS419000'] = 0.03 * industries_ghgs.loc['BS41000']
+            industries_ghgs.loc['BS441000'] = 0.16 * industries_ghgs.loc['BS4AA00']
+            industries_ghgs.loc['BS442000'] = 0.05 * industries_ghgs.loc['BS4AA00']
+            industries_ghgs.loc['BS443000'] = 0.03 * industries_ghgs.loc['BS4AA00']
+            industries_ghgs.loc['BS444000'] = 0.08 * industries_ghgs.loc['BS4AA00']
+            industries_ghgs.loc['BS445000'] = 0.19 * industries_ghgs.loc['BS4AA00']
+            industries_ghgs.loc['BS446000'] = 0.11 * industries_ghgs.loc['BS4AA00']
+            industries_ghgs.loc['BS447000'] = 0.06 * industries_ghgs.loc['BS4AA00']
+            industries_ghgs.loc['BS448000'] = 0.11 * industries_ghgs.loc['BS4AA00']
+            industries_ghgs.loc['BS451000'] = 0.03 * industries_ghgs.loc['BS4AA00']
+            industries_ghgs.loc['BS452000'] = 0.1 * industries_ghgs.loc['BS4AA00']
+            industries_ghgs.loc['BS453A00'] = 0.04 * industries_ghgs.loc['BS4AA00']
+            industries_ghgs.loc['BS454000'] = 0.04 * industries_ghgs.loc['BS4AA00']
+            industries_ghgs.loc['BS486A00'] = 0.51 * industries_ghgs.loc['BS48600']
+            industries_ghgs.loc['BS486200'] = 0.49 * industries_ghgs.loc['BS48600']
+            industries_ghgs.loc['BS485100'] = 0.11 * industries_ghgs.loc['BS48B00']
+            industries_ghgs.loc['BS48A000'] = 0.09 * industries_ghgs.loc['BS48B00']
+            industries_ghgs.loc['BS485300'] = 0.06 * industries_ghgs.loc['BS48B00']
+            industries_ghgs.loc['BS488000'] = 0.75 * industries_ghgs.loc['BS48B00']
+            industries_ghgs.loc['BS491000'] = 0.34 * industries_ghgs.loc['BS49A00']
+            industries_ghgs.loc['BS492000'] = 0.66 * industries_ghgs.loc['BS49A00']
+            industries_ghgs.loc['BS5121A0'] = 0.77 * industries_ghgs.loc['BS51200']
+            industries_ghgs.loc['BS512130'] = 0.14 * industries_ghgs.loc['BS51200']
+            industries_ghgs.loc['BS512200'] = 0.08 * industries_ghgs.loc['BS51200']
+            industries_ghgs.loc['BS511110'] = 0.04 * industries_ghgs.loc['BS51B00']
+            industries_ghgs.loc['BS5111A0'] = 0.05 * industries_ghgs.loc['BS51B00']
+            industries_ghgs.loc['BS511200'] = 0.11 * industries_ghgs.loc['BS51B00']
+            industries_ghgs.loc['BS515200'] = 0.05 * industries_ghgs.loc['BS51B00']
+            industries_ghgs.loc['BS517000'] = 0.66 * industries_ghgs.loc['BS51B00']
+            industries_ghgs.loc['BS518000'] = 0.06 * industries_ghgs.loc['BS51B00']
+            industries_ghgs.loc['BS519000'] = 0.04 * industries_ghgs.loc['BS51B00']
+            industries_ghgs.loc['BS521000'] = 0.002 * industries_ghgs.loc['BS52B00']
+            industries_ghgs.loc['BS5221A0'] = 0.469 * industries_ghgs.loc['BS52B00']
+            industries_ghgs.loc['BS522130'] = 0.042 * industries_ghgs.loc['BS52B00']
+            industries_ghgs.loc['BS522200'] = 0.067 * industries_ghgs.loc['BS52B00']
+            industries_ghgs.loc['BS522300'] = 0.031 * industries_ghgs.loc['BS52B00']
+            industries_ghgs.loc['BS52A000'] = 0.306 * industries_ghgs.loc['BS52B00']
+            industries_ghgs.loc['BS524200'] = 0.082 * industries_ghgs.loc['BS52B00']
+            industries_ghgs.loc['BS532100'] = 0.28 * industries_ghgs.loc['BS53B00']
+            industries_ghgs.loc['BS532A00'] = 0.56 * industries_ghgs.loc['BS53B00']
+            industries_ghgs.loc['BS533000'] = 0.16 * industries_ghgs.loc['BS53B00']
+            industries_ghgs.loc['BS541100'] = 0.26 * industries_ghgs.loc['BS541C0']
+            industries_ghgs.loc['BS541200'] = 0.26 * industries_ghgs.loc['BS541C0']
+            industries_ghgs.loc['BS541300'] = 0.48 * industries_ghgs.loc['BS541C0']
+            industries_ghgs.loc['BS541400'] = 0.03 * industries_ghgs.loc['BS541D0']
+            industries_ghgs.loc['BS541500'] = 0.52 * industries_ghgs.loc['BS541D0']
+            industries_ghgs.loc['BS541600'] = 0.21 * industries_ghgs.loc['BS541D0']
+            industries_ghgs.loc['BS541700'] = 0.08 * industries_ghgs.loc['BS541D0']
+            industries_ghgs.loc['BS541900'] = 0.16 * industries_ghgs.loc['BS541D0']
+            industries_ghgs.loc['BS561100'] = 0.18 * industries_ghgs.loc['BS56100']
+            industries_ghgs.loc['BS561A00'] = 0.16 * industries_ghgs.loc['BS56100']
+            industries_ghgs.loc['BS561300'] = 0.17 * industries_ghgs.loc['BS56100']
+            industries_ghgs.loc['BS561400'] = 0.11 * industries_ghgs.loc['BS56100']
+            industries_ghgs.loc['BS561500'] = 0.07 * industries_ghgs.loc['BS56100']
+            industries_ghgs.loc['BS561600'] = 0.09 * industries_ghgs.loc['BS56100']
+            industries_ghgs.loc['BS561700'] = 0.23 * industries_ghgs.loc['BS56100']
+            industries_ghgs.loc['BS531A00'] = 0.62 * industries_ghgs.loc['BS5A000']
+            industries_ghgs.loc['BS551113'] = 0.38 * industries_ghgs.loc['BS5A000']
+            industries_ghgs.loc['BS621100'] = 0.44 * industries_ghgs.loc['BS62000']
+            industries_ghgs.loc['BS621200'] = 0.21 * industries_ghgs.loc['BS62000']
+            industries_ghgs.loc['BS621A00'] = 0.17 * industries_ghgs.loc['BS62000']
+            industries_ghgs.loc['BS623000'] = 0.11 * industries_ghgs.loc['BS62000']
+            industries_ghgs.loc['BS624000'] = 0.07 * industries_ghgs.loc['BS62000']
+            industries_ghgs.loc['BS71A000'] = 0.37 * industries_ghgs.loc['BS71000']
+            industries_ghgs.loc['BS713A00'] = 0.37 * industries_ghgs.loc['BS71000']
+            industries_ghgs.loc['BS713200'] = 0.26 * industries_ghgs.loc['BS71000']
+            industries_ghgs.loc['BS721100'] = 0.19 * industries_ghgs.loc['BS72000']
+            industries_ghgs.loc['BS721A00'] = 0.03 * industries_ghgs.loc['BS72000']
+            industries_ghgs.loc['BS722000'] = 0.78 * industries_ghgs.loc['BS72000']
+            industries_ghgs.loc['BS811100'] = 0.53 * industries_ghgs.loc['BS81100']
+            industries_ghgs.loc['BS811A00'] = 0.47 * industries_ghgs.loc['BS81100']
+            industries_ghgs.loc['BS812A00'] = 0.59 * industries_ghgs.loc['BS81A00']
+            industries_ghgs.loc['BS812200'] = 0.11 * industries_ghgs.loc['BS81A00']
+            industries_ghgs.loc['BS812300'] = 0.12 * industries_ghgs.loc['BS81A00']
+            industries_ghgs.loc['BS814000'] = 0.18 * industries_ghgs.loc['BS81A00']
+            industries_ghgs.loc['FC210000'] = 0.5 * industries_ghgs.loc['FC20000']
+            industries_ghgs.loc['FC220000'] = 0.5 * industries_ghgs.loc['FC20000']
+            industries_ghgs.loc['NP621000'] = 0.09 * industries_ghgs.loc['NPA0000']
+            industries_ghgs.loc['NP813A00'] = 0.65 * industries_ghgs.loc['NPA0000']
+            industries_ghgs.loc['NP999999'] = 0.26 * industries_ghgs.loc['NPA0000']
+            industries_ghgs.loc['GS611100'] = 0.83 * industries_ghgs.loc['GS611B0']
+            industries_ghgs.loc['GS611200'] = 0.16 * industries_ghgs.loc['GS611B0']
+            industries_ghgs.loc['GS611A00'] = 0.01 * industries_ghgs.loc['GS611B0']
+            industries_ghgs.loc['GS911100'] = 0.27 * industries_ghgs.loc['GS91100']
+            industries_ghgs.loc['GS911A00'] = 0.73 * industries_ghgs.loc['GS91100']
+
+            new_index = []
+            for code in industries_ghgs.index:
+                if code in key_changes:
+                    if key_changes[code] != '':
+                        new_index.append(key_changes[code])
+                    else:
+                        new_index.append(code)
+                else:
+                    new_index.append(code)
+
+            industries_ghgs.index = new_index
+            industries_ghgs = industries_ghgs.loc[IOIC_codes]
+
+        industries_ghgs.index = [i[1] for i in self.industries]
+        industries_ghgs.name = ('GHGs', 'air')
+        industries_ghgs *= 1000000
+        self.F = self.F.append(industries_ghgs)
+
+        self.emission_metadata.loc[('GHGs', 'air'), 'CAS Number'] = 'N/A'
+        self.emission_metadata.loc[('GHGs', 'air'), 'Unit'] = 'kgCO2eq'
+
+        # normalize
         if self.classification == 'industry':
             self.S = self.F.dot(self.inv_g)
 
         if self.classification == 'product':
             self.F = self.F.dot(self.V.dot(self.inv_g).T)
             self.S = self.F.dot(self.inv_q)
-
-        # assert that most of the emissions (>99%) given by the NPRI are present in self.F
-        assert self.F.sum().sum() / total_emissions_origin > 0.99
-        assert self.F.sum().sum() / total_emissions_origin < 1.01
-
