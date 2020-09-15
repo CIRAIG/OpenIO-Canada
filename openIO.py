@@ -1687,16 +1687,16 @@ class IOTables:
         for pollutant in concordance_IW:
             match_CAS = ''
             try:
-                if len(self.emission_metadata.loc[(pollutant, 'air'), 'CAS Number'].split('-')[0]) == 2:
-                    match_CAS = '0000' + self.emission_metadata.loc[(pollutant, 'air'), 'CAS Number']
-                elif len(self.emission_metadata.loc[(pollutant, 'air'), 'CAS Number'].split('-')[0]) == 3:
-                    match_CAS = '000' + self.emission_metadata.loc[(pollutant, 'air'), 'CAS Number']
-                elif len(self.emission_metadata.loc[(pollutant, 'air'), 'CAS Number'].split('-')[0]) == 4:
-                    match_CAS = '00' + self.emission_metadata.loc[(pollutant, 'air'), 'CAS Number']
-                elif len(self.emission_metadata.loc[(pollutant, 'air'), 'CAS Number'].split('-')[0]) == 5:
-                    match_CAS = '0' + self.emission_metadata.loc[(pollutant, 'air'), 'CAS Number']
-                elif len(self.emission_metadata.loc[(pollutant, 'air'), 'CAS Number'].split('-')[0]) == 6:
-                    match_CAS = self.emission_metadata.loc[(pollutant, 'air'), 'CAS Number']
+                if len(self.emission_metadata.loc[(pollutant, 'Air'), 'CAS Number'].split('-')[0]) == 2:
+                    match_CAS = '0000' + self.emission_metadata.loc[(pollutant, 'Air'), 'CAS Number']
+                elif len(self.emission_metadata.loc[(pollutant, 'Air'), 'CAS Number'].split('-')[0]) == 3:
+                    match_CAS = '000' + self.emission_metadata.loc[(pollutant, 'Air'), 'CAS Number']
+                elif len(self.emission_metadata.loc[(pollutant, 'Air'), 'CAS Number'].split('-')[0]) == 4:
+                    match_CAS = '00' + self.emission_metadata.loc[(pollutant, 'Air'), 'CAS Number']
+                elif len(self.emission_metadata.loc[(pollutant, 'Air'), 'CAS Number'].split('-')[0]) == 5:
+                    match_CAS = '0' + self.emission_metadata.loc[(pollutant, 'Air'), 'CAS Number']
+                elif len(self.emission_metadata.loc[(pollutant, 'Air'), 'CAS Number'].split('-')[0]) == 6:
+                    match_CAS = self.emission_metadata.loc[(pollutant, 'Air'), 'CAS Number']
                 try:
                     concordance_IW[pollutant] = [df.loc[i, 'Elem flow name'] for i in df.index if i == match_CAS][0]
 
