@@ -14,17 +14,12 @@ import pkg_resources
 
 
 class IOTables:
-    def __init__(self, supply_use_excel_path, classification, aggregate_final_demand=True):
+    def __init__(self, supply_use_excel_path, classification):
         """
-
         :param supply_use_excel_path: the path to the SUT excel file (e.g. /../Detail level/CA_SUT_C2016_D.xlsx)
-        :param NPRI_excel: the path to the NPRI excel file (e.g. /../2017_INRP-NPRI.xlsx)
         :param classification: [string] the type of classification to adopt for the symmetric IOT ("product" or "industry")
-        :param assumption: [string] the assumption used to create the symmetric IO tables ("industry technology" or
-                            "fixed industry sales structure")
-        :param aggregate_final_demand: [boolean] aggregating the final demand to 6 elements or not
-
         """
+
         self.SU_tables = pd.read_excel(supply_use_excel_path, None)
         self.level_of_detail = self.SU_tables['Supply'].iloc[5, 0]
         self.NPRI = pd.read_excel((pkg_resources.resource_stream(__name__, '/Data/2017_INRP-NPRI.xlsx')), None)
@@ -35,6 +30,7 @@ class IOTables:
         elif self.classification == "industry":
             self.assumption = 'fixed industry sales structure'
 
+        # values
         self.V = pd.DataFrame()
         self.U = pd.DataFrame()
         self.A = pd.DataFrame()
@@ -50,18 +46,22 @@ class IOTables:
         self.F = pd.DataFrame()
         self.S = pd.DataFrame()
         self.FY = pd.DataFrame()
+        self.C = pd.DataFrame()
 
+        # metadata
         self.emission_metadata = pd.DataFrame()
+        self.methods_metadata = pd.DataFrame()
         self.industries = []
         self.commodities = []
 
+        # methods executed
         self.format_tables()
         self.gimme_symmetric_iot()
-        if aggregate_final_demand:
-            self.aggregate_final_demand()
+        self.aggregate_final_demand()
         self.remove_codes()
         self.extract_environmental_data()
         self.match_environmental_data_to_iots()
+        self.characterization_matrix()
 
     def format_tables(self):
         """
@@ -235,7 +235,7 @@ class IOTables:
         temp_df = emissions.groupby(emissions.index).head(n=1)
         # separating the metadata for emissions (CAS and units)
         self.emission_metadata = pd.DataFrame('', index=pd.MultiIndex.from_product([temp_df.index,
-                                                                                    ['air', 'water', 'soil']]),
+                                                                                    ['Air', 'Water', 'Soil']]),
                                               columns=['CAS Number', 'Unit'])
         for emission in temp_df.index:
             self.emission_metadata.loc[emission, 'CAS Number'] = temp_df.loc[emission, 'CAS Number']
@@ -244,9 +244,19 @@ class IOTables:
 
         self.F = pd.pivot_table(data=emissions, index=[emissions.index], columns=['NAICS 6 Code'],
                                 aggfunc=np.sum).fillna(0)
-        self.F.columns.set_levels(['air', 'water', 'soil'], level=0, inplace=True)
+        self.F.columns.set_levels(['Air', 'Water', 'Soil'], level=0, inplace=True)
         self.F.columns = self.F.columns.rename(['compartment', 'NAICS'])
         self.F = self.F.T.unstack('compartment').T[self.F.T.unstack('compartment').T != 0].fillna(0)
+
+        # convert all tonnes and grams to kgs and change in metadata as well
+        self.F.loc[
+            [i for i in self.emission_metadata.index if self.emission_metadata.loc[i, 'Unit'] == 'tonnes']] *= 1000
+        self.emission_metadata.loc[[i for i in self.emission_metadata.index if
+                                    self.emission_metadata.loc[i, 'Unit'] == 'tonnes'], 'Unit'] = 'kg'
+        self.F.loc[
+            [i for i in self.emission_metadata.index if self.emission_metadata.loc[i, 'Unit'] == 'grams']] /= 1000
+        self.emission_metadata.loc[[i for i in self.emission_metadata.index if
+                                    self.emission_metadata.loc[i, 'Unit'] == 'grams'], 'Unit'] = 'kg'
 
     def match_environmental_data_to_iots(self):
         """
@@ -423,10 +433,11 @@ class IOTables:
         # households emissions
         self.FY = pd.DataFrame([[
             GHGs.loc[[i for i in GHGs.index if 'Households' in i]].sum().loc['VALUE']*1000000, 0, 0, 0, 0, 0],
-            [water.loc[[i for i in water.index if 'Households' in i]].sum().loc['VALUE'], 0, 0, 0, 0, 0],
-            [NRG.loc[[i for i in NRG.index if 'Households' in i]].sum().loc['VALUE'], 0, 0, 0, 0, 0]],
-            index=['GHGs', 'Water use', 'Energy use'],
+            [NRG.loc[[i for i in NRG.index if 'Households' in i]].sum().loc['VALUE'], 0, 0, 0, 0, 0],
+            [water.loc[[i for i in water.index if 'Households' in i]].sum().loc['VALUE'], 0, 0, 0, 0, 0]],
+            index=[('GHGs',''), ('Energy use',''), ('Water use','')],
             columns=self.Y.columns)
+        self.FY = pd.concat([pd.DataFrame(0, self.F.index, self.Y.columns),self.FY])
 
         industries_nrg = select_industries_emissions(NRG)
         industries_water = select_industries_emissions(water)
@@ -1662,6 +1673,98 @@ class IOTables:
         if self.classification == 'product':
             self.F = self.F.dot(self.V.dot(self.inv_g).T)
             self.S = self.F.dot(self.inv_q)
+
+    def characterization_matrix(self):
+
+        IW = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Impact_World.xlsx'))
+
+        df = IW.set_index('CAS number')
+        df.index = [str(i) for i in df.index]
+        df = df.groupby(df.index).head(n=1)
+
+        concordance_IW = dict.fromkeys(self.F.index.levels[0])
+
+        for pollutant in concordance_IW:
+            match_CAS = ''
+            try:
+                if len(self.emission_metadata.loc[(pollutant, 'air'), 'CAS Number'].split('-')[0]) == 2:
+                    match_CAS = '0000' + self.emission_metadata.loc[(pollutant, 'air'), 'CAS Number']
+                elif len(self.emission_metadata.loc[(pollutant, 'air'), 'CAS Number'].split('-')[0]) == 3:
+                    match_CAS = '000' + self.emission_metadata.loc[(pollutant, 'air'), 'CAS Number']
+                elif len(self.emission_metadata.loc[(pollutant, 'air'), 'CAS Number'].split('-')[0]) == 4:
+                    match_CAS = '00' + self.emission_metadata.loc[(pollutant, 'air'), 'CAS Number']
+                elif len(self.emission_metadata.loc[(pollutant, 'air'), 'CAS Number'].split('-')[0]) == 5:
+                    match_CAS = '0' + self.emission_metadata.loc[(pollutant, 'air'), 'CAS Number']
+                elif len(self.emission_metadata.loc[(pollutant, 'air'), 'CAS Number'].split('-')[0]) == 6:
+                    match_CAS = self.emission_metadata.loc[(pollutant, 'air'), 'CAS Number']
+                try:
+                    concordance_IW[pollutant] = [df.loc[i, 'Elem flow name'] for i in df.index if i == match_CAS][0]
+
+                except IndexError:
+                    pass
+            except KeyError:
+                pass
+
+        # hardcoding what could not be matched using CAS number
+        concordance_IW['Aluminum oxide (fibrous forms only)'] = 'Aluminium'
+        concordance_IW['Antimony (and its compounds)'] = 'Antimony'
+        concordance_IW['Arsenic (and its compounds)'] = 'Arsenic'
+        concordance_IW['Cadmium (and its compounds)'] = 'Cadmium'
+        concordance_IW['Chromium (and its compounds)'] = 'Chromium'
+        concordance_IW['Cobalt (and its compounds)'] = 'Cobalt'
+        concordance_IW['Copper (and its compounds)'] = 'Copper'
+        concordance_IW['Fluorine'] = 'Fluorine'
+        concordance_IW['Lead (and its compounds)'] = 'Lead'
+        concordance_IW['Nickel (and its compounds)'] = 'Nickel'
+        concordance_IW['Molybdenum (and its compounds)'] = 'Molybdenum'
+        concordance_IW['Mercury (and its compounds)'] = 'Mercury'
+        concordance_IW['Manganese (and its compounds)'] = 'Manganese'
+        concordance_IW['PM10 - Particulate matter <=10 microns'] = 'Particulates, < 10 um'
+        concordance_IW['PM2.5 - Particulate matter <=2.5 microns'] = 'Particulates, < 2.5 um'
+        concordance_IW['Phosphorus (and its compounds)'] = 'Phosphorus'
+        concordance_IW['Selenium (and its compounds)'] = 'Selenium'
+        concordance_IW['Silver (and its compounds)'] = 'Silver'
+        concordance_IW['Thallium (and its compounds)'] = 'Thallium'
+        concordance_IW['Zinc (and its compounds)'] = 'Zinc'
+        concordance_IW['Speciated VOC - Butane  (all isomers)'] = 'Butane'
+        concordance_IW['Speciated VOC - Butene  (all isomers)'] = '1-Butene'
+        concordance_IW['Speciated VOC - Anthraquinone (all isomers)'] = 'Anthraquinone'
+        concordance_IW['Speciated VOC - Cycloheptane'] = 'Cycloheptane'
+        concordance_IW['Speciated VOC - Cyclohexene'] = 'Cyclohexene'
+        concordance_IW['Speciated VOC - Cyclooctane'] = 'Cyclooctane'
+        concordance_IW['Speciated VOC - Decane  (all isomers)'] = 'Decane'
+        concordance_IW['Speciated VOC - Dodecane  (all isomers)'] = 'Dodecane'
+        concordance_IW['Speciated VOC - Heptane  (all isomers)'] = 'Heptane'
+        concordance_IW['Speciated VOC - Hexane'] = 'Hexane'
+        concordance_IW['Speciated VOC - Nonane  (all isomers)'] = 'Nonane'
+        concordance_IW['Speciated VOC - Octane  (all isomers)'] = 'N-octane'
+        concordance_IW['Speciated VOC - Pentane  (all isomers)'] = 'Pentane'
+        concordance_IW['Speciated VOC - Pentene  (all isomers)'] = '1-Pentene'
+
+        pivoting = pd.pivot_table(IW, values='CF value', index='Impact category',
+                                  columns=['Elem flow name', 'Compartment', 'Sub-compartment']).fillna(0)
+
+        self.C = pd.DataFrame(0, pivoting.index, self.F.index)
+        for flow in self.C.columns:
+            if concordance_IW[flow[0]] != None:
+                try:
+                    self.C.loc[:, (flow[0], flow[1])] = pivoting.loc[:, (concordance_IW[flow[0]], flow[1], '(unspecified)')]
+                except KeyError:
+                    pass
+        self.C.loc['Climate change', ('GHGs', '')] = 1
+        self.C.loc['Energy use', ('Energy use', '')] = 1
+        self.C.loc['Water use', ('Water use', '')] = 1
+        # remove impact categories with no pollutants
+        self.C = self.C.loc[self.C.sum(axis=1)[self.C.sum(axis=1) != 0].index].fillna(0)
+
+        self.methods_metadata = IW.loc[:, ['Impact category', 'CF unit']]
+        self.methods_metadata = self.methods_metadata.set_index('Impact category')
+        self.methods_metadata = self.methods_metadata.groupby(self.methods_metadata.index).head(n=1)
+        self.methods_metadata = pd.concat([self.methods_metadata ,
+                                           pd.DataFrame(['kgCO2eq', 'TJ', 'm3'],
+                                                        ['Climate change', 'Energy use', 'Water use'],
+                                                        ['CF unit'])])
+        self.methods_metadata = self.methods_metadata.loc[self.C.index]
 
 
 def extract_data_from_csv(file_name):
