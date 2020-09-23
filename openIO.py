@@ -14,15 +14,16 @@ import pkg_resources
 
 
 class IOTables:
-    def __init__(self, supply_use_excel_path, classification):
+    def __init__(self, supply_use_excel_path, NPRI_excel_path, classification):
         """
         :param supply_use_excel_path: the path to the SUT excel file (e.g. /../Detail level/CA_SUT_C2016_D.xlsx)
+        :param NPRI_excel_path: the path to the NPRI excel file (e.g. /../2016_INRP-NPRI.xlsx)
         :param classification: [string] the type of classification to adopt for the symmetric IOT ("product" or "industry")
         """
 
         self.SU_tables = pd.read_excel(supply_use_excel_path, None)
         self.level_of_detail = self.SU_tables['Supply'].iloc[5, 0]
-        self.NPRI = pd.read_excel((pkg_resources.resource_stream(__name__, '/Data/2017_INRP-NPRI.xlsx')), None)
+        self.NPRI = pd.read_excel(NPRI_excel_path, None)
         self.classification = classification
 
         if self.classification == "product":
@@ -49,6 +50,7 @@ class IOTables:
         self.C = pd.DataFrame()
 
         # metadata
+        self.year = 2016
         self.emission_metadata = pd.DataFrame()
         self.methods_metadata = pd.DataFrame()
         self.industries = []
@@ -74,6 +76,8 @@ class IOTables:
 
         Supply_table = self.SU_tables['Supply'].copy()
         Use_table = self.SU_tables['Use_Basic'].copy()
+
+        self.year = int(Supply_table.columns[0][-4:])
 
         for i in range(0, len(Supply_table.columns)):
             if Supply_table.iloc[11, i] == 'Total':
@@ -429,15 +433,15 @@ class IOTables:
         assert self.F.sum().sum() / total_emissions_origin > 0.98
         assert self.F.sum().sum() / total_emissions_origin < 1.02
 
-        GHGs = extract_data_from_csv('GHG_emissions.csv')
-        NRG = extract_data_from_csv('Energy_use.csv')
-        water = extract_data_from_csv('Water_use.csv')
+        GHGs = self.extract_data_from_csv('GHG_emissions.csv')
+        NRG = self.extract_data_from_csv('Energy_use.csv')
+        water = self.extract_data_from_csv('Water_use.csv')
 
         # households emissions
         self.FY = pd.DataFrame([[
             GHGs.loc[[i for i in GHGs.index if 'Households' in i]].sum().loc['VALUE']*1000000, 0, 0, 0, 0, 0],
             [NRG.loc[[i for i in NRG.index if 'Households' in i]].sum().loc['VALUE'], 0, 0, 0, 0, 0],
-            [water.loc[[i for i in water.index if 'Households' in i]].sum().loc['VALUE'], 0, 0, 0, 0, 0]],
+            [water.loc[[i for i in water.index if 'Households' in i]].sum().loc['VALUE']*1000, 0, 0, 0, 0, 0]],
             index=[('GHGs', ''), ('Energy use', ''), ('Water use', '')],
             columns=self.Y.columns)
 
@@ -1843,15 +1847,24 @@ class IOTables:
         self.FY = pd.concat([pd.DataFrame(0, self.F.index, self.Y.columns), self.FY])
         self.FY = self.FY.groupby(self.FY.index).sum()
 
-
-def extract_data_from_csv(file_name):
-    year = 2017
-    if file_name == 'Water_use.csv':
-        year = 2015
-    df = pd.read_csv(pkg_resources.resource_stream(__name__, '/Data/'+file_name))
-    df = df.loc[[i for i in df.index if df.loc[i, 'GEO'] == 'Canada' and df.loc[i, 'REF_DATE'] == year]]
-    df.set_index('Sector', inplace=True)
-    return df
+    def extract_data_from_csv(self, file_name):
+        df = pd.read_csv(pkg_resources.resource_stream(__name__, '/Data/' + file_name))
+        if self.year < 2009:
+            df = df.loc[[i for i in df.index if df.loc[i, 'GEO'] == 'Canada' and df.loc[i, 'REF_DATE'] == 2009]]
+            print('Data for GHG, water and energy are only for 2009+ years. The year 2009 was selected as a proxy')
+        elif self.year in [2016, 2017]:
+            if file_name == 'Water_use.csv':
+                print('Data for water use only goes till 2015. Year 2015 was selected as proxy')
+                df = df.loc[[i for i in df.index if df.loc[i, 'GEO'] == 'Canada' and df.loc[i, 'REF_DATE'] == 2015]]
+            else:
+                df = df.loc[[i for i in df.index if df.loc[i, 'GEO'] == 'Canada' and df.loc[i, 'REF_DATE'] == self.year]]
+        elif self.year > 2017:
+            print('Environmental data for years after 2017 unavailable. 2017 will be selected as proxy.')
+            df = df.loc[[i for i in df.index if df.loc[i, 'GEO'] == 'Canada' and df.loc[i, 'REF_DATE'] == 2017]]
+        else:
+            df = df.loc[[i for i in df.index if df.loc[i, 'GEO'] == 'Canada' and df.loc[i, 'REF_DATE'] == self.year]]
+        df.set_index('Sector', inplace=True)
+        return df
 
 
 def select_industries_emissions(df):
