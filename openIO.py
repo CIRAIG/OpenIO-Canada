@@ -11,18 +11,21 @@ import pandas as pd
 import numpy as np
 import re
 import pkg_resources
+import os
+from time import time
 
 
 class IOTables:
-    def __init__(self, supply_use_excel_path, NPRI_excel_path, classification):
+    def __init__(self, folder_path, NPRI_excel_path, classification):
         """
         :param supply_use_excel_path: the path to the SUT excel file (e.g. /../Detail level/CA_SUT_C2016_D.xlsx)
         :param NPRI_excel_path: the path to the NPRI excel file (e.g. /../2016_INRP-NPRI.xlsx)
         :param classification: [string] the type of classification to adopt for the symmetric IOT ("product" or "industry")
         """
 
-        self.SU_tables = pd.read_excel(supply_use_excel_path, None)
-        self.level_of_detail = self.SU_tables['Supply'].iloc[5, 0]
+        print("Reading all the Excel files...")
+
+        self.level_of_detail = folder_path.split('/')[-1]
         self.NPRI = pd.read_excel(NPRI_excel_path, None)
         self.classification = classification
 
@@ -50,104 +53,316 @@ class IOTables:
         self.C = pd.DataFrame()
 
         # metadata
-        self.year = 2016
         self.emission_metadata = pd.DataFrame()
         self.methods_metadata = pd.DataFrame()
         self.industries = []
         self.commodities = []
+        self.factors_of_production = []
         self.concordance_IW = {}
 
-        # methods executed
-        self.format_tables()
-        self.gimme_symmetric_iot()
-        self.aggregate_final_demand()
-        self.remove_codes()
-        self.extract_environmental_data()
-        self.match_environmental_data_to_iots()
-        self.characterization_matrix()
-        self.balance_flows()
-        self.normalize()
+        self.matching_dict = {'AB': 'Alberta',
+                                'BC': 'British Columbia',
+                                'MB': 'Manitoba',
+                                'NB': 'New Brunswick',
+                                'NL': 'Newfoundland and Labrador',
+                                'NS': 'Nova Scotia',
+                                'NT': 'Northwest Territories',
+                                'NU': 'Nunavut',
+                                'ON': 'Ontario',
+                                'PE': 'Prince Edward Island',
+                                'QC': 'Quebec',
+                                'SK': 'Saskatchewan',
+                                'YT': 'Yukon'}
 
-    def format_tables(self):
+        files = [i for i in os.walk(folder_path)]
+        files = [i for i in files[0][2] if i[:2] in self.matching_dict.keys() and 'SUT' in i]
+        self.year = int(files[0].split('SUT_C')[1].split('_')[0])
+
+        print("Formatting the Supply and Use tables...")
+        for province_data in files:
+            su_tables = pd.read_excel(folder_path+province_data, None)
+            region = province_data[:2]
+            self.format_tables(su_tables, region)
+
+        self.W = self.W.fillna(0)
+        self.WY = self.WY.fillna(0)
+        self.Y = self.Y.fillna(0)
+        self.q = self.q.fillna(0)
+        self.g = self.g.fillna(0)
+        self.U = self.U.fillna(0)
+        self.V = self.V.fillna(0)
+
+        print('Aggregating final demand sectors...')
+        self.aggregate_final_demand()
+
+        print('Removing IOIC codes from index...')
+        self.remove_codes()
+
+        # self.province_import_export(pd.read_excel(
+        #     folder_path+[i for i in [j for j in os.walk(folder_path)][0][2] if 'Provincial_trade_flow' in i][0], 'Data'))
+        # self.gimme_symmetric_iot()
+        # self.extract_environmental_data()
+        # self.match_environmental_data_to_iots()
+        # self.characterization_matrix()
+        # self.balance_flows()
+        # self.normalize_flows()
+
+    def format_tables(self, su_tables, region):
         """
-        Extracts the relevant dataframes from the Excel file
+        Extracts the relevant dataframes from the Excel files in the Stat Can folder
+        :param su_tables: the supply and use economic tables
+        :param region: the province of Canada to compile data for
         :return: self.W, self.WY, self.Y, self.g, self.q, self.V, self.U
         """
 
-        Supply_table = self.SU_tables['Supply'].copy()
-        Use_table = self.SU_tables['Use_Basic'].copy()
+        supply_table = su_tables['Supply'].copy()
+        use_table = su_tables['Use_Basic'].copy()
 
-        self.year = int(Supply_table.columns[0][-4:])
+        if not self.industries:
+            for i in range(0, len(supply_table.columns)):
+                if supply_table.iloc[11, i] == 'Total':
+                    break
+                if supply_table.iloc[11, i] not in [np.nan, 'Industries']:
+                    # tuple with code + name (need code to deal with duplicate names in detailed levels)
+                    self.industries.append((supply_table.iloc[12, i], supply_table.iloc[11, i]))
 
-        for i in range(0, len(Supply_table.columns)):
-            if Supply_table.iloc[11, i] == 'Total':
-                break
-            if Supply_table.iloc[11, i] not in [np.nan, 'Industries']:
-                # tuple with code + name (need code to deal with duplicate names in detailed levels)
-                self.industries.append((Supply_table.iloc[12, i], Supply_table.iloc[11, i]))
-
-        factors_of_production = []
-        for i, element in enumerate(Supply_table.iloc[:, 0].tolist()):
-            if type(element) == str:
-                # identify by their codes
-                if re.search(r'^[M,F,N,G,I,E]\w*\d', element):
-                    self.commodities.append((element, Supply_table.iloc[i, 1]))
-                elif re.search(r'^P\w*\d', element) or re.search(r'^GVA', element):
-                    factors_of_production.append((element, Supply_table.iloc[i, 1]))
+        if not self.commodities:
+            for i, element in enumerate(supply_table.iloc[:, 0].tolist()):
+                if type(element) == str:
+                    # identify by their codes
+                    if re.search(r'^[M,F,N,G,I,E]\w*\d', element):
+                        self.commodities.append((element, supply_table.iloc[i, 1]))
+                    elif re.search(r'^P\w*\d', element) or re.search(r'^GVA', element):
+                        self.factors_of_production.append((element, supply_table.iloc[i, 1]))
 
         final_demand = []
-        for i in range(0, len(Use_table.columns)):
-            if Use_table.iloc[11, i] == 'Total use':
+        for i in range(0, len(use_table.columns)):
+            if use_table.iloc[11, i] == 'Total use':
                 break
-            if Use_table.iloc[11, i] not in [np.nan, 'Industries']:
-                final_demand.append((Use_table.iloc[12, i], Use_table.iloc[11, i]))
+            if use_table.iloc[11, i] not in [np.nan, 'Industries']:
+                final_demand.append((use_table.iloc[12, i], use_table.iloc[11, i]))
         final_demand = [i for i in final_demand if i not in self.industries and i[1] != 'Total']
 
-        df = Supply_table.iloc[14:, 2:]
-        df.index = list(zip(Supply_table.iloc[14:, 0].tolist(), Supply_table.iloc[14:, 1].tolist()))
-        df.columns = list(zip(Supply_table.iloc[12, 2:].tolist(), Supply_table.iloc[11, 2:].tolist()))
-        Supply_table = df
+        df = supply_table.iloc[14:, 2:]
+        df.index = list(zip(supply_table.iloc[14:, 0].tolist(), supply_table.iloc[14:, 1].tolist()))
+        df.columns = list(zip(supply_table.iloc[12, 2:].tolist(), supply_table.iloc[11, 2:].tolist()))
+        supply_table = df
 
-        df = Use_table.iloc[14:, 2:]
-        df.index = list(zip(Use_table.iloc[14:, 0].tolist(), Use_table.iloc[14:, 1].tolist()))
-        df.columns = list(zip(Use_table.iloc[12, 2:].tolist(), Use_table.iloc[11, 2:].tolist()))
-        Use_table = df
+        df = use_table.iloc[14:, 2:]
+        df.index = list(zip(use_table.iloc[14:, 0].tolist(), use_table.iloc[14:, 1].tolist()))
+        df.columns = list(zip(use_table.iloc[12, 2:].tolist(), use_table.iloc[11, 2:].tolist()))
+        use_table = df
 
         # fill with zeros
-        Supply_table.replace('.', 0, inplace=True)
-        Use_table.replace('.', 0, inplace=True)
+        supply_table.replace('.', 0, inplace=True)
+        use_table.replace('.', 0, inplace=True)
 
         # get strings as floats
-        Supply_table = Supply_table.astype('float64')
-        Use_table = Use_table.astype('float64')
+        supply_table = supply_table.astype('float64')
+        use_table = use_table.astype('float64')
 
         # tables from M$ to $
-        Supply_table *= 1000000
-        Use_table *= 1000000
+        supply_table *= 1000000
+        use_table *= 1000000
 
         # check calculated totals matched displayed totals
-        assert np.allclose(Use_table.iloc[:, Use_table.columns.get_loc(('TOTAL', 'Total'))],
-                           Use_table.iloc[:, :Use_table.columns.get_loc(('TOTAL', 'Total'))].sum(axis=1))
-        assert np.allclose(Supply_table.iloc[Supply_table.index.get_loc(('TOTAL', 'Total'))],
-                           Supply_table.iloc[:Supply_table.index.get_loc(('TOTAL', 'Total'))].sum())
+        assert np.allclose(use_table.iloc[:, use_table.columns.get_loc(('TOTAL', 'Total'))],
+                           use_table.iloc[:, :use_table.columns.get_loc(('TOTAL', 'Total'))].sum(axis=1), atol=1e-5)
+        assert np.allclose(supply_table.iloc[supply_table.index.get_loc(('TOTAL', 'Total'))],
+                           supply_table.iloc[:supply_table.index.get_loc(('TOTAL', 'Total'))].sum(), atol=1e-5)
 
-        self.W = Use_table.loc[factors_of_production, self.industries]
-        self.W.drop(('GVA', 'Gross value-added at basic prices'), inplace=True)
-        self.Y = Use_table.loc[self.commodities, final_demand]
-        self.WY = Use_table.loc[factors_of_production, final_demand]
-        self.WY.drop(('GVA', 'Gross value-added at basic prices'), inplace=True)
-        self.g = Supply_table.loc[[('TOTAL', 'Total')], self.industries]
-        self.q = Supply_table.loc[self.commodities, [('TOTAL', 'Total')]]
-        self.V = Supply_table.loc[self.commodities, self.industries]
-        self.U = Use_table.loc[self.commodities, self.industries]
+        W = use_table.loc[self.factors_of_production, self.industries]
+        W.drop(('GVA', 'Gross value-added at basic prices'), inplace=True)
+        Y = use_table.loc[self.commodities, final_demand]
+        WY = use_table.loc[self.factors_of_production, final_demand]
+        WY.drop(('GVA', 'Gross value-added at basic prices'), inplace=True)
+        g = supply_table.loc[[('TOTAL', 'Total')], self.industries]
+        q = supply_table.loc[self.commodities, [('TOTBASIC', 'Total supply at basic prices')]]
+        V = supply_table.loc[self.commodities, self.industries]
+        U = use_table.loc[self.commodities, self.industries]
+
+        for matrix in [W, Y, WY, g, q, V, U]:
+            matrix.columns = pd.MultiIndex.from_product([[region], matrix.columns]).tolist()
+            matrix.index = pd.MultiIndex.from_product([[region], matrix.index]).tolist()
+
+        self.W = pd.concat([self.W, W])
+        self.WY = pd.concat([self.WY, WY])
+        self.Y = pd.concat([self.Y, Y])
+        self.q = pd.concat([self.q, q])
+        self.g = pd.concat([self.g, g])
+        self.U = pd.concat([self.U, U])
+        self.V = pd.concat([self.V, V])
+
+        assert np.isclose(self.V.sum().sum(), self.g.sum().sum())
+        assert np.isclose(self.U.sum().sum()+self.Y.drop([
+            i for i in self.Y.columns if i[1] == ('IPTEX', 'Interprovincial exports')], axis=1).sum().sum(),
+                          self.q.sum().sum())
+
+    def aggregate_final_demand(self):
+        """
+        Aggregates all final demand sectors into 6 elements: ["Household final consumption expenditure",
+        "Non-profit institutions serving households' final consumption expenditure",
+        "Governments final consumption expenditure", "Gross fixed capital formation", "Changes in inventories",
+        "International exports"]
+        Provincial exports will be included in self.U and are thus excluded from self.Y
+        :return: self.Y with final demand sectors aggregated
+        """
+
+        # final demands are identified through their codes, hence the use of regex
+        aggregated_Y = self.Y.loc[:, [i for i in self.Y.columns if
+                                      re.search(r'^PEC\w*\d', i[1][0])]].groupby(level=0, axis=1).sum()
+        aggregated_Y.columns = pd.MultiIndex.from_product([aggregated_Y.columns,
+                                                           ["Household final consumption expenditure"]])
+        df = self.Y.loc[:, [i for i in self.Y.columns if
+                            re.search(r'^CEN\w*\d', i[1][0])]].groupby(level=0, axis=1).sum()
+        df.columns = pd.MultiIndex.from_product([
+            df.columns, ["Non-profit institutions serving households' final consumption expenditure"]])
+        aggregated_Y = pd.concat([aggregated_Y, df], axis=1)
+
+        df = self.Y.loc[:, [i for i in self.Y.columns if
+                            re.search(r'^CEG\w*\d', i[1][0])]].groupby(level=0, axis=1).sum()
+        df.columns = pd.MultiIndex.from_product([
+            df.columns, ["Governments final consumption expenditure"]])
+        aggregated_Y = pd.concat([aggregated_Y, df], axis=1)
+
+        df = self.Y.loc[:, [i for i in self.Y.columns if
+                            re.search(r'^CO\w*\d', i[1][0])]].groupby(level=0, axis=1).sum()
+        df.columns = pd.MultiIndex.from_product([
+            df.columns, ["Gross fixed capital formation"]])
+        aggregated_Y = pd.concat([aggregated_Y, df], axis=1)
+
+        df = self.Y.loc[:, [i for i in self.Y.columns if
+                            re.search(r'^INV\w*\d', i[1][0])]].groupby(level=0, axis=1).sum()
+        df.columns = pd.MultiIndex.from_product([
+            df.columns, ["Changes in inventories"]])
+        aggregated_Y = pd.concat([aggregated_Y, df], axis=1)
+
+        df = self.Y.loc[:, [i for i in self.Y.columns if
+                            re.search(r'^INT\w*', i[1][0])]].groupby(level=0, axis=1).sum()
+        df.columns = pd.MultiIndex.from_product([
+            df.columns, ["International exports"]])
+        aggregated_Y = pd.concat([aggregated_Y, df], axis=1)
+
+        self.Y = aggregated_Y
+        self.Y = self.Y.T.sort_index().T
+
+        aggregated_WY = self.WY.loc[:, [i for i in self.WY.columns if
+                                      re.search(r'^PEC\w*\d', i[1][0])]].groupby(level=0, axis=1).sum()
+        aggregated_WY.columns = pd.MultiIndex.from_product([aggregated_WY.columns,
+                                                           ["Household final consumption expenditure"]])
+        df = self.WY.loc[:, [i for i in self.WY.columns if
+                            re.search(r'^CEN\w*\d', i[1][0])]].groupby(level=0, axis=1).sum()
+        df.columns = pd.MultiIndex.from_product([
+            df.columns, ["Non-profit institutions serving households' final consumption expenditure"]])
+        aggregated_WY = pd.concat([aggregated_WY, df], axis=1)
+
+        df = self.WY.loc[:, [i for i in self.WY.columns if
+                            re.search(r'^CEG\w*\d', i[1][0])]].groupby(level=0, axis=1).sum()
+        df.columns = pd.MultiIndex.from_product([
+            df.columns, ["Governments final consumption expenditure"]])
+        aggregated_WY = pd.concat([aggregated_WY, df], axis=1)
+
+        df = self.WY.loc[:, [i for i in self.WY.columns if
+                            re.search(r'^CO\w*\d', i[1][0])]].groupby(level=0, axis=1).sum()
+        df.columns = pd.MultiIndex.from_product([
+            df.columns, ["Gross fixed capital formation"]])
+        aggregated_WY = pd.concat([aggregated_WY, df], axis=1)
+
+        df = self.WY.loc[:, [i for i in self.WY.columns if
+                            re.search(r'^INV\w*\d', i[1][0])]].groupby(level=0, axis=1).sum()
+        df.columns = pd.MultiIndex.from_product([
+            df.columns, ["Changes in inventories"]])
+        aggregated_WY = pd.concat([aggregated_WY, df], axis=1)
+
+        df = self.WY.loc[:, [i for i in self.WY.columns if
+                            re.search(r'^INT\w*', i[1][0])]].groupby(level=0, axis=1).sum()
+        df.columns = pd.MultiIndex.from_product([
+            df.columns, ["International exports"]])
+        aggregated_WY = pd.concat([aggregated_WY, df], axis=1)
+
+        self.WY = aggregated_WY
+        self.WY = self.WY.T.sort_index().T
+
+        for df in [self.Y, self.WY]:
+            assert len([i for i in df.columns.levels[1] if i not in [
+                "Household final consumption expenditure",
+                "Non-profit institutions serving households' final consumption expenditure",
+                "Governments final consumption expenditure",
+                "Gross fixed capital formation",
+                "Changes in inventories",
+                "International exports"
+            ]]) == 0
+
+    def remove_codes(self):
+        """
+        Removes the IOIC codes from the index to only leave the name.
+        :return: Dataframes with the code of the multi-index removed
+        """
+        for df in [self.W, self.g, self.V, self.U]:
+            df.columns = [(i[0], i[1][1]) for i in df.columns]
+        for df in [self.W, self.Y, self.WY, self.q, self.V, self.U]:
+            df.index = [(i[0], i[1][1]) for i in df.index]
+
+        for df in [self.W, self.Y, self.WY, self.g, self.q, self.V, self.U]:
+            df.index = pd.MultiIndex.from_tuples(df.index)
+            df.columns = pd.MultiIndex.from_tuples(df.columns)
+
+    def province_import_export(self, province_trade_file):
+        """
+        Method extracting and formatting inter province imports/exports
+        :return: modified self.U, self.V, self.W, self.Y
+        """
+
+        province_trade_file = province_trade_file
+
+        province_trade_file.Origin = [{v: k for k, v in self.matching_dict.items()}[i.split(') ')[1]] if (
+                    ')' in i and i != '(81) Canadian territorial enclaves abroad') else i for i in
+                                    province_trade_file.Origin]
+        province_trade_file.Destination = [{v: k for k, v in self.matching_dict.items()}[i.split(') ')[1]] if (
+                    ')' in i and i != '(81) Canadian territorial enclaves abroad') else i for i in
+                                         province_trade_file.Destination]
+        # extracting and formatting supply for each province
+        provincial_supply = pd.pivot_table(data=province_trade_file, index='Destination', columns=['Origin', 'Product'])
+
+        provincial_supply = provincial_supply.loc[
+            [i for i in provincial_supply.index if i in self.matching_dict], [i for i in provincial_supply.columns if
+                                                                                i[1] in self.matching_dict]]
+        provincial_supply *= 1000000
+        provincial_supply.columns = [(i[1], i[2].split(': ')[1]) if ':' in i[2] else i for i in
+                                     provincial_supply.columns]
+        provincial_supply.drop([i for i in provincial_supply.columns if i[1] not in [i[1] for i in self.commodities]],
+                               axis=1, inplace=True)
+        provincial_supply.columns = pd.MultiIndex.from_tuples(provincial_supply.columns)
+
+        # entering province use data into self.U
+        # triple for loop is definitely ugly and inefficient, buuuuuut no time to think of a more elegant way
+        for product in self.commodities:
+            # no fictive material bullshit
+            if not re.search(r'^F\w*\d', product[0]):
+                # some sectors are not used domestically (e.g. mine exploration) can't use the distribution then
+                if self.U.loc(axis=0)[:, product[1]].sum().sum().sum().sum() != 0:
+                    # extract the domestic distribution of the studied product
+                    # TODO integrate final demand in the intraprovince_market
+                    intraprovince_market = (self.U.loc(axis=0)[:, product[1]].T /
+                                            self.U.loc(axis=0)[:, product[1]].sum(axis=1)).T.fillna(0)
+                    for supplying_province in self.matching_dict:
+                        for using_province in self.matching_dict:
+                            # only for interprovincial trade (not intra)
+                            if supplying_province != using_province:
+                                # reapply the distribution of domestic use to the inter-provincial imports
+                                self.U.loc[[(supplying_province, product[1])], using_province] = (
+                                        intraprovince_market.loc[[(using_province, product[1])], using_province] *
+                                        provincial_supply.loc[using_province, (supplying_province, product[1])]
+                                ).values
 
     def gimme_symmetric_iot(self):
         """
-        Transforms Supply and Use self to symmetric IO tables
-        :return: self.A, self.Z and self.R
+        Transforms Supply and Use tables to symmetric IO tables and transforms Y from product to industries if
+        selected classification is "industry"
+        :return: self.A, self.Z, self.R and self.Y
         """
-        self.inv_q = pd.DataFrame(np.diag((1 / self.q.iloc[:, 0]).replace(np.inf, 0)), self.q.index, self.q.index)
-        self.inv_g = pd.DataFrame(np.diag((1 / self.g.iloc[0]).replace(np.inf, 0)), self.g.columns, self.g.columns)
+        self.inv_q = pd.DataFrame(np.diag((1 / self.q.sum(axis=1)).replace(np.inf, 0)), self.q.index, self.q.index)
+        self.inv_g = pd.DataFrame(np.diag((1 / self.g.sum()).replace(np.inf, 0)), self.g.columns, self.g.columns)
 
         if self.assumption == "industry technology" and self.classification == "product":
             self.Z = self.U.dot(self.inv_g.dot(self.V.T))
@@ -157,69 +372,8 @@ class IOTables:
             self.Z = self.V.T.dot(self.inv_q).dot(self.U)
             self.A = self.V.T.dot(self.inv_q).dot(self.U).dot(self.inv_g)
             self.R = self.W.dot(self.inv_g)
-
-    def aggregate_final_demand(self):
-        """
-        Aggregates all final demand sectors into 6 elements: ["Household final consumption expenditure",
-        "Non-profit institutions serving households' final consumption expenditure",
-        "Governments final consumption expenditure", "Gross fixed capital formation", "Changes in inventories",
-        "International exports"]
-        :return: self.Y with final demand sectors aggregated
-        """
-        # final demands are identified through their codes, hence the use of regex
-        self.Y.loc[:, "Household final consumption expenditure"] = self.Y.loc[:, [i for i in self.Y.columns if
-                                                                        re.search(r'^PEC\w*\d', i[0])]].sum(axis=1)
-        self.Y.loc[:, "Non-profit institutions serving households' final consumption expenditure"] = self.Y.loc[:,
-                                                                                                [i for i in self.Y.columns if
-                                                                                                 re.search(r'^CEN\w*\d',
-                                                                                                           i[0])]].sum(
-            axis=1)
-        self.Y.loc[:, "Governments final consumption expenditure"] = self.Y.loc[:, [i for i in self.Y.columns if
-                                                                          re.search(r'^CEG\w*\d', i[0])]].sum(axis=1)
-        self.Y.loc[:, "Gross fixed capital formation"] = self.Y.loc[:, [i for i in self.Y.columns if
-                                                              re.search(r'^CO\w*\d|^ME\w*\d|^IP\w*\d', i[0])]].sum(
-            axis=1)
-        self.Y.loc[:, "Changes in inventories"] = self.Y.loc[:, [i for i in self.Y.columns if re.search(r'^INV', i[0])]].sum(axis=1)
-        self.Y.loc[:, "International exports"] = self.Y.loc[:, [i for i in self.Y.columns if re.search(r'^INT', i[0])]].sum(axis=1)
-        self.Y.drop([i for i in self.Y.columns if i not in ["Household final consumption expenditure",
-                                                  "Non-profit institutions serving households' final consumption expenditure",
-                                                  "Governments final consumption expenditure",
-                                                  "Gross fixed capital formation",
-                                                  "Changes in inventories",
-                                                  "International exports"]], axis=1, inplace=True)
-
-        self.WY.loc[:, "Household final consumption expenditure"] = self.WY.loc[:, [i for i in self.WY.columns if
-                                                                          re.search(r'^PEC\w*\d', i[0])]].sum(axis=1)
-        self.WY.loc[:, "Non-profit institutions serving households' final consumption expenditure"] = self.WY.loc[:,
-                                                                                                 [i for i in self.WY.columns
-                                                                                                  if re.search(
-                                                                                                     r'^CEN\w*\d',
-                                                                                                     i[0])]].sum(axis=1)
-        self.WY.loc[:, "Governments final consumption expenditure"] = self.WY.loc[:, [i for i in self.WY.columns if
-                                                                            re.search(r'^CEG\w*\d', i[0])]].sum(axis=1)
-        self.WY.loc[:, "Gross fixed capital formation"] = self.WY.loc[:, [i for i in self.WY.columns if
-                                                                re.search(r'^CO\w*\d|^ME\w*\d|^IP\w*\d', i[0])]].sum(
-            axis=1)
-        self.WY.loc[:, "Changes in inventories"] = self.WY.loc[:, [i for i in self.WY.columns if re.search(r'^INV', i[0])]].sum(axis=1)
-        self.WY.loc[:, "International exports"] = self.WY.loc[:, [i for i in self.WY.columns if re.search(r'^INT', i[0])]].sum(axis=1)
-        self.WY.drop([i for i in self.WY.columns if i not in ["Household final consumption expenditure",
-                                                    "Non-profit institutions serving households' final consumption expenditure",
-                                                    "Governments final consumption expenditure",
-                                                    "Gross fixed capital formation",
-                                                    "Changes in inventories",
-                                                    "International exports"]], axis=1, inplace=True)
-
-    def remove_codes(self):
-        """
-        Removes the codes from the index to only leave the name.
-        :return: Dataframes with the code of the multi-index removed
-        """
-        for df in [self.A, self.Z, self.W, self.R, self.Y, self.WY, self.q, self.inv_g, self.inv_q, self.V, self.U]:
-            df.index = pd.MultiIndex.from_tuples(df.index)
-            df.index = df.index.droplevel(0)
-        for df in [self.A, self.Z, self.W, self.R, self.g, self.inv_g, self.inv_q, self.V, self.U]:
-            df.columns = pd.MultiIndex.from_tuples(df.columns)
-            df.columns = df.columns.droplevel(0)
+            # TODO check the Y in industries transformation
+            self.Y = self.V.dot(self.inv_g).T.dot(self.Y)
 
     def extract_environmental_data(self):
         """
@@ -231,13 +385,18 @@ class IOTables:
         emissions.columns = list(zip(emissions.iloc[0].ffill().tolist(), emissions.iloc[2]))
         emissions = emissions.iloc[3:]
         emissions = emissions.loc[:, [i for i in emissions.columns if
-                                      (i[1] in ['NAICS 6 Code', 'CAS Number', 'Substance Name (English)', 'Units']
+                                      (i[1] in
+                                       ['NAICS 6 Code', 'CAS Number', 'Substance Name (English)', 'Units', 'Province']
                                        or i[1] == 'Total' and 'Air' in i[0]
                                        or i[1] == 'Total' and 'Water' in i[0]
                                        or i[1] == 'Total' and 'Land' in i[0])]].fillna(0)
-        emissions.columns = ['NAICS 6 Code', 'CAS Number', 'Substance Name', 'Units', 'Emissions to air',
+        emissions.columns = ['Province', 'NAICS 6 Code', 'CAS Number', 'Substance Name', 'Units', 'Emissions to air',
                              'Emissions to water', 'Emissions to land']
         emissions.set_index('Substance Name', inplace=True)
+
+        if self.region != 'CA':
+            # drop emissions not for the studied region
+            emissions = emissions.loc[[i for i in emissions.index if emissions.loc[i,'Province'] == self.region]]
 
         temp_df = emissions.groupby(emissions.index).head(n=1)
         # separating the metadata for emissions (CAS and units)
@@ -1825,7 +1984,7 @@ class IOTables:
         # we modified flows in self.F, modify self.C accordingly
         self.C = self.C.loc[:, self.F.index].fillna(0)
 
-    def normalize(self):
+    def normalize_flows(self):
         """
         Produce normalized environmental extensions
         :return: self.S and self.F with product classification if it's been selected
@@ -1848,21 +2007,27 @@ class IOTables:
         self.FY = self.FY.groupby(self.FY.index).sum()
 
     def extract_data_from_csv(self, file_name):
+
+        # TODO fcking energy and water are not regionalized. Find a way to make it regionalized!
+
         df = pd.read_csv(pkg_resources.resource_stream(__name__, '/Data/' + file_name))
+
+        region = match_region_code_to_name(self.region)
+
         if self.year < 2009:
-            df = df.loc[[i for i in df.index if df.loc[i, 'GEO'] == 'Canada' and df.loc[i, 'REF_DATE'] == 2009]]
-            print('Data for GHG, water and energy are only for 2009+ years. The year 2009 was selected as a proxy')
+            df = df.loc[[i for i in df.index if df.loc[i, 'GEO'] == region and df.loc[i, 'REF_DATE'] == 2009]]
+            print('No data on GHG, water and energy for '+str(self.year)+'. 2009 was selected as a proxy')
         elif self.year in [2016, 2017]:
             if file_name == 'Water_use.csv':
-                print('Data for water use only goes till 2015. Year 2015 was selected as proxy')
-                df = df.loc[[i for i in df.index if df.loc[i, 'GEO'] == 'Canada' and df.loc[i, 'REF_DATE'] == 2015]]
+                print('No data on water use for '+str(self.year)+'. 2015 was selected as proxy')
+                df = df.loc[[i for i in df.index if df.loc[i, 'GEO'] == region and df.loc[i, 'REF_DATE'] == 2015]]
             else:
-                df = df.loc[[i for i in df.index if df.loc[i, 'GEO'] == 'Canada' and df.loc[i, 'REF_DATE'] == self.year]]
+                df = df.loc[[i for i in df.index if df.loc[i, 'GEO'] == region and df.loc[i, 'REF_DATE'] == self.year]]
         elif self.year > 2017:
             print('Environmental data for years after 2017 unavailable. 2017 will be selected as proxy.')
-            df = df.loc[[i for i in df.index if df.loc[i, 'GEO'] == 'Canada' and df.loc[i, 'REF_DATE'] == 2017]]
+            df = df.loc[[i for i in df.index if df.loc[i, 'GEO'] == region and df.loc[i, 'REF_DATE'] == 2017]]
         else:
-            df = df.loc[[i for i in df.index if df.loc[i, 'GEO'] == 'Canada' and df.loc[i, 'REF_DATE'] == self.year]]
+            df = df.loc[[i for i in df.index if df.loc[i, 'GEO'] == region and df.loc[i, 'REF_DATE'] == self.year]]
         df.set_index('Sector', inplace=True)
         return df
 
@@ -1875,3 +2040,13 @@ def select_industries_emissions(df):
 
     industries.index = [i.split('[')[1].split(']')[0] for i in industries.index]
     return industries
+
+
+def match_folder_to_file_name(level_of_detail):
+
+    dict_ = {'Summary level': 'S',
+             'Detail level': 'D',
+             'Link-1997 level': 'L97',
+             'Link-1961 level': 'L61'}
+
+    return dict_[level_of_detail]
