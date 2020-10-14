@@ -12,6 +12,7 @@ import numpy as np
 import re
 import pkg_resources
 import os
+from pyomo.environ import *
 from time import time
 
 
@@ -23,6 +24,7 @@ class IOTables:
         :param classification: [string] the type of classification to adopt for the symmetric IOT ("product" or "industry")
         """
 
+        start = time()
         print("Reading all the Excel files...")
 
         self.level_of_detail = folder_path.split('/')[-1]
@@ -98,14 +100,20 @@ class IOTables:
         print('Removing IOIC codes from index...')
         self.remove_codes()
 
-        # self.province_import_export(pd.read_excel(
-        #     folder_path+[i for i in [j for j in os.walk(folder_path)][0][2] if 'Provincial_trade_flow' in i][0], 'Data'))
-        # self.gimme_symmetric_iot()
+        print("Balancing inter-provincial trade...")
+        self.province_import_export(pd.read_excel(
+            folder_path+[i for i in [j for j in os.walk(folder_path)][0][2] if 'Provincial_trade_flow' in i][0], 'Data'))
+
+        print("Building the IOT")
+        self.gimme_symmetric_iot()
+
         # self.extract_environmental_data()
         # self.match_environmental_data_to_iots()
         # self.characterization_matrix()
         # self.balance_flows()
         # self.normalize_flows()
+
+        print('Took '+str(time()-start)+' seconds')
 
     def format_tables(self, su_tables, region):
         """
@@ -176,8 +184,8 @@ class IOTables:
         Y = use_table.loc[self.commodities, final_demand]
         WY = use_table.loc[self.factors_of_production, final_demand]
         WY.drop(('GVA', 'Gross value-added at basic prices'), inplace=True)
-        g = supply_table.loc[[('TOTAL', 'Total')], self.industries]
-        q = supply_table.loc[self.commodities, [('TOTBASIC', 'Total supply at basic prices')]]
+        g = use_table.loc[[('TOTAL', 'Total')], self.industries]
+        q = supply_table.loc[self.commodities, [('TOTAL', 'Total')]]
         V = supply_table.loc[self.commodities, self.industries]
         U = use_table.loc[self.commodities, self.industries]
 
@@ -193,10 +201,10 @@ class IOTables:
         self.U = pd.concat([self.U, U])
         self.V = pd.concat([self.V, V])
 
-        assert np.isclose(self.V.sum().sum(), self.g.sum().sum())
-        assert np.isclose(self.U.sum().sum()+self.Y.drop([
-            i for i in self.Y.columns if i[1] == ('IPTEX', 'Interprovincial exports')], axis=1).sum().sum(),
-                          self.q.sum().sum())
+        # assert np.isclose(self.V.sum().sum(), self.g.sum().sum())
+        # assert np.isclose(self.U.sum().sum()+self.Y.drop([
+        #     i for i in self.Y.columns if i[1] == ('IPTEX', 'Interprovincial exports')], axis=1).sum().sum(),
+        #                   self.q.sum().sum())
 
     def aggregate_final_demand(self):
         """
@@ -213,6 +221,7 @@ class IOTables:
                                       re.search(r'^PEC\w*\d', i[1][0])]].groupby(level=0, axis=1).sum()
         aggregated_Y.columns = pd.MultiIndex.from_product([aggregated_Y.columns,
                                                            ["Household final consumption expenditure"]])
+
         df = self.Y.loc[:, [i for i in self.Y.columns if
                             re.search(r'^CEN\w*\d', i[1][0])]].groupby(level=0, axis=1).sum()
         df.columns = pd.MultiIndex.from_product([
@@ -226,7 +235,7 @@ class IOTables:
         aggregated_Y = pd.concat([aggregated_Y, df], axis=1)
 
         df = self.Y.loc[:, [i for i in self.Y.columns if
-                            re.search(r'^CO\w*\d', i[1][0])]].groupby(level=0, axis=1).sum()
+                            re.search(r'^CO\w*\d|^ME\w*\d|^IP\w*\d', i[1][0])]].groupby(level=0, axis=1).sum()
         df.columns = pd.MultiIndex.from_product([
             df.columns, ["Gross fixed capital formation"]])
         aggregated_Y = pd.concat([aggregated_Y, df], axis=1)
@@ -250,6 +259,7 @@ class IOTables:
                                       re.search(r'^PEC\w*\d', i[1][0])]].groupby(level=0, axis=1).sum()
         aggregated_WY.columns = pd.MultiIndex.from_product([aggregated_WY.columns,
                                                            ["Household final consumption expenditure"]])
+
         df = self.WY.loc[:, [i for i in self.WY.columns if
                             re.search(r'^CEN\w*\d', i[1][0])]].groupby(level=0, axis=1).sum()
         df.columns = pd.MultiIndex.from_product([
@@ -263,7 +273,7 @@ class IOTables:
         aggregated_WY = pd.concat([aggregated_WY, df], axis=1)
 
         df = self.WY.loc[:, [i for i in self.WY.columns if
-                            re.search(r'^CO\w*\d', i[1][0])]].groupby(level=0, axis=1).sum()
+                            re.search(r'^CO\w*\d|^ME\w*\d|^IP\w*\d', i[1][0])]].groupby(level=0, axis=1).sum()
         df.columns = pd.MultiIndex.from_product([
             df.columns, ["Gross fixed capital formation"]])
         aggregated_WY = pd.concat([aggregated_WY, df], axis=1)
@@ -322,54 +332,101 @@ class IOTables:
                     ')' in i and i != '(81) Canadian territorial enclaves abroad') else i for i in
                                          province_trade_file.Destination]
         # extracting and formatting supply for each province
-        provincial_supply = pd.pivot_table(data=province_trade_file, index='Destination', columns=['Origin', 'Product'])
+        province_trade = pd.pivot_table(data=province_trade_file, index='Destination', columns=['Origin', 'Product'])
 
-        provincial_supply = provincial_supply.loc[
-            [i for i in provincial_supply.index if i in self.matching_dict], [i for i in provincial_supply.columns if
+        province_trade = province_trade.loc[
+            [i for i in province_trade.index if i in self.matching_dict], [i for i in province_trade.columns if
                                                                                 i[1] in self.matching_dict]]
-        provincial_supply *= 1000000
-        provincial_supply.columns = [(i[1], i[2].split(': ')[1]) if ':' in i[2] else i for i in
-                                     provincial_supply.columns]
-        provincial_supply.drop([i for i in provincial_supply.columns if i[1] not in [i[1] for i in self.commodities]],
+        province_trade *= 1000000
+        province_trade.columns = [(i[1], i[2].split(': ')[1]) if ':' in i[2] else i for i in
+                                     province_trade.columns]
+        province_trade.drop([i for i in province_trade.columns if i[1] not in [i[1] for i in self.commodities]],
                                axis=1, inplace=True)
-        provincial_supply.columns = pd.MultiIndex.from_tuples(provincial_supply.columns)
+        province_trade.columns = pd.MultiIndex.from_tuples(province_trade.columns)
+        for province in province_trade.index:
+            province_trade.loc[province, province] = 0
 
-        # entering province use data into self.U
-        # triple for loop is definitely ugly and inefficient, buuuuuut no time to think of a more elegant way
-        for product in self.commodities:
-            # no fictive material bullshit
-            if not re.search(r'^F\w*\d', product[0]):
-                # some sectors are not used domestically (e.g. mine exploration) can't use the distribution then
-                if self.U.loc(axis=0)[:, product[1]].sum().sum().sum().sum() != 0:
-                    # extract the domestic distribution of the studied product
-                    # TODO integrate final demand in the intraprovince_market
-                    intraprovince_market = (self.U.loc(axis=0)[:, product[1]].T /
-                                            self.U.loc(axis=0)[:, product[1]].sum(axis=1)).T.fillna(0)
-                    for supplying_province in self.matching_dict:
-                        for using_province in self.matching_dict:
-                            # only for interprovincial trade (not intra)
-                            if supplying_province != using_province:
-                                # reapply the distribution of domestic use to the inter-provincial imports
-                                self.U.loc[[(supplying_province, product[1])], using_province] = (
-                                        intraprovince_market.loc[[(using_province, product[1])], using_province] *
-                                        provincial_supply.loc[using_province, (supplying_province, product[1])]
-                                ).values
+        for importing_province in province_trade.index:
+            U_Y = pd.concat([self.U.loc[importing_province, importing_province],
+                             self.Y.loc[importing_province, importing_province]], axis=1)
+            total_imports = province_trade.groupby(level=1,axis=1).sum().loc[importing_province]
+            index_commodity = [i[1] for i in self.commodities]
+            total_imports = total_imports.reindex(index_commodity).fillna(0)
+            initial_distribution = ((U_Y.T / (U_Y.sum(axis=1))) * total_imports).T.fillna(0)
+
+            # Remove changes in inventories as imports will not go directly into this category
+            initial_distribution.drop(["Changes in inventories"], axis=1, inplace=True)
+            U_Y.drop(["Changes in inventories"], axis=1, inplace=True)
+            # imports cannot be allocated to negative gross fixed capital formation as it is probably not importing if
+            # it's transferring ownership for a given product
+            initial_distribution.loc[initial_distribution.loc[:, 'Gross fixed capital formation'] < 0,
+                                     'Gross fixed capital formation'] = 0
+            U_Y.loc[U_Y.loc[:, 'Gross fixed capital formation'] < 0, 'Gross fixed capital formation'] = 0
+
+            # Remove products where total imports exceed consumption, or there are actually no imports
+            bad_ix_excess_imports = total_imports[(U_Y.sum(1) - total_imports) < 0].index.to_list()
+            if len(bad_ix_excess_imports) > 1:
+                print('Warning, there is more '+str(bad_ix_excess_imports)+' imported then used in '+
+                      importing_province+"'s economy.")
+            bad_ix_no_import = total_imports[total_imports <= 0].index.to_list()
+            bad_ix = bad_ix_excess_imports + bad_ix_no_import
+            initial_distribution = initial_distribution.drop(bad_ix, axis=0)
+            U_Y = U_Y.drop(bad_ix, axis=0)
+            total_imports = total_imports.drop(bad_ix)
+
+            # pyomo optimization (see code at the end)
+            Ui, S_imports, S_positive = reconcile_entire_region(U_Y, initial_distribution, total_imports)
+
+            # add index entries that are null
+            Ui = Ui.reindex([i[1] for i in self.commodities]).fillna(0)
+
+            # remove really small values coming from optimization
+            Ui = Ui[Ui > 1].fillna(0)
+
+            # distribution balance imports to the different exporting regions
+            final_demand_imports = [i for i in Ui.columns if i not in self.U.columns.levels[1]]
+            for exporting_province in province_trade.index:
+                if importing_province != exporting_province:
+                    df = ((Ui.T * (province_trade / province_trade.sum()).fillna(0).loc[
+                        exporting_province, importing_province]).T).reindex(Ui.index).fillna(0)
+                    # assert index and columns are the same before using .values
+                    assert all(self.U.loc[exporting_province, importing_province].index == df.loc[:,
+                                                                                             self.U.columns.levels[
+                                                                                                 1]].reindex(
+                        self.U.loc[exporting_province, importing_province].columns, axis=1).index)
+                    assert all(self.U.loc[exporting_province, importing_province].columns == df.loc[:,
+                                                                                               self.U.columns.levels[
+                                                                                                   1]].reindex(
+                        self.U.loc[exporting_province, importing_province].columns, axis=1).columns)
+                    # assign new values into self.U and self.Y
+                    self.U.loc[exporting_province, importing_province] = df.loc[:,
+                                                                           self.U.columns.levels[1]].reindex(
+                        self.U.loc[exporting_province, importing_province].columns, axis=1).values
+                    self.Y.loc[exporting_province, importing_province].update(df.loc[:, final_demand_imports])
+
+            # remove inter-provincial trade from intra-provincial trade
+            self.U.loc[importing_province, importing_province].update(
+                self.U.loc[importing_province, importing_province] - self.U.loc[
+                    [i for i in self.matching_dict if i != importing_province], importing_province].groupby(
+                    level=1).sum())
+            self.Y.loc[importing_province, importing_province].update(
+                self.Y.loc[importing_province, importing_province] - self.Y.loc[
+                    [i for i in self.matching_dict if i != importing_province], importing_province].groupby(
+                    level=1).sum())
 
     def gimme_symmetric_iot(self):
         """
         Transforms Supply and Use tables to symmetric IO tables and transforms Y from product to industries if
         selected classification is "industry"
-        :return: self.A, self.Z, self.R and self.Y
+        :return: self.A, self.R and self.Y
         """
         self.inv_q = pd.DataFrame(np.diag((1 / self.q.sum(axis=1)).replace(np.inf, 0)), self.q.index, self.q.index)
         self.inv_g = pd.DataFrame(np.diag((1 / self.g.sum()).replace(np.inf, 0)), self.g.columns, self.g.columns)
 
         if self.assumption == "industry technology" and self.classification == "product":
-            self.Z = self.U.dot(self.inv_g.dot(self.V.T))
             self.A = self.U.dot(self.inv_g.dot(self.V.T)).dot(self.inv_q)
             self.R = self.W.dot(self.inv_g.dot(self.V.T)).dot(self.inv_q)
         elif self.assumption == "fixed industry sales structure" and self.classification == "industry":
-            self.Z = self.V.T.dot(self.inv_q).dot(self.U)
             self.A = self.V.T.dot(self.inv_q).dot(self.U).dot(self.inv_g)
             self.R = self.W.dot(self.inv_g)
             # TODO check the Y in industries transformation
@@ -2050,3 +2107,108 @@ def match_folder_to_file_name(level_of_detail):
              'Link-1961 level': 'L61'}
 
     return dict_[level_of_detail]
+
+
+def todf(data):
+    """ Simple function to inspect pyomo element as Pandas DataFrame"""
+    try:
+        out = pd.Series(data.get_values())
+    except AttributeError:
+        # probably already is a dataframe
+        out = data
+
+    if out.index.nlevels > 1:
+        out = out.unstack()
+    return out
+
+
+# pyomo optimization functions
+def reconcile_one_product_market(uy, u0, imp, penalty_multiplicator):
+    opt = SolverFactory('ipopt')
+
+    # Define model and parameter
+    model = ConcreteModel()
+    model.U0 = u0
+    model.UY = uy
+    model.imports = imp
+
+    # Large number used as penalty for slack in the objective function.
+    # Defined here as a multiplicative of the largest import value in U0.
+    # If solver gives a value error, can adjust penalty multiplicator.
+    big = model.U0.max() * penalty_multiplicator
+
+    # Define dimensions ("sets") over which to loop
+    model.sectors = model.UY.index.to_list()
+    model.non_null_sectors = model.U0[model.U0 != 0].index.to_list()
+
+    # When defining our variable Ui, we initialize it close to U0, really gives the solver a break
+    def initialize_close_to_U0(model, sector):
+        return model.U0[sector]
+
+    model.Ui = Var(model.sectors, domain=NonNegativeReals, initialize=initialize_close_to_U0)
+
+    # Two slack variables to help our solvers reach a feasible solution
+    model.slack_total = Var(domain=Reals)
+    model.slack_positive = Var(model.sectors, domain=NonNegativeReals)
+
+    # (soft) Constraint 1: (near) conservation of imports, linked to slack_total
+    def cons_total(model):
+        return sum(model.Ui[i] for i in model.sectors) + model.slack_total == model.imports
+
+    model.constraint_total = Constraint(rule=cons_total)
+
+    # (soft) Constraint 2: sectoral imports (nearly) always smaller than sectoral use
+    def cons_positive(model, sector):
+        return model.UY.loc[sector] - model.Ui[sector] >= - model.slack_positive[sector]
+
+    model.constraint_positive = Constraint(model.sectors, rule=cons_positive)
+
+    # Objective function
+    def obj_minimize(model):
+        # Penalty for relatively deviating from initial estimate _and_ for using slack variables
+        # Note the use of big
+        return sum(
+            ((model.U0[sector] - model.Ui[sector]) / model.U0[sector]) ** 2 for sector in model.non_null_sectors) + \
+               big * model.slack_total ** 2 + \
+               big * sum(model.slack_positive[i] ** 2 for i in model.sectors)
+
+    model.obj = Objective(rule=obj_minimize, sense=minimize)
+
+    # Solve
+    sol = opt.solve(model)
+    return todf(model.Ui), model.slack_total.get_values()[None], todf(model.slack_positive)
+
+
+def reconcile_entire_region(U_Y, initial_distribution, total_imports):
+    # Dataframe to fill
+    Ui = pd.DataFrame(dtype=float).reindex_like(U_Y)
+
+    # Slack dataframes to, for the record
+    S_imports = pd.Series(index=total_imports.index, dtype=float)
+    S_positive = pd.DataFrame(dtype=float).reindex_like(U_Y)
+
+    # Loop over all products, selecting the market
+    for product in initial_distribution.index:
+        uy = U_Y.loc[product]
+        u0 = initial_distribution.loc[product]
+        imp = total_imports[product]
+        penalty_multiplicators = [1E6, 1E4, 1E3, 1E3, 1E2, 10]
+
+        # Loop through penalty functions until the solver (hopefully) succeeds
+        for pen in penalty_multiplicators:
+            try:
+                ui, slack_import, slack_positive = reconcile_one_product_market(uy, u0, imp, pen)
+            except ValueError as e:
+                if pen == penalty_multiplicators[-1]:
+                    raise e
+            else:
+                break
+
+        # Assign the rebalanced imports to the right market row
+        Ui.loc[product, :] = ui
+
+        # commit slack values to history
+        S_imports[product] = slack_import
+        S_positive.loc[product, :] = slack_positive
+
+    return Ui, S_imports, S_positive
