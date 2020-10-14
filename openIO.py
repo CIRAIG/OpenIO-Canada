@@ -59,6 +59,7 @@ class IOTables:
 
         # methods executed
         self.format_tables()
+        self.dealing_with_duplicated_names()
         self.gimme_symmetric_iot()
         self.aggregate_final_demand()
         self.remove_codes()
@@ -85,12 +86,14 @@ class IOTables:
             if Supply_table.iloc[11, i] not in [np.nan, 'Industries']:
                 # tuple with code + name (need code to deal with duplicate names in detailed levels)
                 self.industries.append((Supply_table.iloc[12, i], Supply_table.iloc[11, i]))
+        # remove fictive sectors
+        self.industries = [i for i in self.industries if not re.search(r'^F', i[0])]
 
         factors_of_production = []
         for i, element in enumerate(Supply_table.iloc[:, 0].tolist()):
             if type(element) == str:
                 # identify by their codes
-                if re.search(r'^[M,F,N,G,I,E]\w*\d', element):
+                if re.search(r'^[M,N,G,I,E]\w*\d', element):
                     self.commodities.append((element, Supply_table.iloc[i, 1]))
                 elif re.search(r'^P\w*\d', element) or re.search(r'^GVA', element):
                     factors_of_production.append((element, Supply_table.iloc[i, 1]))
@@ -141,6 +144,21 @@ class IOTables:
         self.V = Supply_table.loc[self.commodities, self.industries]
         self.U = Use_table.loc[self.commodities, self.industries]
 
+    def dealing_with_duplicated_names(self):
+        """
+        IOIC classification has duplicate names, so we rename when it's the case
+        :return: updated dataframes
+        """
+        if self.level_of_detail in ['Link-1961 level', 'Link-1997 level', 'Detail level']:
+            self.industries = [(i[0], i[1] + ' (private)') if re.search(r'^BS61', i[0]) else i for i in
+                               self.industries]
+            self.industries = [(i[0], i[1] + ' (non-profit)') if re.search(r'^NP61|^NP71', i[0]) else i for i in
+                               self.industries]
+            self.industries = [(i[0], i[1] + ' (public)') if re.search(r'^GS61', i[0]) else i for i in
+                               self.industries]
+        for df in [self.W, self.g, self.U, self.V]:
+            df.columns = self.industries
+
     def gimme_symmetric_iot(self):
         """
         Transforms Supply and Use self to symmetric IO tables
@@ -150,13 +168,12 @@ class IOTables:
         self.inv_g = pd.DataFrame(np.diag((1 / self.g.iloc[0]).replace(np.inf, 0)), self.g.columns, self.g.columns)
 
         if self.assumption == "industry technology" and self.classification == "product":
-            self.Z = self.U.dot(self.inv_g.dot(self.V.T))
             self.A = self.U.dot(self.inv_g.dot(self.V.T)).dot(self.inv_q)
             self.R = self.W.dot(self.inv_g.dot(self.V.T)).dot(self.inv_q)
         elif self.assumption == "fixed industry sales structure" and self.classification == "industry":
-            self.Z = self.V.T.dot(self.inv_q).dot(self.U)
             self.A = self.V.T.dot(self.inv_q).dot(self.U).dot(self.inv_g)
             self.R = self.W.dot(self.inv_g)
+            # TODO self.Y
 
     def aggregate_final_demand(self):
         """
@@ -214,10 +231,10 @@ class IOTables:
         Removes the codes from the index to only leave the name.
         :return: Dataframes with the code of the multi-index removed
         """
-        for df in [self.A, self.Z, self.W, self.R, self.Y, self.WY, self.q, self.inv_g, self.inv_q, self.V, self.U]:
+        for df in [self.A, self.W, self.R, self.Y, self.WY, self.q, self.inv_g, self.inv_q, self.V, self.U]:
             df.index = pd.MultiIndex.from_tuples(df.index)
             df.index = df.index.droplevel(0)
-        for df in [self.A, self.Z, self.W, self.R, self.g, self.inv_g, self.inv_q, self.V, self.U]:
+        for df in [self.A, self.W, self.R, self.g, self.inv_g, self.inv_q, self.V, self.U]:
             df.columns = pd.MultiIndex.from_tuples(df.columns)
             df.columns = df.columns.droplevel(0)
 
