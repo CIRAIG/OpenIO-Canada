@@ -53,6 +53,7 @@ class IOTables:
         self.S = pd.DataFrame()
         self.FY = pd.DataFrame()
         self.C = pd.DataFrame()
+        self.INT_imports = pd.DataFrame()
 
         # metadata
         self.emission_metadata = pd.DataFrame()
@@ -104,8 +105,16 @@ class IOTables:
         self.province_import_export(pd.read_excel(
             folder_path+[i for i in [j for j in os.walk(folder_path)][0][2] if 'Provincial_trade_flow' in i][0], 'Data'))
 
-        print("Building the IOT")
+        # TODO could have international imports/exports as a Rest-of-the-World region
+        # TODO or could link it to a GMRIO like EXIOBASE
+        # print("Balancing international trade...")
+        # self.international_import_export()
+
+        print("Building the symmetric tables...")
         self.gimme_symmetric_iot()
+
+        # print("Balancing value added...")
+        # self.balance_value_added()
 
         # self.extract_environmental_data()
         # self.match_environmental_data_to_iots()
@@ -179,6 +188,7 @@ class IOTables:
         assert np.allclose(supply_table.iloc[supply_table.index.get_loc(('TOTAL', 'Total'))],
                            supply_table.iloc[:supply_table.index.get_loc(('TOTAL', 'Total'))].sum(), atol=1e-5)
 
+        # extract the tables we need
         W = use_table.loc[self.factors_of_production, self.industries]
         W.drop(('GVA', 'Gross value-added at basic prices'), inplace=True)
         Y = use_table.loc[self.commodities, final_demand]
@@ -188,11 +198,15 @@ class IOTables:
         q = supply_table.loc[self.commodities, [('TOTAL', 'Total')]]
         V = supply_table.loc[self.commodities, self.industries]
         U = use_table.loc[self.commodities, self.industries]
+        INT_imports = supply_table.loc[self.commodities,
+                                       [i for i in supply_table.columns if re.search(r'^INTIM', i[0])]]
 
-        for matrix in [W, Y, WY, g, q, V, U]:
+        # create multiindex with region as first level
+        for matrix in [W, Y, WY, g, q, V, U, INT_imports]:
             matrix.columns = pd.MultiIndex.from_product([[region], matrix.columns]).tolist()
             matrix.index = pd.MultiIndex.from_product([[region], matrix.index]).tolist()
 
+        # concat the region tables with the all the other tables
         self.W = pd.concat([self.W, W])
         self.WY = pd.concat([self.WY, WY])
         self.Y = pd.concat([self.Y, Y])
@@ -200,6 +214,7 @@ class IOTables:
         self.g = pd.concat([self.g, g])
         self.U = pd.concat([self.U, U])
         self.V = pd.concat([self.V, V])
+        self.INT_imports = pd.concat([self.INT_imports, INT_imports])
 
         # assert np.isclose(self.V.sum().sum(), self.g.sum().sum())
         # assert np.isclose(self.U.sum().sum()+self.Y.drop([
@@ -308,14 +323,25 @@ class IOTables:
         Removes the IOIC codes from the index to only leave the name.
         :return: Dataframes with the code of the multi-index removed
         """
-        for df in [self.W, self.g, self.V, self.U]:
+
+        # removing the IOIC codes
+        for df in [self.W, self.g, self.V, self.U, self.INT_imports]:
             df.columns = [(i[0], i[1][1]) for i in df.columns]
-        for df in [self.W, self.Y, self.WY, self.q, self.V, self.U]:
+        for df in [self.W, self.Y, self.WY, self.q, self.V, self.U, self.INT_imports]:
             df.index = [(i[0], i[1][1]) for i in df.index]
 
-        for df in [self.W, self.Y, self.WY, self.g, self.q, self.V, self.U]:
+        # recreating MultiIndexes
+        for df in [self.W, self.Y, self.WY, self.g, self.q, self.V, self.U, self.INT_imports]:
             df.index = pd.MultiIndex.from_tuples(df.index)
             df.columns = pd.MultiIndex.from_tuples(df.columns)
+
+        # reordering columns
+        reindexed_columns = pd.MultiIndex.from_product([list(self.matching_dict.keys()),
+                                                        [i[1] for i in self.industries]])
+        self.W = self.W.T.reindex(reindexed_columns).T
+        self.g = self.g.T.reindex(reindexed_columns).T
+        self.V = self.V.T.reindex(reindexed_columns).T
+        self.U = self.U.T.reindex(reindexed_columns).T
 
     def province_import_export(self, province_trade_file):
         """
@@ -414,6 +440,139 @@ class IOTables:
                     [i for i in self.matching_dict if i != importing_province], importing_province].groupby(
                     level=1).sum())
 
+    # TODO in current status international imports need to be removed from prinvincial use
+    def international_import_export(self):
+        """
+        Method to deal with international imports and exports. These imports/exports will be allocated to a
+        Rest-of-the_world region (RoW). The structure of use and supply in the RoW region is taken from the Canadian
+        total as an approximation.
+        :return:  the following updated dataframes: U, V, g, q, Y, W, WY
+        """
+
+        final_demand_sectors = ['Changes in inventories',
+                                'Governments final consumption expenditure',
+                                'Gross fixed capital formation',
+                                'Household final consumption expenditure',
+                                "Non-profit institutions serving households' final consumption expenditure"]
+
+        # aggregating all international exports
+        int_exports = self.Y.loc(axis=1)[:, 'International exports'].groupby(level=1, axis=1).sum()
+        # extracting the use distribution in Canada
+        national_use_market = pd.concat([self.U.groupby(level=1, axis=1).sum(),
+                                         self.Y.groupby(level=1, axis=1).sum().drop('International exports', axis=1)],
+                                        axis=1)
+        # the previous distribution is used to scale up international exports use
+        row_use = (national_use_market.T / national_use_market.sum(1)).fillna(0).T * int_exports.values
+        # separating intermediary use from final demand
+        row_final_demand = row_use.loc[:, final_demand_sectors]
+        row_use = row_use.loc[:, [i[1] for i in self.industries]]
+        # introducing the RoW MultiIndex level
+        row_use.columns = pd.MultiIndex.from_product([['RoW'], row_use.columns])
+        row_final_demand.columns = pd.MultiIndex.from_product([['RoW'], row_final_demand.columns])
+        # concatenating with self.U and self.V
+        updated_U = pd.concat([self.U, row_use], axis=1)
+        updated_Y = pd.concat([self.Y, row_final_demand], axis=1)
+
+        # aggregating the canadian imports coming from RoW
+        canadian_imports_from_row = self.INT_imports.groupby(level=1, axis=0).sum().reindex(
+            [i[1] for i in self.commodities])
+        canadian_imports_from_row.index = pd.MultiIndex.from_product([['RoW'], canadian_imports_from_row.index])
+
+        # we then split these imports using the use of each commodity in a given province
+        province_use_row_products = pd.DataFrame()
+        for province in self.matching_dict:
+            provincial_use_market = (pd.concat([
+                self.U.groupby(level=1, axis=0).sum().loc[:, province],
+                self.Y.drop([i for i in self.Y.columns if i[1] == 'International exports'],
+                            axis=1).groupby(level=1, axis=0).sum().loc[:, province]], axis=1))
+            # applying provincial use distribution to the use of row products in a given province
+            df = ((provincial_use_market.T / provincial_use_market.sum(1)).T.replace(np.inf, 0).fillna(0)).reindex(
+                [i[1] for i in self.commodities]) * canadian_imports_from_row.loc[:, province].values
+            # introducing the regions in the indexes
+            df.index = pd.MultiIndex.from_product([['RoW'], df.index])
+            df.columns = pd.MultiIndex.from_product([[province], df.columns])
+            # concatenating df of each province together
+            province_use_row_products = pd.concat([province_use_row_products, df], axis=1)
+
+        # updating U
+        updated_U = pd.concat([updated_U,
+                               province_use_row_products.loc[:, [i for i in province_use_row_products.columns if
+                                                                 i[1] in self.U.columns.levels[1]]]]
+                              ).fillna(0)
+        # reindexing U
+        updated_U = (updated_U.T.reindex(
+            pd.MultiIndex.from_product([list(self.matching_dict) + ['RoW'], [i[1] for i in self.industries]]))).T
+        # updating Y
+        updated_Y = pd.concat([updated_Y, province_use_row_products.loc[:, [i for i in province_use_row_products.columns if
+                                                            i[1] in self.Y.columns.levels[1]]]]).fillna(0)
+        # reindexing Y
+        updated_Y = (updated_Y.T.reindex(pd.MultiIndex.from_product([list(self.matching_dict) + ['RoW'],
+                                                                     final_demand_sectors]))).T
+        # at this point we have successfully allocated the use of RoW imported goods to provinces and each province's
+        # goods uses to RoW
+        # Now we focus on creating an internal economy for RoW
+
+        # scale supply_tables_row to global economy level? Right now it's literally equal to total Canadian economy
+        scaling_to_global = 1
+        # create RoW's supply table based on Canada's
+        supply_table_row = self.V.groupby(level=1, axis=0).sum().groupby(level=1, axis=1).sum()
+        supply_table_row = supply_table_row.reindex([i[1] for i in self.commodities])
+        supply_table_row = supply_table_row.T.reindex([i[1] for i in self.industries]).T
+        supply_table_row.index = pd.MultiIndex.from_product([['RoW'], supply_table_row.index])
+        supply_table_row.columns = pd.MultiIndex.from_product([['RoW'], supply_table_row.columns])
+        # create RoW's final demand based on Canada's
+        final_demand_row = self.Y.groupby(level=1, axis=0).sum().groupby(level=1, axis=1).sum()
+        final_demand_row = final_demand_row.reindex([i[1] for i in self.commodities])
+        final_demand_row.drop('International exports', axis=1, inplace=True)
+        final_demand_row.index = pd.MultiIndex.from_product([['RoW'], final_demand_row.index])
+        final_demand_row.columns = pd.MultiIndex.from_product([['RoW'], final_demand_row.columns])
+        # scale everything to match RoW actual economy volume
+        supply_table_row *= scaling_to_global
+        final_demand_row *= scaling_to_global
+        # update and reindex V
+        updated_V = pd.concat([self.V, supply_table_row])
+        updated_V = updated_V.T.reindex(pd.MultiIndex.from_product(
+            [list(self.matching_dict.keys()) + ['RoW'], [i[1] for i in self.industries]])).T.fillna(0)
+        # update Y
+        updated_Y.update(final_demand_row)
+
+        # now we focus on updating self.g and self.q
+        df = pd.DataFrame(updated_U.loc[:, 'RoW'].sum())
+        df.index = pd.MultiIndex.from_product([['RoW'], [i[1] for i in self.industries]])
+        df.columns = pd.MultiIndex.from_product([['RoW'], ['(TOTAL, Total)']])
+        updated_g = pd.concat([self.g, df.T]).fillna(0)
+        updated_g = updated_g.T.reindex(pd.MultiIndex.from_product(
+            [list(self.matching_dict.keys()) + ['RoW'], [i[1] for i in self.industries]])).T
+        df = pd.DataFrame(updated_V.loc['RoW'].sum(1))
+        df.index = pd.MultiIndex.from_product([['RoW'], [i[1] for i in self.commodities]])
+        df.columns = pd.MultiIndex.from_product([['RoW'], ['(TOTAL, Total)']])
+        updated_q = pd.concat([self.q, df], axis=1).fillna(0)
+        updated_q = updated_q.reindex(pd.MultiIndex.from_product(
+            [list(self.matching_dict.keys()) + ['RoW'], [i[1] for i in self.commodities]]))
+
+        # we add an empty dimension to added value
+        added_value_row = pd.DataFrame(0, index=pd.MultiIndex.from_product([['RoW'], [i[1] for i in self.factors_of_production]]),
+                                       columns=pd.MultiIndex.from_product([['RoW'], [i[1] for i in self.industries]]))
+
+        updated_W = pd.concat([self.W, added_value_row]).fillna(0)
+        updated_W = updated_W.T.reindex(pd.MultiIndex.from_product([list(self.matching_dict.keys()) + ['RoW'],
+                                                                    [i[1] for i in self.industries]])).T
+        added_value_row_fd = pd.DataFrame(0, index=pd.MultiIndex.from_product([['RoW'], [i[1] for i in self.factors_of_production]]),
+                                          columns=pd.MultiIndex.from_product([['RoW'], final_demand_sectors]))
+
+        updated_WY = pd.concat([self.WY, added_value_row_fd]).fillna(0)
+        updated_WY = updated_WY.T.reindex(pd.MultiIndex.from_product([list(self.matching_dict.keys()) + ['RoW'],
+                                                                      final_demand_sectors])).T
+
+        # finally we replace our updated dataframes with the attributes
+        self.U = updated_U
+        self.V = updated_V
+        self.Y = updated_Y
+        self.g = updated_g
+        self.q = updated_q
+        self.W = updated_W
+        self.WY = updated_WY
+
     def gimme_symmetric_iot(self):
         """
         Transforms Supply and Use tables to symmetric IO tables and transforms Y from product to industries if
@@ -431,6 +590,24 @@ class IOTables:
             self.R = self.W.dot(self.inv_g)
             # TODO check the Y in industries transformation
             self.Y = self.V.dot(self.inv_g).T.dot(self.Y)
+
+    def balance_value_added(self):
+        """
+        Making sure A+R sums up to 1. Balancing on value added because no impacts on the environment is associated to
+        value added.
+        :return: updated self.R
+        """
+
+        new_value_added_value = 1 - self.A.sum()
+
+        updated_R = (self.R / self.R.sum()) * new_value_added_value
+        updated_R = updated_R.fillna(0)
+
+        # checking that is the balance value is different than 1, it's because it's empty industries
+        balance = self.A.sum() + updated_R.sum()
+        assert balance.loc[~np.isclose(balance, 1)].sum() == 0
+
+        self.R = updated_R
 
     def extract_environmental_data(self):
         """
