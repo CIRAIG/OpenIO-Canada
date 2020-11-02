@@ -104,9 +104,9 @@ class IOTables:
         print('Removing IOIC codes from index...')
         self.remove_codes()
 
-        # print("Balancing inter-provincial trade...")
-        # self.province_import_export(pd.read_excel(
-        #     folder_path+[i for i in [j for j in os.walk(folder_path)][0][2] if 'Provincial_trade_flow' in i][0], 'Data'))
+        print("Balancing inter-provincial trade...")
+        self.province_import_export(pd.read_excel(
+            folder_path+[i for i in [j for j in os.walk(folder_path)][0][2] if 'Provincial_trade_flow' in i][0], 'Data'))
 
         # TODO could have international imports/exports as a Rest-of-the-World region
         # TODO or could link it to a GMRIO like EXIOBASE
@@ -115,7 +115,7 @@ class IOTables:
 
         # print("Building the symmetric tables...")
         # self.gimme_symmetric_iot()
-
+        #
         # print("Balancing value added...")
         # self.balance_value_added()
 
@@ -145,6 +145,8 @@ class IOTables:
                 if supply_table.iloc[11, i] not in [np.nan, 'Industries']:
                     # tuple with code + name (need code to deal with duplicate names in detailed levels)
                     self.industries.append((supply_table.iloc[12, i], supply_table.iloc[11, i]))
+            # remove fictive sectors
+            self.industries = [i for i in self.industries if not re.search(r'^F', i[0])]
 
         if not self.commodities:
             for i, element in enumerate(supply_table.iloc[:, 0].tolist()):
@@ -235,6 +237,13 @@ class IOTables:
             self.industries = [(i[0], i[1] + ' (non-profit)') if re.search(r'^NP61|^NP71', i[0]) else i for i in
                                self.industries]
             self.industries = [(i[0], i[1] + ' (public)') if re.search(r'^GS61', i[0]) else i for i in
+                               self.industries]
+        if self.level_of_detail in ['Link-1997 level', 'Detail level']:
+            self.industries = [(i[0], i[1] + ' (private)') if re.search(r'^BS623|^BS624', i[0]) else i for i in
+                               self.industries]
+            self.industries = [(i[0], i[1] + ' (non-profit)') if re.search(r'^NP624', i[0]) else i for i in
+                               self.industries]
+            self.industries = [(i[0], i[1] + ' (public)') if re.search(r'^GS623', i[0]) else i for i in
                                self.industries]
         for df in [self.W, self.g, self.U, self.V]:
             df.columns = pd.MultiIndex.from_product([self.matching_dict, self.industries])
@@ -385,7 +394,7 @@ class IOTables:
         province_trade.columns = [(i[1], i[2].split(': ')[1]) if ':' in i[2] else i for i in
                                      province_trade.columns]
         province_trade.drop([i for i in province_trade.columns if i[1] not in [i[1] for i in self.commodities]],
-                               axis=1, inplace=True)
+                            axis=1, inplace=True)
         province_trade.columns = pd.MultiIndex.from_tuples(province_trade.columns)
         for province in province_trade.index:
             province_trade.loc[province, province] = 0
@@ -409,9 +418,6 @@ class IOTables:
 
             # Remove products where total imports exceed consumption, or there are actually no imports
             bad_ix_excess_imports = total_imports[(U_Y.sum(1) - total_imports) < 0].index.to_list()
-            if len(bad_ix_excess_imports) > 1:
-                print('Warning, there is more '+str(bad_ix_excess_imports)+' imported then used in '+
-                      importing_province+"'s economy.")
             bad_ix_no_import = total_imports[total_imports <= 0].index.to_list()
             bad_ix = bad_ix_excess_imports + bad_ix_no_import
             initial_distribution = initial_distribution.drop(bad_ix, axis=0)
@@ -2387,7 +2393,7 @@ def reconcile_entire_region(U_Y, initial_distribution, total_imports):
         uy = U_Y.loc[product]
         u0 = initial_distribution.loc[product]
         imp = total_imports[product]
-        penalty_multiplicators = [1E6, 1E4, 1E3, 1E3, 1E2, 10]
+        penalty_multiplicators = [1E10, 1E9, 1E8, 1E7, 1E6, 1E5, 1E4, 1E3, 1E3, 1E2, 10]
 
         # Loop through penalty functions until the solver (hopefully) succeeds
         for pen in penalty_multiplicators:
