@@ -27,7 +27,7 @@ class IOTables:
         start = time()
         print("Reading all the Excel files...")
 
-        self.level_of_detail = folder_path.split('/')[-1]
+        self.level_of_detail = [i for i in folder_path.split('/') if 'level' in i][0]
         self.NPRI = pd.read_excel(NPRI_excel_path, None)
         self.classification = classification
 
@@ -95,23 +95,26 @@ class IOTables:
         self.U = self.U.fillna(0)
         self.V = self.V.fillna(0)
 
+        print("Modifying names of duplicated sectors...")
+        self.dealing_with_duplicated_names()
+
         print('Aggregating final demand sectors...')
         self.aggregate_final_demand()
 
         print('Removing IOIC codes from index...')
         self.remove_codes()
 
-        print("Balancing inter-provincial trade...")
-        self.province_import_export(pd.read_excel(
-            folder_path+[i for i in [j for j in os.walk(folder_path)][0][2] if 'Provincial_trade_flow' in i][0], 'Data'))
+        # print("Balancing inter-provincial trade...")
+        # self.province_import_export(pd.read_excel(
+        #     folder_path+[i for i in [j for j in os.walk(folder_path)][0][2] if 'Provincial_trade_flow' in i][0], 'Data'))
 
         # TODO could have international imports/exports as a Rest-of-the-World region
         # TODO or could link it to a GMRIO like EXIOBASE
         # print("Balancing international trade...")
         # self.international_import_export()
 
-        print("Building the symmetric tables...")
-        self.gimme_symmetric_iot()
+        # print("Building the symmetric tables...")
+        # self.gimme_symmetric_iot()
 
         # print("Balancing value added...")
         # self.balance_value_added()
@@ -220,6 +223,21 @@ class IOTables:
         # assert np.isclose(self.U.sum().sum()+self.Y.drop([
         #     i for i in self.Y.columns if i[1] == ('IPTEX', 'Interprovincial exports')], axis=1).sum().sum(),
         #                   self.q.sum().sum())
+
+    def dealing_with_duplicated_names(self):
+        """
+        IOIC classification has duplicate names, so we rename when it's the case
+        :return: updated dataframes
+        """
+        if self.level_of_detail in ['Link-1961 level', 'Link-1997 level', 'Detail level']:
+            self.industries = [(i[0], i[1] + ' (private)') if re.search(r'^BS61', i[0]) else i for i in
+                               self.industries]
+            self.industries = [(i[0], i[1] + ' (non-profit)') if re.search(r'^NP61|^NP71', i[0]) else i for i in
+                               self.industries]
+            self.industries = [(i[0], i[1] + ' (public)') if re.search(r'^GS61', i[0]) else i for i in
+                               self.industries]
+        for df in [self.W, self.g, self.U, self.V]:
+            df.columns = pd.MultiIndex.from_product([self.matching_dict, self.industries])
 
     def aggregate_final_demand(self):
         """
