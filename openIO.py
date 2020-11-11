@@ -104,9 +104,9 @@ class IOTables:
         print('Removing IOIC codes from index...')
         self.remove_codes()
 
-        print("Balancing inter-provincial trade...")
-        self.province_import_export(pd.read_excel(
-            folder_path+[i for i in [j for j in os.walk(folder_path)][0][2] if 'Provincial_trade_flow' in i][0], 'Data'))
+        # print("Balancing inter-provincial trade...")
+        # self.province_import_export(pd.read_excel(
+        #     folder_path+[i for i in [j for j in os.walk(folder_path)][0][2] if 'Provincial_trade_flow' in i][0], 'Data'))
 
         # TODO could have international imports/exports as a Rest-of-the-World region
         # TODO or could link it to a GMRIO like EXIOBASE
@@ -430,7 +430,7 @@ class IOTables:
             # add index entries that are null
             Ui = Ui.reindex([i[1] for i in self.commodities]).fillna(0)
 
-            # remove really small values coming from optimization
+            # remove really small values (< 1$) coming from optimization
             Ui = Ui[Ui > 1].fillna(0)
 
             # distribution balance imports to the different exporting regions
