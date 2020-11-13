@@ -104,22 +104,27 @@ class IOTables:
         print('Removing IOIC codes from index...')
         self.remove_codes()
 
-        # print("Balancing inter-provincial trade...")
-        # self.province_import_export(pd.read_excel(
-        #     folder_path+[i for i in [j for j in os.walk(folder_path)][0][2] if 'Provincial_trade_flow' in i][0], 'Data'))
+        print("Balancing inter-provincial trade...")
+        self.province_import_export(pd.read_excel(
+            folder_path+[i for i in [j for j in os.walk(folder_path)][0][2] if 'Provincial_trade_flow' in i][0], 'Data'))
 
         # TODO could have international imports/exports as a Rest-of-the-World region
         # TODO or could link it to a GMRIO like EXIOBASE
         # print("Balancing international trade...")
         # self.international_import_export()
 
-        # print("Building the symmetric tables...")
-        # self.gimme_symmetric_iot()
-        #
-        # print("Balancing value added...")
-        # self.balance_value_added()
+        print("Building the symmetric tables...")
+        self.gimme_symmetric_iot()
 
-        # self.extract_environmental_data()
+        print("Balancing value added...")
+        self.balance_value_added()
+
+        print("Extracting and formatting environmental data from the NPRI file...")
+        self.extract_environmental_data()
+
+        print("Matching emission data from NPRI to IOT sectors...")
+        self.match_npri_data_to_iots()
+
         # self.match_environmental_data_to_iots()
         # self.characterization_matrix()
         # self.balance_flows()
@@ -464,7 +469,7 @@ class IOTables:
                     [i for i in self.matching_dict if i != importing_province], importing_province].groupby(
                     level=1).sum())
 
-    # TODO in current status international imports need to be removed from prinvincial use
+    # TODO in current status international imports need to be removed from provincial use
     def international_import_export(self):
         """
         Method to deal with international imports and exports. These imports/exports will be allocated to a
@@ -642,45 +647,107 @@ class IOTables:
         emissions = self.NPRI[[i for i in self.NPRI.keys() if "INRP-NPRI" in i][0]]
         emissions.columns = list(zip(emissions.iloc[0].ffill().tolist(), emissions.iloc[2]))
         emissions = emissions.iloc[3:]
+        # selecting the relevant columns from the file
         emissions = emissions.loc[:, [i for i in emissions.columns if
                                       (i[1] in
                                        ['NAICS 6 Code', 'CAS Number', 'Substance Name (English)', 'Units', 'Province']
-                                       or i[1] == 'Total' and 'Air' in i[0]
-                                       or i[1] == 'Total' and 'Water' in i[0]
-                                       or i[1] == 'Total' and 'Land' in i[0])]].fillna(0)
+                                       or 'Total' in i[1] and 'Air' in i[0]
+                                       or 'Total' in i[1] and 'Water' in i[0]
+                                       or 'Total' in i[1] and 'Land' in i[0])]].fillna(0)
+        # renaming the columns
         emissions.columns = ['Province', 'NAICS 6 Code', 'CAS Number', 'Substance Name', 'Units', 'Emissions to air',
                              'Emissions to water', 'Emissions to land']
-        emissions.set_index('Substance Name', inplace=True)
 
-        if self.region != 'CA':
-            # drop emissions not for the studied region
-            emissions = emissions.loc[[i for i in emissions.index if emissions.loc[i,'Province'] == self.region]]
+        # somehow the NPRI manages to have entries without NAICS codes... Remove them
+        no_naics_code_entries = emissions.loc[:, 'NAICS 6 Code'][emissions.loc[:, 'NAICS 6 Code'] == 0].index
+        emissions.drop(no_naics_code_entries, inplace=True)
 
-        temp_df = emissions.groupby(emissions.index).head(n=1)
+        # NAICS codes as strings and not integers
+        emissions.loc[:, 'NAICS 6 Code'] = emissions.loc[:, 'NAICS 6 Code'].astype('str')
+
+        # extracting metadata for substances
+        temp_df = emissions.copy()
+        temp_df.set_index('Substance Name', inplace=True)
+        temp_df = temp_df.groupby(temp_df.index).head(n=1)
         # separating the metadata for emissions (CAS and units)
-        self.emission_metadata = pd.DataFrame('', index=pd.MultiIndex.from_product([temp_df.index,
-                                                                                    ['Air', 'Water', 'Soil']]),
-                                              columns=['CAS Number', 'Unit'])
+        self.emission_metadata = pd.DataFrame('', index=temp_df.index, columns=['CAS Number', 'Unit'])
         for emission in temp_df.index:
             self.emission_metadata.loc[emission, 'CAS Number'] = temp_df.loc[emission, 'CAS Number']
             self.emission_metadata.loc[emission, 'Unit'] = temp_df.loc[emission, 'Units']
         del temp_df
 
-        self.F = pd.pivot_table(data=emissions, index=[emissions.index], columns=['NAICS 6 Code'],
-                                aggfunc=np.sum).fillna(0)
+        self.F = pd.pivot_table(data=emissions, index=['Province', 'Substance Name'],
+                                columns=['Province', 'NAICS 6 Code'], aggfunc=np.sum).fillna(0)
+        # renaming compartments
         self.F.columns.set_levels(['Air', 'Water', 'Soil'], level=0, inplace=True)
-        self.F.columns = self.F.columns.rename(['compartment', 'NAICS'])
+        # renaming the names of the columns indexes
+        self.F.columns = self.F.columns.rename(['compartment', 'Province', 'NAICS'])
+        # reorder multi index to have province as first level
+        self.F = self.F.reorder_levels(['Province', 'compartment', 'NAICS'], axis=1)
+        # match compartments with emissions and not to provinces
         self.F = self.F.T.unstack('compartment').T[self.F.T.unstack('compartment').T != 0].fillna(0)
+        # identify emissions that are in tonnes
+        emissions_to_rescale = [i for i in self.emission_metadata.index if
+                                self.emission_metadata.loc[i, 'Unit'] == 'tonnes']
+        # convert them to kg
+        self.F.loc(axis=0)[:, emissions_to_rescale] *= 1000
+        self.emission_metadata.loc[emissions_to_rescale, 'Unit'] = 'kg'
+        # same thing for emissions in grams
+        emissions_to_rescale = [i for i in self.emission_metadata.index if
+                                self.emission_metadata.loc[i, 'Unit'] == 'grams']
+        self.F.loc(axis=0)[:, emissions_to_rescale] /= 1000
+        self.emission_metadata.loc[emissions_to_rescale, 'Unit'] = 'kg'
 
-        # convert all tonnes and grams to kgs and change in metadata as well
-        self.F.loc[
-            [i for i in self.emission_metadata.index if self.emission_metadata.loc[i, 'Unit'] == 'tonnes']] *= 1000
-        self.emission_metadata.loc[[i for i in self.emission_metadata.index if
-                                    self.emission_metadata.loc[i, 'Unit'] == 'tonnes'], 'Unit'] = 'kg'
-        self.F.loc[
-            [i for i in self.emission_metadata.index if self.emission_metadata.loc[i, 'Unit'] == 'grams']] /= 1000
-        self.emission_metadata.loc[[i for i in self.emission_metadata.index if
-                                    self.emission_metadata.loc[i, 'Unit'] == 'grams'], 'Unit'] = 'kg'
+        # harmonizing emissions across provinces, set to zero if missing initially
+        new_index = pd.MultiIndex.from_product(
+            [self.matching_dict, self.emission_metadata.sort_index().index, ['Air', 'Water', 'Soil']])
+        self.F = self.F.reindex(new_index).fillna(0)
+
+        # harmonizing NAICS codes across provinces this time
+        self.F = self.F.T.reindex(
+            pd.MultiIndex.from_product([self.F.columns.levels[0], self.F.columns.levels[1]])).T.fillna(0)
+
+    def match_npri_data_to_iots(self):
+
+        total_emissions_origin = self.F.sum().sum()
+
+        # load and format concordances file
+        concordance = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/concordance.xlsx'),
+                                    self.level_of_detail)
+        concordance.set_index('NAICS 6 Code', inplace=True)
+        concordance.drop('NAICS 6 Sector Name (English)', axis=1, inplace=True)
+
+        # splitting emissions between private and public sectors
+        if self.level_of_detail == 'Summary level':
+            self.split_private_public_sectors(NAICS_code=['611210', '611310', '611510'], IOIC_code='GS610')
+        elif self.level_of_detail == 'Link-1961 level':
+            self.split_private_public_sectors(NAICS_code=['611210', '611510'], IOIC_code='GS611B0')
+            self.split_private_public_sectors(NAICS_code='611310', IOIC_code='GS61130')
+        elif self.level_of_detail in ['Link-1997 level', 'Detail level']:
+            self.split_private_public_sectors(NAICS_code='611210', IOIC_code='GS611200')
+            self.split_private_public_sectors(NAICS_code='611310', IOIC_code='GS611300')
+            self.split_private_public_sectors(NAICS_code='611510', IOIC_code='GS611A00')
+
+        # switch NAICS codes in self.F for corresponding IOIC codes (from concordances file)
+        IOIC_index = []
+        for NAICS in self.F.columns:
+            try:
+                IOIC_index.append((NAICS[0], concordance.loc[int(NAICS[1]), 'IOIC']))
+            except ValueError:
+                IOIC_index.append(NAICS)
+        self.F.columns = pd.MultiIndex.from_tuples(IOIC_index)
+
+        # adding emissions from same sectors together (summary level is more aggregated than NAICS 6 Code)
+        self.F = self.F.groupby(self.F.columns, axis=1).sum()
+        # reordering columns
+        self.F = self.F.T.reindex(
+            pd.MultiIndex.from_product([self.matching_dict, [i[0] for i in self.industries]])).T.fillna(0)
+        # changing codes for actual names of the sectors
+        self.F.columns = pd.MultiIndex.from_product([self.matching_dict, [i[1] for i in self.industries]])
+
+        # assert that nearly all emissions present in the NPRI were successfully transferred in self.F
+        assert self.F.sum().sum() / total_emissions_origin > 0.98
+        assert self.F.sum().sum() / total_emissions_origin < 1.02
 
     def match_environmental_data_to_iots(self):
         """
@@ -2288,6 +2355,21 @@ class IOTables:
             df = df.loc[[i for i in df.index if df.loc[i, 'GEO'] == region and df.loc[i, 'REF_DATE'] == self.year]]
         df.set_index('Sector', inplace=True)
         return df
+
+    def split_private_public_sectors(self, NAICS_code, IOIC_code):
+        """
+        Support method to split equally emissions from private and public sectors
+        :param NAICS_code: [string or list] the NAICS code(s) whose emissions will be split
+        :param IOIC_code: [string] the IOIC_code inhereting the split emissions (will be private or public sector)
+        :return: updated self.F
+        """
+        df = self.F.loc(axis=1)[:, NAICS_code].copy()
+        if type(NAICS_code) == list:
+            df.columns = pd.MultiIndex.from_product([self.matching_dict, [IOIC_code] * len(NAICS_code)])
+        elif type(NAICS_code) == str:
+            df.columns = pd.MultiIndex.from_product([self.matching_dict, [IOIC_code]])
+        self.F = pd.concat([self.F, df / 2], axis=1)
+        self.F.loc(axis=1)[:, NAICS_code] /= 2
 
 
 def select_industries_emissions(df):
