@@ -1,22 +1,23 @@
-**OpenIO Canada**
+**OpenIO Canada v1.0**
 
-**_In development, not ready for use._**
+Class that creates symmetric Environmentally Extended Input-Output (EEIO) tables for Canada.
 
-Class that creates symmetric Input-Output tables based on the Supply and Use economic tables provided by Statistic
-Canada (https://www150.statcan.gc.ca/n1/en/catalogue/15-602-X), the NPRI of Canada 
-(https://open.canada.ca/data/en/dataset/1fb7d8d4-7713-4ec6-b957-4a882a84fed3)
-and the physical flows accounts of GHG emissions, water use and energy use of Canada 
-(https://www150.statcan.gc.ca/n1/tbl/csv/38100097-eng.zip).
+Includes 280 pollutants in 3 compartments (air, water and soil). These flows are linked to the IMPACT World+ 
+life cycle impact assessment methodology.
 
-Currently, the scope of the project only includes the creation of a system at the national scale. Ultimately, this 
-system might be regionalized to differentiate trade and impacts linked to provincial trade, i.e., specific data for 
-Quebec or Ontario would be available.
+In v1.0, open IO operates at the national scale.
 
-Tables are available both in _ixi_ and _pxp_ formats, generated either using the fixed industry sales structure or the industry technology 
-assumptions. More transformation models might be added in the future.
+Tables are available both in _ixi_ (industry) and _pxp_ (product) formats.
+The fixed industry sales structure assumption was used to generate the _ixi_ format and the industry technology 
+assumption was used for the _pxp_ format. More transformation models might be added in the future.
 
 Unfortunately, GHG emissions are not disaggregated and were precompiled using IPCC2007 impact factors, which are 
 outdated. 
 
-OpenIO includes 280 pollutants in 3 compartments (air, water and soil). These flows are linked to the IMPACT World+ 
-life cycle impact assessment methodology.
+Data used:
+- https://www150.statcan.gc.ca/n1/en/catalogue/15-602-X
+- https://open.canada.ca/data/en/dataset/1fb7d8d4-7713-4ec6-b957-4a882a84fed3
+- https://www150.statcan.gc.ca/n1/tbl/csv/38100097-eng.zip
+
+
+More documentation will come with v2.0.
