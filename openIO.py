@@ -1031,8 +1031,8 @@ class IOTables:
             'Volatile organic compounds'] = 'NMVOC, non-methane volatile organic compounds, unspecified origin'
 
         # proxies, NOT A 1 FOR 1 MATCH but better than no characterization factor
-        concordance_IW['HCFC-123 (all isomers)'] = 'Ethane, 2-chloro-1,1,1,2-tetrafluoro-, HCFC-124'
-        concordance_IW['HCFC-124 (all isomers)'] = 'Ethane, 2,2-dichloro-1,1,1-trifluoro-, HCFC-123'
+        concordance_IW['HCFC-123 (all isomers)'] = 'Ethane, 2-chloro-1,1,1,2-tetrafluoro-, HCFC-123'
+        concordance_IW['HCFC-124 (all isomers)'] = 'Ethane, 2,2-dichloro-1,1,1-trifluoro-, HCFC-124'
         concordance_IW['Nonylphenol and its ethoxylates'] = 'Nonylphenol'
         concordance_IW['Phosphorus (yellow or white only)'] = 'Phosphorus'
         concordance_IW['Phosphorus (total)'] = 'Phosphorus'
