@@ -104,8 +104,10 @@ class IOTables:
         self.remove_codes()
 
         print("Balancing inter-provincial trade...")
-        self.province_import_export(pd.read_excel(
-            folder_path+[i for i in [j for j in os.walk(folder_path)][0][2] if 'Provincial_trade_flow' in i][0], 'Data'))
+        self.province_import_export(
+            pd.read_excel(
+                folder_path+[i for i in [j for j in os.walk(folder_path)][0][2] if 'Provincial_trade_flow' in i][0],
+                'Data'))
 
         # TODO could have international imports/exports as a Rest-of-the-World region
         # TODO or could link it to a GMRIO like EXIOBASE
@@ -386,20 +388,20 @@ class IOTables:
         province_trade_file = province_trade_file
 
         province_trade_file.Origin = [{v: k for k, v in self.matching_dict.items()}[i.split(') ')[1]] if (
-                    ')' in i and i != '(81) Canadian territorial enclaves abroad') else i for i in
-                                    province_trade_file.Origin]
+                ')' in i and i != '(81) Canadian territorial enclaves abroad') else i for i in
+                                      province_trade_file.Origin]
         province_trade_file.Destination = [{v: k for k, v in self.matching_dict.items()}[i.split(') ')[1]] if (
-                    ')' in i and i != '(81) Canadian territorial enclaves abroad') else i for i in
-                                         province_trade_file.Destination]
+                ')' in i and i != '(81) Canadian territorial enclaves abroad') else i for i in
+                                           province_trade_file.Destination]
         # extracting and formatting supply for each province
         province_trade = pd.pivot_table(data=province_trade_file, index='Destination', columns=['Origin', 'Product'])
 
         province_trade = province_trade.loc[
             [i for i in province_trade.index if i in self.matching_dict], [i for i in province_trade.columns if
-                                                                                i[1] in self.matching_dict]]
+                                                                           i[1] in self.matching_dict]]
         province_trade *= 1000000
         province_trade.columns = [(i[1], i[2].split(': ')[1]) if ':' in i[2] else i for i in
-                                     province_trade.columns]
+                                  province_trade.columns]
         province_trade.drop([i for i in province_trade.columns if i[1] not in [i[1] for i in self.commodities]],
                             axis=1, inplace=True)
         province_trade.columns = pd.MultiIndex.from_tuples(province_trade.columns)
@@ -409,55 +411,29 @@ class IOTables:
         for importing_province in province_trade.index:
             U_Y = pd.concat([self.U.loc[importing_province, importing_province],
                              self.Y.loc[importing_province, importing_province]], axis=1)
-            total_imports = province_trade.groupby(level=1,axis=1).sum().loc[importing_province]
+            total_imports = province_trade.groupby(level=1, axis=1).sum().loc[importing_province]
             index_commodity = [i[1] for i in self.commodities]
             total_imports = total_imports.reindex(index_commodity).fillna(0)
-            initial_distribution = ((U_Y.T / (U_Y.sum(axis=1))) * total_imports).T.fillna(0)
-
-            # Remove changes in inventories as imports will not go directly into this category
-            initial_distribution.drop(["Changes in inventories"], axis=1, inplace=True)
-            U_Y.drop(["Changes in inventories"], axis=1, inplace=True)
-            # imports cannot be allocated to negative gross fixed capital formation as it is probably not importing if
-            # it's transferring ownership for a given product
-            initial_distribution.loc[initial_distribution.loc[:, 'Gross fixed capital formation'] < 0,
-                                     'Gross fixed capital formation'] = 0
-            U_Y.loc[U_Y.loc[:, 'Gross fixed capital formation'] < 0, 'Gross fixed capital formation'] = 0
-
-            # Remove products where total imports exceed consumption, or there are actually no imports
-            bad_ix_excess_imports = total_imports[(U_Y.sum(1) - total_imports) < 0].index.to_list()
-            bad_ix_no_import = total_imports[total_imports <= 0].index.to_list()
-            bad_ix = bad_ix_excess_imports + bad_ix_no_import
-            initial_distribution = initial_distribution.drop(bad_ix, axis=0)
-            U_Y = U_Y.drop(bad_ix, axis=0)
-            total_imports = total_imports.drop(bad_ix)
-
-            # pyomo optimization (see code at the end)
-            Ui, S_imports, S_positive = reconcile_entire_region(U_Y, initial_distribution, total_imports)
-
-            # add index entries that are null
-            Ui = Ui.reindex([i[1] for i in self.commodities]).fillna(0)
-
-            # remove really small values (< 1$) coming from optimization
-            Ui = Ui[Ui > 1].fillna(0)
+            import_distribution = ((U_Y.T / (U_Y.sum(axis=1))) * total_imports).T.fillna(0)
 
             # distribution balance imports to the different exporting regions
-            final_demand_imports = [i for i in Ui.columns if i not in self.U.columns.levels[1]]
+            final_demand_imports = [i for i in import_distribution.columns if i not in self.U.columns.levels[1]]
             for exporting_province in province_trade.index:
                 if importing_province != exporting_province:
-                    df = ((Ui.T * (province_trade / province_trade.sum()).fillna(0).loc[
-                        exporting_province, importing_province]).T).reindex(Ui.index).fillna(0)
+                    df = ((import_distribution.T * (province_trade / province_trade.sum()).fillna(0).loc[
+                        exporting_province, importing_province]).T).reindex(import_distribution.index).fillna(0)
                     # assert index and columns are the same before using .values
                     assert all(self.U.loc[exporting_province, importing_province].index == df.loc[:,
-                                                                                             self.U.columns.levels[
-                                                                                                 1]].reindex(
+                                                                                           self.U.columns.levels[
+                                                                                               1]].reindex(
                         self.U.loc[exporting_province, importing_province].columns, axis=1).index)
                     assert all(self.U.loc[exporting_province, importing_province].columns == df.loc[:,
-                                                                                               self.U.columns.levels[
-                                                                                                   1]].reindex(
+                                                                                             self.U.columns.levels[
+                                                                                                 1]].reindex(
                         self.U.loc[exporting_province, importing_province].columns, axis=1).columns)
                     # assign new values into self.U and self.Y
                     self.U.loc[exporting_province, importing_province] = df.loc[:,
-                                                                           self.U.columns.levels[1]].reindex(
+                                                                         self.U.columns.levels[1]].reindex(
                         self.U.loc[exporting_province, importing_province].columns, axis=1).values
                     self.Y.loc[exporting_province, importing_province].update(df.loc[:, final_demand_imports])
 
@@ -470,6 +446,9 @@ class IOTables:
                 self.Y.loc[importing_province, importing_province] - self.Y.loc[
                     [i for i in self.matching_dict if i != importing_province], importing_province].groupby(
                     level=1).sum())
+
+            # checking no negative values popped up our of nowhere
+            assert not self.U[self.U < 0].any().any()
 
     # TODO in current status international imports need to be removed from provincial use
     def international_import_export(self):
@@ -1067,6 +1046,101 @@ class IOTables:
         concordance_IW['Speciated VOC - Pentene (all isomers)'] = '1-Pentene'
 
         return pd.DataFrame.from_dict(concordance_IW, orient='index')
+
+# ------------------------------------------------ DEPRECATED ---------------------------------------------------------
+    def old_province_import_export(self, province_trade_file):
+        """
+        Method extracting and formatting inter province imports/exports
+        :return: modified self.U, self.V, self.W, self.Y
+        """
+
+        province_trade_file = province_trade_file
+
+        province_trade_file.Origin = [{v: k for k, v in self.matching_dict.items()}[i.split(') ')[1]] if (
+                    ')' in i and i != '(81) Canadian territorial enclaves abroad') else i for i in
+                                    province_trade_file.Origin]
+        province_trade_file.Destination = [{v: k for k, v in self.matching_dict.items()}[i.split(') ')[1]] if (
+                    ')' in i and i != '(81) Canadian territorial enclaves abroad') else i for i in
+                                         province_trade_file.Destination]
+        # extracting and formatting supply for each province
+        province_trade = pd.pivot_table(data=province_trade_file, index='Destination', columns=['Origin', 'Product'])
+
+        province_trade = province_trade.loc[
+            [i for i in province_trade.index if i in self.matching_dict], [i for i in province_trade.columns if
+                                                                                i[1] in self.matching_dict]]
+        province_trade *= 1000000
+        province_trade.columns = [(i[1], i[2].split(': ')[1]) if ':' in i[2] else i for i in
+                                     province_trade.columns]
+        province_trade.drop([i for i in province_trade.columns if i[1] not in [i[1] for i in self.commodities]],
+                            axis=1, inplace=True)
+        province_trade.columns = pd.MultiIndex.from_tuples(province_trade.columns)
+        for province in province_trade.index:
+            province_trade.loc[province, province] = 0
+
+        for importing_province in province_trade.index:
+            U_Y = pd.concat([self.U.loc[importing_province, importing_province],
+                             self.Y.loc[importing_province, importing_province]], axis=1)
+            total_imports = province_trade.groupby(level=1,axis=1).sum().loc[importing_province]
+            index_commodity = [i[1] for i in self.commodities]
+            total_imports = total_imports.reindex(index_commodity).fillna(0)
+            initial_distribution = ((U_Y.T / (U_Y.sum(axis=1))) * total_imports).T.fillna(0)
+
+            # Remove changes in inventories as imports will not go directly into this category
+            initial_distribution.drop(["Changes in inventories"], axis=1, inplace=True)
+            U_Y.drop(["Changes in inventories"], axis=1, inplace=True)
+            # imports cannot be allocated to negative gross fixed capital formation as it is probably not importing if
+            # it's transferring ownership for a given product
+            initial_distribution.loc[initial_distribution.loc[:, 'Gross fixed capital formation'] < 0,
+                                     'Gross fixed capital formation'] = 0
+            U_Y.loc[U_Y.loc[:, 'Gross fixed capital formation'] < 0, 'Gross fixed capital formation'] = 0
+
+            # Remove products where total imports exceed consumption, or there are actually no imports
+            bad_ix_excess_imports = total_imports[(U_Y.sum(1) - total_imports) < 0].index.to_list()
+            bad_ix_no_import = total_imports[total_imports <= 0].index.to_list()
+            bad_ix = bad_ix_excess_imports + bad_ix_no_import
+            initial_distribution = initial_distribution.drop(bad_ix, axis=0)
+            U_Y = U_Y.drop(bad_ix, axis=0)
+            total_imports = total_imports.drop(bad_ix)
+
+            # pyomo optimization (see code at the end)
+            Ui, S_imports, S_positive = reconcile_entire_region(U_Y, initial_distribution, total_imports)
+
+            # add index entries that are null
+            Ui = Ui.reindex([i[1] for i in self.commodities]).fillna(0)
+
+            # remove really small values (< 1$) coming from optimization
+            Ui = Ui[Ui > 1].fillna(0)
+
+            # distribution balance imports to the different exporting regions
+            final_demand_imports = [i for i in Ui.columns if i not in self.U.columns.levels[1]]
+            for exporting_province in province_trade.index:
+                if importing_province != exporting_province:
+                    df = ((Ui.T * (province_trade / province_trade.sum()).fillna(0).loc[
+                        exporting_province, importing_province]).T).reindex(Ui.index).fillna(0)
+                    # assert index and columns are the same before using .values
+                    assert all(self.U.loc[exporting_province, importing_province].index == df.loc[:,
+                                                                                             self.U.columns.levels[
+                                                                                                 1]].reindex(
+                        self.U.loc[exporting_province, importing_province].columns, axis=1).index)
+                    assert all(self.U.loc[exporting_province, importing_province].columns == df.loc[:,
+                                                                                               self.U.columns.levels[
+                                                                                                   1]].reindex(
+                        self.U.loc[exporting_province, importing_province].columns, axis=1).columns)
+                    # assign new values into self.U and self.Y
+                    self.U.loc[exporting_province, importing_province] = df.loc[:,
+                                                                           self.U.columns.levels[1]].reindex(
+                        self.U.loc[exporting_province, importing_province].columns, axis=1).values
+                    self.Y.loc[exporting_province, importing_province].update(df.loc[:, final_demand_imports])
+
+            # remove inter-provincial trade from intra-provincial trade
+            self.U.loc[importing_province, importing_province].update(
+                self.U.loc[importing_province, importing_province] - self.U.loc[
+                    [i for i in self.matching_dict if i != importing_province], importing_province].groupby(
+                    level=1).sum())
+            self.Y.loc[importing_province, importing_province].update(
+                self.Y.loc[importing_province, importing_province] - self.Y.loc[
+                    [i for i in self.matching_dict if i != importing_province], importing_province].groupby(
+                    level=1).sum())
 
 
 def todf(data):

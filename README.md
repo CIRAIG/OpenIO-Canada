@@ -19,3 +19,6 @@ Data used:
 - https://www150.statcan.gc.ca/n1/en/catalogue/15-602-X
 - https://open.canada.ca/data/en/dataset/1fb7d8d4-7713-4ec6-b957-4a882a84fed3
 - https://www150.statcan.gc.ca/n1/tbl/csv/38100097-eng.zip
+
+This project was in part funded by Shared Services Canada (SSC) but they are not responsible for any data/results 
+obtained from open IO Canada.
