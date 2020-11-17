@@ -946,6 +946,9 @@ class IOTables:
         Produce normalized environmental extensions
         :return: self.S and self.F with product classification if it's been selected
         """
+
+        self.F = self.F.sort_index()
+
         if self.classification == 'industry':
             self.S = self.F.dot(self.inv_g)
 
