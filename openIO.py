@@ -241,6 +241,13 @@ class IOTables:
         IOIC classification has duplicate names, so we rename when it's the case
         :return: updated dataframes
         """
+
+        # reindexing to fix the order of the columns
+        self.V = self.V.T.reindex(pd.MultiIndex.from_product([self.matching_dict, self.industries]).tolist()).T
+        self.U = self.U.T.reindex(pd.MultiIndex.from_product([self.matching_dict, self.industries]).tolist()).T
+        self.g = self.g.T.reindex(pd.MultiIndex.from_product([self.matching_dict, self.industries]).tolist()).T
+        self.W = self.W.T.reindex(pd.MultiIndex.from_product([self.matching_dict, self.industries]).tolist()).T
+
         if self.level_of_detail in ['Link-1961 level', 'Link-1997 level', 'Detail level']:
             self.industries = [(i[0], i[1] + ' (private)') if re.search(r'^BS61', i[0]) else i for i in
                                self.industries]
@@ -255,8 +262,10 @@ class IOTables:
                                self.industries]
             self.industries = [(i[0], i[1] + ' (public)') if re.search(r'^GS623', i[0]) else i for i in
                                self.industries]
-        for df in [self.W, self.g, self.U, self.V]:
-            df.columns = pd.MultiIndex.from_product([self.matching_dict, self.industries])
+
+        # applying the change of names to columns
+        for df in [self.V, self.U, self.g, self.W]:
+            df.columns = pd.MultiIndex.from_product([self.matching_dict, self.industries]).tolist()
 
     def aggregate_final_demand(self):
         """
@@ -447,7 +456,7 @@ class IOTables:
                     [i for i in self.matching_dict if i != importing_province], importing_province].groupby(
                     level=1).sum())
 
-            # checking no negative values popped up our of nowhere
+            # checking no negative values popped up out of nowhere
             assert not self.U[self.U < 0].any().any()
 
     # TODO in current status international imports need to be removed from provincial use
@@ -814,7 +823,7 @@ class IOTables:
             # adding GHG accoutns to pollutants
             self.F = pd.concat([self.F, ghgs.T])
             # reindexing
-            self.F = self.F.reindex(self.A.index, axis=1)
+            self.F = self.F.reindex(self.U.columns, axis=1)
 
         # GHG emissions for households
         self.FY = pd.DataFrame(0, FD_GHG.columns, self.Y.columns)
@@ -854,8 +863,8 @@ class IOTables:
                 except KeyError:
                     pass
 
-        self.C.loc['Climate change, human health, short term', [i for i in self.C.columns if i[1] == 'GHGs']] = 1
-        self.C.loc['Climate change, human health, long term', [i for i in self.C.columns if i[1] == 'GHGs']] = 1
+        self.C.loc['Climate change, short term', [i for i in self.C.columns if i[1] == 'GHGs']] = 1
+        self.C.loc['Climate change, long term', [i for i in self.C.columns if i[1] == 'GHGs']] = 1
         self.C.loc[
             'Climate change, ecosystem quality, long term', [i for i in self.C.columns if i[1] == 'GHGs']] = 0.628
         self.C.loc[
