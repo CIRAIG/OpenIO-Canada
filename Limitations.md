@@ -4,7 +4,9 @@ The following document present the limitations of open IO Canada v2.0.
 - Primary energy flows from Statistics Canada are only available as aggregated primary energy and already includes 
 electricity which would trigger a double counting with economic electricity flows. Hence, energy use is not available 
 for now.
-- Water use flows are not available yet.
+- Water use flows are only available per sector at the national level. The output of each province for each sector was
+used to distribute water use flows across provinces. For households demands in water, the consumption levels of each 
+provinces were used to distribute households' water flow uses across each province.
 - Inter-provincial trade were allocated using provincial outputs, i.e., the amount of aluminium imported by Quebec from 
 other provinces was allocated according to the output of each province.These inter-provincial trade were then optimized 
 using pyomo to avoid the appearance of negative entries
