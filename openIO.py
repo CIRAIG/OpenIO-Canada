@@ -129,6 +129,9 @@ class IOTables:
         print("Matching GHG accounts to IOT sectors...")
         self.match_ghg_accounts_to_iots()
 
+        print("Matching water accounts to IOT sectors...")
+        self.match_water_accounts_to_iots()
+
         print("Creating the characterization matrix...")
         self.characterization_matrix()
 
@@ -820,7 +823,7 @@ class IOTables:
             ghgs.columns = pd.MultiIndex.from_product([self.matching_dict, ['GHGs'], ['Air']])
             for province in ghgs.columns.levels[0]:
                 ghgs.loc[[i for i in ghgs.index.levels[0] if i != province], province] = 0
-            # adding GHG accoutns to pollutants
+            # adding GHG accounts to pollutants
             self.F = pd.concat([self.F, ghgs.T])
             # reindexing
             self.F = self.F.reindex(self.U.columns, axis=1)
@@ -836,6 +839,101 @@ class IOTables:
 
         self.emission_metadata.loc['GHGs', 'CAS Number'] = 'N/A'
         self.emission_metadata.loc['GHGs', 'Unit'] = 'kgCO2eq'
+
+    def match_water_accounts_to_iots(self):
+        """
+        Method matching water accounts to IOIC classification selected by the user
+        :return: self.F and self.FY with GHG flows included
+        """
+        # load the water use data from STATCAN
+        water = pd.read_csv(pkg_resources.resource_stream(__name__, '/Data/water_use.csv'))
+
+        # Only odd years from 2009 to 2015
+        if self.year == 2010:
+            year_for_water = 2011
+        elif self.year == 2012:
+            year_for_water = 2013
+        elif self.year == 2014:
+            year_for_water = 2015
+        elif self.year > 2015:
+            year_for_water = 2015
+        else:
+            year_for_water = self.year
+        # select the year of the data
+        water = water.loc[
+            [i for i in water.index if water.REF_DATE[i] == int(year_for_water)], ['Sector', 'VALUE']].fillna(0)
+
+        # convert into cubic meters
+        water.VALUE *= 1000
+
+        # water use from households
+        FD_water = water.loc[[i for i in water.index if water.Sector[i] == 'Households']]
+        # national water use will be distributed depending on the amount of $ spent by households in a given province
+        provincial_FD_consumption_distribution = self.Y.loc(axis=1)[:,
+                                                 'Household final consumption expenditure'].sum() / self.Y.loc(
+            axis=1)[:, 'Household final consumption expenditure'].sum().sum()
+        FD_water = provincial_FD_consumption_distribution * FD_water.VALUE.values
+        # spatializing
+        FD_water = pd.concat([FD_water] * len(FD_water.index.levels[0]), axis=1)
+        FD_water.columns = pd.MultiIndex.from_product([self.matching_dict.keys(), ['Water'], ['Water']])
+        FD_water = FD_water.T
+        for province in FD_water.index.levels[0]:
+            FD_water.loc[province, [i for i in FD_water.columns if i[0] != province]] = 0
+        FD_water = FD_water.T.reindex(self.Y.columns).T.fillna(0)
+        self.FY = pd.concat([self.FY, FD_water])
+
+        # format the names of the sector to match those used up till then
+        water = water.loc[[i for i in water.index if '[' in water.Sector[i]]]
+        water.Sector = [i.split('[')[1].split(']')[0] for i in water.Sector]
+        water.drop([i for i in water.index if re.search(r'^FC', water.Sector.loc[i])], inplace=True)
+        water.set_index('Sector', inplace=True)
+
+        # load concordances matching water use data classification to the different classifications used in OpenIO
+        concordance = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/water_concordance.xlsx'),
+                                    self.level_of_detail)
+        concordance.set_index('Sector', inplace=True)
+        # dropping potential empty sectors (mostly Cannabis related)
+        to_drop = concordance.loc[concordance.loc[:, 'IOIC'].isna()].index
+        concordance.drop(to_drop, inplace=True)
+
+        water_flows = pd.DataFrame()
+        if self.level_of_detail in ['Link-1961 level', 'Link-1997 level', 'Detail level']:
+            for code in concordance.index:
+                # Detail level is more precise than water accounts, we use market share to distribute water flows
+                sectors_to_split = [i[1] for i in self.industries if
+                                    i[0] in concordance.loc[code].dropna().values.tolist()]
+                output_sectors_to_split = self.V.loc[:,
+                                          [i for i in self.V.columns if i[1] in sectors_to_split]].sum()
+
+                share_sectors_to_split = output_sectors_to_split / output_sectors_to_split.sum() * water.loc[
+                    code, 'VALUE']
+                water_flows = pd.concat([water_flows, share_sectors_to_split])
+        elif self.level_of_detail == 'Summary level':
+            water = pd.concat([water, concordance], axis=1)
+            water.set_index('IOIC', inplace=True)
+            water = water.groupby(water.index).sum()
+            water.index = [dict(self.industries)[i] for i in water.index]
+            water = water.reindex([i[1] for i in self.industries]).fillna(0)
+            water_flows = pd.DataFrame()
+            for sector in water.index:
+                water_split = self.g.sum().loc(axis=0)[:, sector] / self.g.sum().loc(axis=0)[:, sector].sum() * \
+                              water.loc[sector, 'VALUE']
+                water_flows = pd.concat([water_flows, water_split])
+
+        water_flows = water_flows.groupby(water_flows.index).sum().fillna(0)
+        # multi index for the win
+        water_flows.index = pd.MultiIndex.from_tuples(water_flows.index)
+        water_flows.columns = ['Water']
+
+        # spatializing water flows
+        water_flows = pd.concat([water_flows.T] * len(water_flows.index.levels[0]))
+        water_flows.index = pd.MultiIndex.from_product([self.matching_dict.keys(), ['Water'], ['Water']])
+        water_flows = water_flows.T.reindex(self.F.columns).T
+        for province in water_flows.index.levels[0]:
+            water_flows.loc[province, [i for i in water_flows.columns if i[0] != province]] = 0
+
+        # fillna(0) for cannabis industries
+        self.F = pd.concat([self.F, water_flows]).fillna(0)
 
     def characterization_matrix(self):
         """
@@ -855,13 +953,13 @@ class IOTables:
 
         self.C = pd.DataFrame(0, pivoting.index, self.F.index)
         for flow in self.C.columns:
-            if concordance.loc[flow[1], 'IMPACT World+ flows'] is not None:
-                try:
+            try:
+                if concordance.loc[flow[1], 'IMPACT World+ flows'] is not None:
                     self.C.loc[:, flow] = pivoting.loc[:,
                                           [(concordance.loc[flow[1], 'IMPACT World+ flows'], flow[2],
                                             '(unspecified)')]].values
-                except KeyError:
-                    pass
+            except KeyError:
+                pass
 
         self.C.loc['Climate change, short term', [i for i in self.C.columns if i[1] == 'GHGs']] = 1
         self.C.loc['Climate change, long term', [i for i in self.C.columns if i[1] == 'GHGs']] = 1
@@ -873,6 +971,8 @@ class IOTables:
             'Climate change, human health, long term', [i for i in self.C.columns if i[1] == 'GHGs']] = 0.00000286
         self.C.loc[
             'Climate change, human health, short term', [i for i in self.C.columns if i[1] == 'GHGs']] = 0.000000818
+
+        self.C.loc[('Water use', 'm3'), [i for i in self.C.columns if i[1] == 'Water']] = 1
 
         # some methods of IMPACT World+ do not make sense in our context, remove them
         self.C.drop(['Fossil and nuclear energy use',
@@ -944,15 +1044,16 @@ class IOTables:
             self.F = self.F.dot(self.V.dot(self.inv_g).T)
             self.S = self.F.dot(self.inv_q)
 
+        # adding empty flows to FY to allow multiplication with self.C
+        self.FY = pd.concat([pd.DataFrame(0, self.F.index, self.Y.columns), self.FY])
+        self.FY = self.FY.groupby(self.FY.index).sum()
+
     def calc(self):
         """
         Method to calculate the Leontief inverse and get total impacts
         :return: self.L, self.x, self.D
         """
-
-        # adding empty flows to FY to allow multiplication with self.C
-        self.FY = pd.concat([pd.DataFrame(0, self.F.index, self.Y.columns), self.FY])
-        self.FY = self.FY.groupby(self.FY.index).sum()
+        pass
 
     def split_private_public_sectors(self, NAICS_code, IOIC_code):
         """
