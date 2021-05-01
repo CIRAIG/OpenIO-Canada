@@ -12,7 +12,7 @@ import numpy as np
 import re
 import pkg_resources
 import os
-from pyomo.environ import *
+# from pyomo.environ import *
 from time import time
 
 
@@ -54,6 +54,9 @@ class IOTables:
         self.FY = pd.DataFrame()
         self.C = pd.DataFrame()
         self.INT_imports = pd.DataFrame()
+        self.L = pd.DataFrame()
+        self.E = pd.DataFrame()
+        self.D = pd.DataFrame()
 
         # metadata
         self.emission_metadata = pd.DataFrame()
@@ -108,11 +111,6 @@ class IOTables:
             pd.read_excel(
                 folder_path+[i for i in [j for j in os.walk(folder_path)][0][2] if 'Provincial_trade_flow' in i][0],
                 'Data'))
-
-        # TODO could have international imports/exports as a Rest-of-the-World region
-        # TODO or could link it to a GMRIO like EXIOBASE
-        # print("Balancing international trade...")
-        # self.international_import_export()
 
         print("Building the symmetric tables...")
         self.gimme_symmetric_iot()
@@ -196,9 +194,14 @@ class IOTables:
         supply_table = supply_table.astype('float64')
         use_table = use_table.astype('float64')
 
-        # tables from M$ to $
-        supply_table *= 1000000
-        use_table *= 1000000
+        if self.level_of_detail == 'Detail level':
+            # tables from k$ to $
+            supply_table *= 1000
+            use_table *= 1000
+        else:
+            # tables from M$ to $
+            supply_table *= 1000000
+            use_table *= 1000000
 
         # check calculated totals matched displayed totals
         assert np.allclose(use_table.iloc[:, use_table.columns.get_loc(('TOTAL', 'Total'))],
@@ -299,7 +302,7 @@ class IOTables:
         aggregated_Y = pd.concat([aggregated_Y, df], axis=1)
 
         df = self.Y.loc[:, [i for i in self.Y.columns if
-                            re.search(r'^CO\w*\d|^ME\w*\d|^IP\w*\d', i[1][0])]].groupby(level=0, axis=1).sum()
+                            re.search(r'^CO\w*\d|^ME\w*\d|^IP\w[T]*\d', i[1][0])]].groupby(level=0, axis=1).sum()
         df.columns = pd.MultiIndex.from_product([
             df.columns, ["Gross fixed capital formation"]])
         aggregated_Y = pd.concat([aggregated_Y, df], axis=1)
@@ -411,7 +414,10 @@ class IOTables:
         province_trade = province_trade.loc[
             [i for i in province_trade.index if i in self.matching_dict], [i for i in province_trade.columns if
                                                                            i[1] in self.matching_dict]]
-        province_trade *= 1000000
+        if self.level_of_detail == 'Detail level':
+            province_trade *= 1000
+        else:
+            province_trade *= 1000000
         province_trade.columns = [(i[1], i[2].split(': ')[1]) if ':' in i[2] else i for i in
                                   province_trade.columns]
         province_trade.drop([i for i in province_trade.columns if i[1] not in [i[1] for i in self.commodities]],
@@ -420,9 +426,21 @@ class IOTables:
         for province in province_trade.index:
             province_trade.loc[province, province] = 0
 
+        import_markets = pd.DataFrame(0, province_trade.index, province_trade.columns)
+        for importing_province in province_trade.index:
+            for exported_product in province_trade.columns.levels[1]:
+                import_markets.loc[
+                    importing_province, [i for i in import_markets.columns if i[1] == exported_product]] = (
+                            province_trade.loc[
+                                importing_province, [i for i in province_trade.columns if i[1] == exported_product]] /
+                            province_trade.loc[importing_province, [i for i in province_trade.columns if
+                                                                    i[1] == exported_product]].sum()).values
+
         for importing_province in province_trade.index:
             U_Y = pd.concat([self.U.loc[importing_province, importing_province],
                              self.Y.loc[importing_province, importing_province]], axis=1)
+            # not distributing interprovincial trade flows to negative values
+            U_Y = U_Y[U_Y > 0].fillna(0)
             total_imports = province_trade.groupby(level=1, axis=1).sum().loc[importing_province]
             index_commodity = [i[1] for i in self.commodities]
             total_imports = total_imports.reindex(index_commodity).fillna(0)
@@ -432,8 +450,10 @@ class IOTables:
             final_demand_imports = [i for i in import_distribution.columns if i not in self.U.columns.levels[1]]
             for exporting_province in province_trade.index:
                 if importing_province != exporting_province:
-                    df = ((import_distribution.T * (province_trade / province_trade.sum()).fillna(0).loc[
-                        exporting_province, importing_province]).T).reindex(import_distribution.index).fillna(0)
+                    df = (
+                        (import_distribution.T * import_markets.fillna(0).loc[
+                            importing_province, exporting_province]).T
+                    ).reindex(import_distribution.index).fillna(0)
                     # assert index and columns are the same before using .values
                     assert all(self.U.loc[exporting_province, importing_province].index == df.loc[:,
                                                                                            self.U.columns.levels[
@@ -449,7 +469,7 @@ class IOTables:
                         self.U.loc[exporting_province, importing_province].columns, axis=1).values
                     self.Y.loc[exporting_province, importing_province].update(df.loc[:, final_demand_imports])
 
-            # remove inter-provincial trade from intra-provincial trade
+            # remove interprovincial from intraprovincial to not double count
             self.U.loc[importing_province, importing_province].update(
                 self.U.loc[importing_province, importing_province] - self.U.loc[
                     [i for i in self.matching_dict if i != importing_province], importing_province].groupby(
@@ -459,7 +479,11 @@ class IOTables:
                     [i for i in self.matching_dict if i != importing_province], importing_province].groupby(
                     level=1).sum())
 
-            # checking no negative values popped up out of nowhere
+            # checking that if there are negative values, they are less than 1$, so artefacts from calculations
+            assert len(self.U[self.U > -1].dropna()) == len(self.U)
+            # removing negative values
+            self.U = self.U[self.U > 0].fillna(0)
+            # checking negative values were removed
             assert not self.U[self.U < 0].any().any()
 
     # TODO in current status international imports need to be removed from provincial use
@@ -747,28 +771,43 @@ class IOTables:
         Method matching GHG accounts to IOIC classification selected by the user
         :return: self.F and self.FY with GHG flows included
         """
-        GHG = pd.read_csv(pkg_resources.resource_stream(__name__, '/Data/GHG_emissions.csv'))
-        GHG = GHG.loc[[i for i in GHG.index if GHG.REF_DATE[i] == self.year and GHG.GEO[i] != 'Canada']]
-        # kilotonnes to kg CO2e
-        GHG.VALUE *= 1000000
+        GHG = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/GHG_emissions_by_gas_RY2017-RY2018.xlsx'),
+                          'L61 ghg emissions by gas')
 
-        FD_GHG = GHG.loc[[i for i in GHG.index if GHG.Sector[i] == 'Total, households']]
-        FD_GHG.GEO = [{v: k for k, v in self.matching_dict.items()}[i] for i in FD_GHG.GEO]
-        FD_GHG = FD_GHG.pivot_table(values='VALUE', index=['GEO', 'Sector'])
-        FD_GHG.columns = [('', 'GHGs', '')]
-        FD_GHG.index.names = (None, None)
-        FD_GHG.index = pd.MultiIndex.from_product([self.matching_dict, ['Household final consumption expenditure']])
+        if self.year in GHG.loc[:, 'Reference Year'].values:
+            GHG = GHG.loc[
+                [i for i in GHG.index if GHG.loc[i, 'Reference Year'] == self.year and GHG.Geography[i] != 'Canada']]
+        else:
+            GHG = GHG.loc[
+                [i for i in GHG.index if GHG.loc[i, 'Reference Year'] == 2017 and GHG.Geography[i] != 'Canada']]
+        # kilotonnes to kgs
+        GHG.loc[:, ['CO2', 'CH4', 'N2O']] *= 1000000
 
-        GHG = GHG.loc[[i for i in GHG.index if '[' in GHG.Sector[i]]]
-        GHG.Sector = [i.split('[')[1].split(']')[0] for i in GHG.Sector]
-        GHG.GEO = [{v: k for k, v in self.matching_dict.items()}[i] for i in GHG.GEO]
-        GHG = GHG.pivot_table(values='VALUE', index=['GEO', 'Sector'])
-        GHG.columns = [('', 'GHGs', '')]
-        GHG.index.names = (None, None)
-        # reindex to have the same number of sectors covered per province
-        GHG = GHG.reindex(pd.MultiIndex.from_product([self.matching_dict, GHG.index.levels[1]])).fillna(0)
-        # removing teh fictive sectors
-        GHG.drop([i for i in GHG.index if re.search(r'^FC', i[1])], inplace=True)
+        # start with the households emissions
+        Household_GHG = GHG.loc[[i for i in GHG.index if 'PEH' in GHG.loc[i, 'IOIC']]]
+        Household_GHG = Household_GHG.groupby('Geography').sum().drop('Reference Year', axis=1).T
+        Household_GHG.index = ['Carbon dioxide', 'Methane', 'Dinitrogen monoxide']
+        Household_GHG.columns = [{v: k for k, v in self.matching_dict.items()}[i] for i in Household_GHG.columns]
+        Household_GHG.columns = pd.MultiIndex.from_product(
+            [Household_GHG.columns, ['Household final consumption expenditure']])
+        self.FY = pd.DataFrame(0, Household_GHG.index, self.Y.columns).merge(Household_GHG, 'right').fillna(0)
+        self.FY.index = pd.MultiIndex.from_product([Household_GHG.index.tolist(), ['Air']])
+        # spatialization
+        self.FY = pd.concat([self.FY] * len(self.FY.columns.levels[0]), axis=0)
+        self.FY.index = pd.MultiIndex.from_product(
+            [list(self.matching_dict.keys()), ['Carbon dioxide', 'Methane', 'Dinitrogen monoxide'], ['Air']])
+        for province in self.FY.columns.levels[0]:
+            self.FY.loc[[i for i in self.FY.index.levels[0] if i != province], province] = 0
+
+        # Now the emissions from production
+        GHG.set_index(pd.MultiIndex.from_tuples(tuple(
+            list(zip([{v: k for k, v in self.matching_dict.items()}[i] for i in GHG.Geography], GHG.IOIC.tolist())))),
+                      inplace=True)
+        GHG.drop(['IOIC', 'Reference Year', 'Geography', 'Description', 'F_Description'], axis=1, inplace=True)
+        GHG.drop([i for i in GHG.index if re.search(r'^FC', i[1])
+                  or re.search(r'^PEH', i[1])
+                  or re.search(r'^Total', i[1])], inplace=True)
+        GHG.columns = ['Carbon dioxide', 'Methane', 'Dinitrogen monoxide']
 
         concordance = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/GHG_concordance.xlsx'),
                                     self.level_of_detail)
@@ -790,7 +829,8 @@ class IOTables:
 
             # spatializing GHG emissions in case we later regionalize impacts (even though it's useless for climate change)
             GHG = pd.concat([GHG] * len(GHG.index.levels[0]), axis=1)
-            GHG.columns = pd.MultiIndex.from_product([self.matching_dict, ['GHGs'], ['Air']])
+            GHG.columns = pd.MultiIndex.from_product(
+                [self.matching_dict, ['Carbon dioxide', 'Methane', 'Dinitrogen monoxide'], ['Air']])
             # emissions takes place in the province of the trade
             for province in GHG.index.levels[0]:
                 GHG.loc[province, [i for i in GHG.index.levels[0] if i != province]] = 0
@@ -809,36 +849,35 @@ class IOTables:
                                     i[0] in concordance.loc[code].dropna().values.tolist()]
                 output_sectors_to_split = self.V.loc[:,
                                           [i for i in self.V.columns if i[1] in sectors_to_split]].sum()
-                share_sectors_to_split = pd.Series(0, output_sectors_to_split.index)
+                share_sectors_to_split = pd.DataFrame(0, output_sectors_to_split.index,
+                                                      ['Carbon dioxide', 'Methane', 'Dinitrogen monoxide'])
                 for province in output_sectors_to_split.index.levels[0]:
-                    share_sectors_to_split.loc[province] = ((output_sectors_to_split.loc[province] /
-                                                             output_sectors_to_split.loc[province].sum()).fillna(
-                        0).values) * GHG.loc(axis=0)[:, code].loc[province].iloc[0, 0]
+                    df = ((output_sectors_to_split.loc[province] / output_sectors_to_split.loc[province].sum()).fillna(0).values)
+                    # hardcoded 3 because 3 GHGs: CO2, CH4, N2O
+                    share_sectors_to_split.loc[province] = (pd.DataFrame([df] * 3,
+                                                                         index=['Carbon dioxide', 'Methane', 'Dinitrogen monoxide'],
+                                                                         columns=sectors_to_split).T
+                                                            * GHG.loc(axis=0)[:, code].loc[province].values).values
                 ghgs = pd.concat([ghgs, share_sectors_to_split])
-            ghgs.index = pd.MultiIndex.from_tuples(ghgs.index)
-            ghgs.columns = pd.MultiIndex.from_product([[''], ['GHGs'], ['Air']])
-
             # spatializing GHG emissions
             ghgs = pd.concat([ghgs] * len(ghgs.index.levels[0]), axis=1)
-            ghgs.columns = pd.MultiIndex.from_product([self.matching_dict, ['GHGs'], ['Air']])
+            ghgs.columns = pd.MultiIndex.from_product(
+                [list(self.matching_dict.keys()), ['Carbon dioxide', 'Methane', 'Dinitrogen monoxide'], ['Air']])
             for province in ghgs.columns.levels[0]:
                 ghgs.loc[[i for i in ghgs.index.levels[0] if i != province], province] = 0
+
             # adding GHG accounts to pollutants
             self.F = pd.concat([self.F, ghgs.T])
+
             # reindexing
             self.F = self.F.reindex(self.U.columns, axis=1)
 
-        # GHG emissions for households
-        self.FY = pd.DataFrame(0, FD_GHG.columns, self.Y.columns)
-        self.FY.update(FD_GHG.T)
-        # spatializing them too
-        self.FY = pd.concat([self.FY] * len(GHG.index.levels[0]))
-        self.FY.index = pd.MultiIndex.from_product([self.matching_dict, ['GHGs'], ['Air']])
-        for province in self.FY.columns.levels[0]:
-            self.FY.loc[[i for i in self.FY.columns.levels[0] if i != province], province] = 0
-
-        self.emission_metadata.loc['GHGs', 'CAS Number'] = 'N/A'
-        self.emission_metadata.loc['GHGs', 'Unit'] = 'kgCO2eq'
+        self.emission_metadata.loc['Carbon dioxide', 'CAS Number'] = '000124-38-9'
+        self.emission_metadata.loc['Carbon dioxide', 'Unit'] = 'kg'
+        self.emission_metadata.loc['Methane', 'CAS Number'] = '000074-82-8'
+        self.emission_metadata.loc['Methane', 'Unit'] = 'kg'
+        self.emission_metadata.loc['Dinitrogen monoxide', 'CAS Number'] = '010024-97-2'
+        self.emission_metadata.loc['Dinitrogen monoxide', 'Unit'] = 'kg'
 
     def match_water_accounts_to_iots(self):
         """
@@ -951,6 +990,11 @@ class IOTables:
         concordance = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/NPRI_IW_concordance.xlsx'))
         concordance.set_index('NPRI flows', inplace=True)
 
+        # adding GHGs to the list of pollutants
+        concordance = pd.concat([concordance, pd.DataFrame(['Carbon dioxide, fossil', 'Methane, fossil', 'Dinitrogen monoxide'],
+                                                           index=['Carbon dioxide', 'Methane', 'Dinitrogen monoxide'],
+                                                           columns=['IMPACT World+ flows'])])
+
         self.C = pd.DataFrame(0, pivoting.index, self.F.index)
         for flow in self.C.columns:
             try:
@@ -960,17 +1004,6 @@ class IOTables:
                                             '(unspecified)')]].values
             except KeyError:
                 pass
-
-        self.C.loc['Climate change, short term', [i for i in self.C.columns if i[1] == 'GHGs']] = 1
-        self.C.loc['Climate change, long term', [i for i in self.C.columns if i[1] == 'GHGs']] = 1
-        self.C.loc[
-            'Climate change, ecosystem quality, long term', [i for i in self.C.columns if i[1] == 'GHGs']] = 0.628
-        self.C.loc[
-            'Climate change, ecosystem quality, short term', [i for i in self.C.columns if i[1] == 'GHGs']] = 0.177
-        self.C.loc[
-            'Climate change, human health, long term', [i for i in self.C.columns if i[1] == 'GHGs']] = 0.00000286
-        self.C.loc[
-            'Climate change, human health, short term', [i for i in self.C.columns if i[1] == 'GHGs']] = 0.000000818
 
         self.C.loc[('Water use', 'm3'), [i for i in self.C.columns if i[1] == 'Water']] = 1
 
@@ -1048,12 +1081,15 @@ class IOTables:
         self.FY = pd.concat([pd.DataFrame(0, self.F.index, self.Y.columns), self.FY])
         self.FY = self.FY.groupby(self.FY.index).sum()
 
-    def calc(self):
+    def calc_for_validation(self):
         """
         Method to calculate the Leontief inverse and get total impacts
-        :return: self.L, self.x, self.D
+        :return: self.L (total requirements), self.E (total emissions), self.D (total impacts)
         """
-        pass
+        I = pd.DataFrame(np.eye(len(self.A)), self.A.index, self.A.columns)
+        self.L = pd.DataFrame(np.linalg.solve(I - self.A, I), self.A.index, I.columns)
+        self.E = self.S.dot(self.L).dot(self.Y)
+        self.D = self.C.dot(self.E)
 
     def split_private_public_sectors(self, NAICS_code, IOIC_code):
         """
@@ -1178,7 +1214,7 @@ class IOTables:
         province_trade = province_trade.loc[
             [i for i in province_trade.index if i in self.matching_dict], [i for i in province_trade.columns if
                                                                                 i[1] in self.matching_dict]]
-        province_trade *= 1000000
+        province_trade *= 1000
         province_trade.columns = [(i[1], i[2].split(': ')[1]) if ':' in i[2] else i for i in
                                      province_trade.columns]
         province_trade.drop([i for i in province_trade.columns if i[1] not in [i[1] for i in self.commodities]],
@@ -1251,6 +1287,106 @@ class IOTables:
                 self.Y.loc[importing_province, importing_province] - self.Y.loc[
                     [i for i in self.matching_dict if i != importing_province], importing_province].groupby(
                     level=1).sum())
+
+    def old_match_ghg_accounts_to_iots(self):
+        """
+        Method was for aggregated GHG accounts. New method works with disaggregated accounts.
+
+        Method matching GHG accounts to IOIC classification selected by the user
+        :return: self.F and self.FY with GHG flows included
+        """
+        GHG = pd.read_csv(pkg_resources.resource_stream(__name__, '/Data/GHG_emissions.csv'))
+        GHG = GHG.loc[[i for i in GHG.index if GHG.REF_DATE[i] == self.year and GHG.GEO[i] != 'Canada']]
+        # kilotonnes to kg CO2e
+        GHG.VALUE *= 1000000
+
+        FD_GHG = GHG.loc[[i for i in GHG.index if GHG.Sector[i] == 'Total, households']]
+        FD_GHG.GEO = [{v: k for k, v in self.matching_dict.items()}[i] for i in FD_GHG.GEO]
+        FD_GHG = FD_GHG.pivot_table(values='VALUE', index=['GEO', 'Sector'])
+        FD_GHG.columns = [('', 'GHGs', '')]
+        FD_GHG.index.names = (None, None)
+        FD_GHG.index = pd.MultiIndex.from_product([self.matching_dict, ['Household final consumption expenditure']])
+
+        GHG = GHG.loc[[i for i in GHG.index if '[' in GHG.Sector[i]]]
+        GHG.Sector = [i.split('[')[1].split(']')[0] for i in GHG.Sector]
+        GHG.GEO = [{v: k for k, v in self.matching_dict.items()}[i] for i in GHG.GEO]
+        GHG = GHG.pivot_table(values='VALUE', index=['GEO', 'Sector'])
+        GHG.columns = [('', 'GHGs', '')]
+        GHG.index.names = (None, None)
+        # reindex to have the same number of sectors covered per province
+        GHG = GHG.reindex(pd.MultiIndex.from_product([self.matching_dict, GHG.index.levels[1]])).fillna(0)
+        # removing the fictive sectors
+        GHG.drop([i for i in GHG.index if re.search(r'^FC', i[1])], inplace=True)
+
+        concordance = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/GHG_concordance.xlsx'),
+                                    self.level_of_detail)
+        concordance.set_index('GHG codes', inplace=True)
+
+        if self.level_of_detail in ['Summary level', 'Link-1961 level']:
+            # transform GHG accounts sectors to IOIC sectors
+            GHG.index = pd.MultiIndex.from_tuples([(i[0], concordance.loc[i[1], 'IOIC']) for i in GHG.index])
+            # some sectors are not linked to IOIC (specifically weird Canabis sectors), drop them
+            if len([i for i in GHG.index if type(i[1]) == float]) != 0:
+                GHG.drop([i for i in GHG.index if type(i[1]) == float], inplace=True)
+            # grouping emissions from same sectors
+            GHG = GHG.groupby(GHG.index).sum()
+            GHG.index = pd.MultiIndex.from_tuples(GHG.index)
+            # reindex to make sure dataframe is ordered as in dictionary
+            GHG = GHG.reindex(pd.MultiIndex.from_product([self.matching_dict, [i[0] for i in self.industries]]))
+            # switching codes for readable names
+            GHG.index = pd.MultiIndex.from_product([self.matching_dict, [i[1] for i in self.industries]])
+
+            # spatializing GHG emissions in case we later regionalize impacts (even though it's useless for climate change)
+            GHG = pd.concat([GHG] * len(GHG.index.levels[0]), axis=1)
+            GHG.columns = pd.MultiIndex.from_product([self.matching_dict, ['GHGs'], ['Air']])
+            # emissions takes place in the province of the trade
+            for province in GHG.index.levels[0]:
+                GHG.loc[province, [i for i in GHG.index.levels[0] if i != province]] = 0
+            # add GHG emissions to other pollutants
+            self.F = pd.concat([self.F, GHG.T])
+            self.F.index = pd.MultiIndex.from_tuples(self.F.index)
+
+        elif self.level_of_detail in ['Link-1997 level', 'Detail level']:
+            # dropping empty sectors (mostly Cannabis related)
+            to_drop = concordance.loc[concordance.loc[:, 'IOIC'].isna()].index
+            concordance.drop(to_drop, inplace=True)
+            ghgs = pd.DataFrame()
+            for code in concordance.index:
+                # L97 and D levels are more precise than GHG accounts, we use market share to distribute GHGs
+                sectors_to_split = [i[1] for i in self.industries if
+                                    i[0] in concordance.loc[code].dropna().values.tolist()]
+                output_sectors_to_split = self.V.loc[:,
+                                          [i for i in self.V.columns if i[1] in sectors_to_split]].sum()
+                share_sectors_to_split = pd.Series(0, output_sectors_to_split.index)
+                for province in output_sectors_to_split.index.levels[0]:
+                    share_sectors_to_split.loc[province] = ((output_sectors_to_split.loc[province] /
+                                                             output_sectors_to_split.loc[province].sum()).fillna(
+                        0).values) * GHG.loc(axis=0)[:, code].loc[province].iloc[0, 0]
+                ghgs = pd.concat([ghgs, share_sectors_to_split])
+            ghgs.index = pd.MultiIndex.from_tuples(ghgs.index)
+            ghgs.columns = pd.MultiIndex.from_product([[''], ['GHGs'], ['Air']])
+
+            # spatializing GHG emissions
+            ghgs = pd.concat([ghgs] * len(ghgs.index.levels[0]), axis=1)
+            ghgs.columns = pd.MultiIndex.from_product([self.matching_dict, ['GHGs'], ['Air']])
+            for province in ghgs.columns.levels[0]:
+                ghgs.loc[[i for i in ghgs.index.levels[0] if i != province], province] = 0
+            # adding GHG accounts to pollutants
+            self.F = pd.concat([self.F, ghgs.T])
+            # reindexing
+            self.F = self.F.reindex(self.U.columns, axis=1)
+
+        # GHG emissions for households
+        self.FY = pd.DataFrame(0, FD_GHG.columns, self.Y.columns)
+        self.FY.update(FD_GHG.T)
+        # spatializing them too
+        self.FY = pd.concat([self.FY] * len(GHG.index.levels[0]))
+        self.FY.index = pd.MultiIndex.from_product([self.matching_dict, ['GHGs'], ['Air']])
+        for province in self.FY.columns.levels[0]:
+            self.FY.loc[[i for i in self.FY.columns.levels[0] if i != province], province] = 0
+
+        self.emission_metadata.loc['GHGs', 'CAS Number'] = 'N/A'
+        self.emission_metadata.loc['GHGs', 'Unit'] = 'kgCO2eq'
 
 
 def todf(data):
