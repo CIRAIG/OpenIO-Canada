@@ -17,10 +17,9 @@ from time import time
 
 
 class IOTables:
-    def __init__(self, folder_path, NPRI_excel_path, classification):
+    def __init__(self, folder_path, classification):
         """
-        :param supply_use_excel_path: the path to the SUT excel file (e.g. /../Detail level/CA_SUT_C2016_D.xlsx)
-        :param NPRI_excel_path: the path to the NPRI excel file (e.g. /../2016_INRP-NPRI.xlsx)
+        :param folder_path: [string] the path to the folder with the economic data (e.g. /../Detail level/)
         :param classification: [string] the type of classification to adopt for the symmetric IOT ("product" or "industry")
         """
 
@@ -28,7 +27,6 @@ class IOTables:
         print("Reading all the Excel files...")
 
         self.level_of_detail = [i for i in folder_path.split('/') if 'level' in i][0]
-        self.NPRI = pd.read_excel(NPRI_excel_path, None)
         self.classification = classification
 
         if self.classification == "product":
@@ -82,6 +80,9 @@ class IOTables:
         files = [i for i in os.walk(folder_path)]
         files = [i for i in files[0][2] if i[:2] in self.matching_dict.keys() and 'SUT' in i]
         self.year = int(files[0].split('SUT_C')[1].split('_')[0])
+
+        self.NPRI = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/NPRI-INRP_DataDonnées_' +
+                                                                str(self.year) + '.xlsx'), None)
 
         print("Formatting the Supply and Use tables...")
         for province_data in files:
@@ -479,9 +480,16 @@ class IOTables:
                     [i for i in self.matching_dict if i != importing_province], importing_province].groupby(
                     level=1).sum())
 
-            # checking that if there are negative values, they are less than 1$, so artefacts from calculations
-            assert len(self.U[self.U > -1].dropna()) == len(self.U)
-            # removing negative values
+            # if some province buys more than they use, drop the value in "changes in inventories"
+            # if it occurs, it's probably linked to the immediate re-export to other provinces
+            if not len(self.U[self.U > -1].dropna()) == len(self.U):
+                product_creating_issue_index = self.U[self.U < -1].dropna(how='all').dropna(1).index
+                product_creating_issue_column = self.U[self.U < -1].dropna(how='all').dropna(1).columns
+                value_to_balance = self.U[self.U < -1].dropna(how='all').dropna(1).iloc[0, 0]
+                self.U.loc[product_creating_issue_index, product_creating_issue_column] = 0
+                self.Y.loc[product_creating_issue_index, (product_creating_issue_index[0][0],
+                                                          'Changes in inventories')] += - value_to_balance
+            # removing negative values lower than 1$ (potential calculation artefacts)
             self.U = self.U[self.U > 0].fillna(0)
             # checking negative values were removed
             assert not self.U[self.U < 0].any().any()
@@ -887,15 +895,17 @@ class IOTables:
         # load the water use data from STATCAN
         water = pd.read_csv(pkg_resources.resource_stream(__name__, '/Data/water_use.csv'))
 
-        # Only odd years from 2009 to 2015
+        # Only odd years from 2009 to 2017
         if self.year == 2010:
             year_for_water = 2011
         elif self.year == 2012:
             year_for_water = 2013
         elif self.year == 2014:
             year_for_water = 2015
-        elif self.year > 2015:
+        elif self.year == 2016:
             year_for_water = 2015
+        elif self.year > 2017:
+            year_for_water = 2017
         else:
             year_for_water = self.year
         # select the year of the data
@@ -1081,14 +1091,14 @@ class IOTables:
         self.FY = pd.concat([pd.DataFrame(0, self.F.index, self.Y.columns), self.FY])
         self.FY = self.FY.groupby(self.FY.index).sum()
 
-    def calc_for_validation(self):
+    def calc(self):
         """
         Method to calculate the Leontief inverse and get total impacts
         :return: self.L (total requirements), self.E (total emissions), self.D (total impacts)
         """
         I = pd.DataFrame(np.eye(len(self.A)), self.A.index, self.A.columns)
         self.L = pd.DataFrame(np.linalg.solve(I - self.A, I), self.A.index, I.columns)
-        self.E = self.S.dot(self.L).dot(self.Y)
+        self.E = self.S.dot(self.L).dot(self.Y) + self.FY
         self.D = self.C.dot(self.E)
 
     def split_private_public_sectors(self, NAICS_code, IOIC_code):
@@ -1192,6 +1202,73 @@ class IOTables:
         concordance_IW['Speciated VOC - Pentene (all isomers)'] = '1-Pentene'
 
         return pd.DataFrame.from_dict(concordance_IW, orient='index')
+
+    def export(self, filepath='', format=''):
+        """
+        Function to export in the chosen format.
+        :param filepath: the path where to store the export file
+        :param format: available formats 'csv', 'excel', 'pickle', 'json'
+        :return: nothing
+        """
+
+        if not filepath:
+            print("Please provide a filepath")
+            return
+        if not format:
+            print("Please enter a format")
+            return
+
+        N = self.C.dot(self.S).dot(self.L)
+        B = self.S.dot(self.L)
+
+        def flat_multiindex(df):
+            df.index = df.index.tolist()
+            df.columns = df.columns.tolist()
+        flat_multiindex(self.A)
+        flat_multiindex(self.Y)
+        flat_multiindex(self.R)
+        flat_multiindex(self.S)
+        flat_multiindex(self.FY)
+        flat_multiindex(self.C)
+        flat_multiindex(self.L)
+        flat_multiindex(self.E)
+        flat_multiindex(self.D)
+        flat_multiindex(B)
+        flat_multiindex(N)
+
+        def remove_zeros(df):
+            return df.replace({0: np.nan})
+        self.A = remove_zeros(self.A)
+        self.Y = remove_zeros(self.Y)
+        self.R = remove_zeros(self.R)
+        self.S = remove_zeros(self.S)
+        self.FY = remove_zeros(self.FY)
+        self.C = remove_zeros(self.C)
+        self.L = remove_zeros(self.L)
+        self.E = remove_zeros(self.E)
+        self.D = remove_zeros(self.D)
+        B = remove_zeros(B)
+        N = remove_zeros(N)
+
+        if format == 'excel':
+            writer = pd.ExcelWriter(filepath, engine='xlsxwriter')
+
+            self.A.to_excel(writer, 'A')
+            self.Y.to_excel(writer, 'Y')
+            self.R.to_excel(writer, 'R')
+            self.S.to_excel(writer, 'S')
+            self.FY.to_excel(writer, 'FY')
+            self.C.to_excel(writer, 'C')
+            self.L.to_excel(writer, 'L')
+            self.E.to_excel(writer, 'E')
+            self.D.to_excel(writer, 'D')
+            B.to_excel(writer, 'B')
+            N.to_excel(writer, 'N')
+
+            writer.save()
+
+        else:
+            print('Format requested not implemented yet.')
 
 # ------------------------------------------------ DEPRECATED ---------------------------------------------------------
     def old_province_import_export(self, province_trade_file):
