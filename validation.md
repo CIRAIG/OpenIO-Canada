@@ -1,6 +1,11 @@
-- Total carbon footprint with L61 level classification for year 2016 is 1.7% lower than EXIOBASE's 2018 carbon footprint for Canada.
+_Comparing aggregated GWP scores from open IO Canada year 2017, with international imports linked to Exiobase 3.8.1 2017, with Canadian GWP scores from Exiobase 3.8.1 2017_
 
-- Total carbon footprint with Detail level classification is 2.5% lower than with L61 level
-- Total carbon footprint with L97 level classification is 1.2% lower than with L61 level
-- Total carbon footprint with Summary level classification is 11.1% higher than with L61 level
--> avoid using Summary level
+- The total Canadian footprint from open IO Canada (Detail level) is 5.0% higher than Exiobase's
+
+- GWP scores of households consumption from open IO Canada (Detail level) are 9.3% higher than Exiobase's
+
+- GWP score of government consumption from open IO Canada (Detail level) are 9.2% lower than Exiobase's
+
+- GWP scores of non-profit organizations from open IO Canada (Detail level) are 7894.4% higher than Exiobase's
+
+- GWP scores of capital formation from open IO Canada (Detail level) are 7.1% lower than Exiobase's

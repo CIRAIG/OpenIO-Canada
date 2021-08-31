@@ -14,13 +14,15 @@ import pkg_resources
 import os
 # from pyomo.environ import *
 from time import time
+import pymrio
 
 
 class IOTables:
-    def __init__(self, folder_path, classification):
+    def __init__(self, folder_path, classification, exiobase_folder=None):
         """
         :param folder_path: [string] the path to the folder with the economic data (e.g. /../Detail level/)
         :param classification: [string] the type of classification to adopt for the symmetric IOT ("product" or "industry")
+        :param exiobase_folder: [string] path to exiobase folder for international imports (optional)
         """
 
         start = time()
@@ -28,6 +30,7 @@ class IOTables:
 
         self.level_of_detail = [i for i in folder_path.split('/') if 'level' in i][0]
         self.classification = classification
+        self.exiobase_folder = exiobase_folder
 
         if self.classification == "product":
             self.assumption = 'industry technology'
@@ -52,6 +55,10 @@ class IOTables:
         self.FY = pd.DataFrame()
         self.C = pd.DataFrame()
         self.INT_imports = pd.DataFrame()
+        self.F_INT_imports = pd.DataFrame()
+        self.S_INT_imports = pd.DataFrame()
+        self.E_INT_imports = pd.DataFrame()
+        self.C_INT_imports = pd.DataFrame()
         self.L = pd.DataFrame()
         self.E = pd.DataFrame()
         self.D = pd.DataFrame()
@@ -81,8 +88,13 @@ class IOTables:
         files = [i for i in files[0][2] if i[:2] in self.matching_dict.keys() and 'SUT' in i]
         self.year = int(files[0].split('SUT_C')[1].split('_')[0])
 
-        self.NPRI = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/NPRI-INRP_DataDonnées_' +
-                                                                str(self.year) + '.xlsx'), None)
+        try:
+            self.NPRI = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/NPRI-INRP_DataDonnées_' +
+                                                                    str(self.year) + '.xlsx'), None)
+        # 2017 by default
+        except FileNotFoundError:
+            self.NPRI = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/NPRI-INRP_DataDonnées_2017.xlsx'),
+                                      None)
 
         print("Formatting the Supply and Use tables...")
         for province_data in files:
@@ -112,6 +124,10 @@ class IOTables:
             pd.read_excel(
                 folder_path+[i for i in [j for j in os.walk(folder_path)][0][2] if 'Provincial_trade_flow' in i][0],
                 'Data'))
+
+        if self.exiobase_folder:
+            print('Linking international imports to Exiobase...')
+            self.international_import_export()
 
         print("Building the symmetric tables...")
         self.gimme_symmetric_iot()
@@ -494,138 +510,73 @@ class IOTables:
             # checking negative values were removed
             assert not self.U[self.U < 0].any().any()
 
-    # TODO in current status international imports need to be removed from provincial use
     def international_import_export(self):
         """
-        Method to deal with international imports and exports. These imports/exports will be allocated to a
-        Rest-of-the_world region (RoW). The structure of use and supply in the RoW region is taken from the Canadian
-        total as an approximation.
-        :return:  the following updated dataframes: U, V, g, q, Y, W, WY
+        Method executes two things:
+        1. It removes international imports from the use table
+        2. It estimates the emissions (or the impacts) from these international imports, based on exiobase
+        Resulting emissions are stored in self.F_INT_imports
+        :returns self.C_INT_imports, self.F_INT_imports, modified self.U
         """
 
-        final_demand_sectors = ['Changes in inventories',
-                                'Governments final consumption expenditure',
-                                'Gross fixed capital formation',
-                                'Household final consumption expenditure',
-                                "Non-profit institutions serving households' final consumption expenditure"]
+        # 1. Removing international imports
 
-        # aggregating all international exports
-        int_exports = self.Y.loc(axis=1)[:, 'International exports'].groupby(level=1, axis=1).sum()
-        # extracting the use distribution in Canada
-        national_use_market = pd.concat([self.U.groupby(level=1, axis=1).sum(),
-                                         self.Y.groupby(level=1, axis=1).sum().drop('International exports', axis=1)],
-                                        axis=1)
-        # the previous distribution is used to scale up international exports use
-        row_use = (national_use_market.T / national_use_market.sum(1)).fillna(0).T * int_exports.values
-        # separating intermediary use from final demand
-        row_final_demand = row_use.loc[:, final_demand_sectors]
-        row_use = row_use.loc[:, [i[1] for i in self.industries]]
-        # introducing the RoW MultiIndex level
-        row_use.columns = pd.MultiIndex.from_product([['RoW'], row_use.columns])
-        row_final_demand.columns = pd.MultiIndex.from_product([['RoW'], row_final_demand.columns])
-        # concatenating with self.U and self.V
-        updated_U = pd.concat([self.U, row_use], axis=1)
-        updated_Y = pd.concat([self.Y, row_final_demand], axis=1)
+        # aggregating international imports in 1 column
+        self.INT_imports = self.INT_imports.groupby(axis=1, level=1).sum()
+        # concat U and Y to look at all users (industry + final demand)
+        U_Y = pd.concat([self.U, self.Y], axis=1)
+        # weighted average of who is requiring the international imports, based on national use
+        who_uses_int_imports = (U_Y.T / U_Y.sum(1)).T * self.INT_imports.values
+        # remove international imports from national use
+        self.U = self.U - who_uses_int_imports.reindex(self.U.columns, axis=1)
+        # check no issues of negatives
+        assert len(self.U[self.U < -1].dropna(how='all', axis=1).dropna(how='all', axis=0)) == 0
+        self.U = self.U[self.U > 0].fillna(0)
+        assert not self.U[self.U < 0].any().any()
+        # remove international imports from final demand
+        self.Y = self.Y - who_uses_int_imports.reindex(self.Y.columns, axis=1)
+        # remove negative artefacts (because of negative values in inventories)
+        self.Y = pd.concat([self.Y[self.Y >= 0].fillna(0), self.Y[self.Y < -1].fillna(0)], axis=1)
+        self.Y = self.Y.groupby(by=self.Y.columns, axis=1).sum()
+        self.Y.columns = pd.MultiIndex.from_tuples(self.Y.columns)
 
-        # aggregating the canadian imports coming from RoW
-        canadian_imports_from_row = self.INT_imports.groupby(level=1, axis=0).sum().reindex(
-            [i[1] for i in self.commodities])
-        canadian_imports_from_row.index = pd.MultiIndex.from_product([['RoW'], canadian_imports_from_row.index])
+        # 2. Estimating the emissions of international imports
 
-        # we then split these imports using the use of each commodity in a given province
-        province_use_row_products = pd.DataFrame()
+        # importing exiobase
+        io = pymrio.parse_exiobase3(self.exiobase_folder)
+        io.calc_all()
+
+        # selecting the countries which make up the international imports
+        INT_countries = [i for i in io.get_regions().tolist() if i != 'CA']
+
+        # importing the concordance between open IO and exiobase classifications
+        ioic_exio = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/IOIC_EXIOBASE.xlsx'),
+                                  'commodities')
+        # make concordance on codes because Statcan changes names of sectors with updates
+        ioic_exio = ioic_exio[2:].drop('IOIC Detail level - EXIOBASE', axis=1).set_index('Unnamed: 1').fillna(0)
+        ioic_exio.index.name = None
+
+        norm_emissions_INT_imports = pd.DataFrame(0, io.satellite.S.index, [i[0] for i in self.commodities])
+        for product in norm_emissions_INT_imports.columns:
+            if len(ioic_exio.loc[product][ioic_exio.loc[product] == 1].index) != 0:
+                df = io.x.loc(axis=0)[:, ioic_exio.loc[product][ioic_exio.loc[product] == 1].index]
+                df = df.loc[INT_countries] / df.loc[INT_countries].sum()
+                norm_emissions_INT_imports.loc[:, product] = (
+                    io.satellite.S.reindex(df.index, axis=1).dot(df)).values
+        norm_emissions_INT_imports = norm_emissions_INT_imports.fillna(0)
+        # exiobase in millions
+        norm_emissions_INT_imports[9:] /= 1000000
+        # exiobase in euros
+        norm_emissions_INT_imports *= 1.5
+        # from codes to names
+        norm_emissions_INT_imports.columns = [dict(self.commodities)[i] for i in norm_emissions_INT_imports.columns]
+
         for province in self.matching_dict:
-            provincial_use_market = (pd.concat([
-                self.U.groupby(level=1, axis=0).sum().loc[:, province],
-                self.Y.drop([i for i in self.Y.columns if i[1] == 'International exports'],
-                            axis=1).groupby(level=1, axis=0).sum().loc[:, province]], axis=1))
-            # applying provincial use distribution to the use of row products in a given province
-            df = ((provincial_use_market.T / provincial_use_market.sum(1)).T.replace(np.inf, 0).fillna(0)).reindex(
-                [i[1] for i in self.commodities]) * canadian_imports_from_row.loc[:, province].values
-            # introducing the regions in the indexes
-            df.index = pd.MultiIndex.from_product([['RoW'], df.index])
-            df.columns = pd.MultiIndex.from_product([[province], df.columns])
-            # concatenating df of each province together
-            province_use_row_products = pd.concat([province_use_row_products, df], axis=1)
-
-        # updating U
-        updated_U = pd.concat([updated_U,
-                               province_use_row_products.loc[:, [i for i in province_use_row_products.columns if
-                                                                 i[1] in self.U.columns.levels[1]]]]
-                              ).fillna(0)
-        # reindexing U
-        updated_U = (updated_U.T.reindex(
-            pd.MultiIndex.from_product([list(self.matching_dict) + ['RoW'], [i[1] for i in self.industries]]))).T
-        # updating Y
-        updated_Y = pd.concat([updated_Y, province_use_row_products.loc[:, [i for i in province_use_row_products.columns if
-                                                            i[1] in self.Y.columns.levels[1]]]]).fillna(0)
-        # reindexing Y
-        updated_Y = (updated_Y.T.reindex(pd.MultiIndex.from_product([list(self.matching_dict) + ['RoW'],
-                                                                     final_demand_sectors]))).T
-        # at this point we have successfully allocated the use of RoW imported goods to provinces and each province's
-        # goods uses to RoW
-        # Now we focus on creating an internal economy for RoW
-
-        # scale supply_tables_row to global economy level? Right now it's literally equal to total Canadian economy
-        scaling_to_global = 1
-        # create RoW's supply table based on Canada's
-        supply_table_row = self.V.groupby(level=1, axis=0).sum().groupby(level=1, axis=1).sum()
-        supply_table_row = supply_table_row.reindex([i[1] for i in self.commodities])
-        supply_table_row = supply_table_row.T.reindex([i[1] for i in self.industries]).T
-        supply_table_row.index = pd.MultiIndex.from_product([['RoW'], supply_table_row.index])
-        supply_table_row.columns = pd.MultiIndex.from_product([['RoW'], supply_table_row.columns])
-        # create RoW's final demand based on Canada's
-        final_demand_row = self.Y.groupby(level=1, axis=0).sum().groupby(level=1, axis=1).sum()
-        final_demand_row = final_demand_row.reindex([i[1] for i in self.commodities])
-        final_demand_row.drop('International exports', axis=1, inplace=True)
-        final_demand_row.index = pd.MultiIndex.from_product([['RoW'], final_demand_row.index])
-        final_demand_row.columns = pd.MultiIndex.from_product([['RoW'], final_demand_row.columns])
-        # scale everything to match RoW actual economy volume
-        supply_table_row *= scaling_to_global
-        final_demand_row *= scaling_to_global
-        # update and reindex V
-        updated_V = pd.concat([self.V, supply_table_row])
-        updated_V = updated_V.T.reindex(pd.MultiIndex.from_product(
-            [list(self.matching_dict.keys()) + ['RoW'], [i[1] for i in self.industries]])).T.fillna(0)
-        # update Y
-        updated_Y.update(final_demand_row)
-
-        # now we focus on updating self.g and self.q
-        df = pd.DataFrame(updated_U.loc[:, 'RoW'].sum())
-        df.index = pd.MultiIndex.from_product([['RoW'], [i[1] for i in self.industries]])
-        df.columns = pd.MultiIndex.from_product([['RoW'], ['(TOTAL, Total)']])
-        updated_g = pd.concat([self.g, df.T]).fillna(0)
-        updated_g = updated_g.T.reindex(pd.MultiIndex.from_product(
-            [list(self.matching_dict.keys()) + ['RoW'], [i[1] for i in self.industries]])).T
-        df = pd.DataFrame(updated_V.loc['RoW'].sum(1))
-        df.index = pd.MultiIndex.from_product([['RoW'], [i[1] for i in self.commodities]])
-        df.columns = pd.MultiIndex.from_product([['RoW'], ['(TOTAL, Total)']])
-        updated_q = pd.concat([self.q, df], axis=1).fillna(0)
-        updated_q = updated_q.reindex(pd.MultiIndex.from_product(
-            [list(self.matching_dict.keys()) + ['RoW'], [i[1] for i in self.commodities]]))
-
-        # we add an empty dimension to added value
-        added_value_row = pd.DataFrame(0, index=pd.MultiIndex.from_product([['RoW'], [i[1] for i in self.factors_of_production]]),
-                                       columns=pd.MultiIndex.from_product([['RoW'], [i[1] for i in self.industries]]))
-
-        updated_W = pd.concat([self.W, added_value_row]).fillna(0)
-        updated_W = updated_W.T.reindex(pd.MultiIndex.from_product([list(self.matching_dict.keys()) + ['RoW'],
-                                                                    [i[1] for i in self.industries]])).T
-        added_value_row_fd = pd.DataFrame(0, index=pd.MultiIndex.from_product([['RoW'], [i[1] for i in self.factors_of_production]]),
-                                          columns=pd.MultiIndex.from_product([['RoW'], final_demand_sectors]))
-
-        updated_WY = pd.concat([self.WY, added_value_row_fd]).fillna(0)
-        updated_WY = updated_WY.T.reindex(pd.MultiIndex.from_product([list(self.matching_dict.keys()) + ['RoW'],
-                                                                      final_demand_sectors])).T
-
-        # finally we replace our updated dataframes with the attributes
-        self.U = updated_U
-        self.V = updated_V
-        self.Y = updated_Y
-        self.g = updated_g
-        self.q = updated_q
-        self.W = updated_W
-        self.WY = updated_WY
+            diag = pd.DataFrame(np.diagflat(self.INT_imports.loc[province].to_numpy()),
+                                self.INT_imports.loc[province].index, self.INT_imports.loc[province].index)
+            dff = norm_emissions_INT_imports.dot(diag)
+            self.F_INT_imports = pd.concat([self.F_INT_imports, dff.T.set_index(
+                pd.MultiIndex.from_product([[province], dff.columns.tolist()])).T], axis=1)
 
     def gimme_symmetric_iot(self):
         """
@@ -1031,6 +982,38 @@ class IOTables:
                      'Water availability, terrestrial ecosystem',
                      'Water scarcity'], axis=0, level=0, inplace=True)
 
+        # importing characterization matrix IMPACT World+/exiobase
+        self.C_INT_imports = pd.read_csv(pkg_resources.resource_stream(__name__, '/Data/C_exio_IW_1.30_1.48.csv'))
+        self.C_INT_imports.set_index('Unnamed: 0', inplace=True)
+        self.C_INT_imports.index.name = None
+
+        self.C_INT_imports.index = pd.MultiIndex.from_tuples(list(zip(
+            [i.split(' (')[0] for i in self.C_INT_imports.index],
+            [i.split(' (')[1].split(')')[0] for i in self.C_INT_imports.index])))
+
+        self.C_INT_imports.drop(['Fossil and nuclear energy use',
+                                 'Ionizing radiations',
+                                 'Ionizing radiation, ecosystem quality',
+                                 'Ionizing radiation, human health',
+                                 'Land occupation, biodiversity',
+                                 'Land transformation, biodiversity',
+                                 'Mineral resources use',
+                                 'Thermally polluted water',
+                                 'Water availability, freshwater ecosystem',
+                                 'Water availability, human health',
+                                 'Water availability, terrestrial ecosystem',
+                                 'Water scarcity'], axis=0, level=0, inplace=True)
+        # adding water use to exiobase flows to match with water use from STATCAN physical accounts
+        # water use in exiobase is identified through "water withdrawal" and NOT "water consumption"
+        adding_water_use = pd.DataFrame(0, index=pd.MultiIndex.from_product([['Water use'], ['m3']]),
+                                        columns=self.F_INT_imports.index)
+        # STATCAN excluded water use due to hydroelectricity from their accounts, we keep consistency by removing them too
+        adding_water_use.loc[:, [i for i in self.F_INT_imports.index if 'Water Withdrawal' in i and (
+                'hydro' not in i or 'tide' not in i)]] = 1
+        self.C_INT_imports = pd.concat([self.C_INT_imports, adding_water_use])
+        # forcing the match with self.C (annoying parentheses for climate change long and short term)
+        self.C_INT_imports.index = self.C.index
+
         self.methods_metadata = pd.DataFrame(self.C.index.tolist(), columns=['Impact category', 'unit'])
         self.methods_metadata = self.methods_metadata.set_index('Impact category')
 
@@ -1086,6 +1069,8 @@ class IOTables:
         if self.classification == 'product':
             self.F = self.F.dot(self.V.dot(self.inv_g).T)
             self.S = self.F.dot(self.inv_q)
+            if self.exiobase_folder:
+                self.S_INT_imports = self.F_INT_imports.dot(self.inv_q)
 
         # adding empty flows to FY to allow multiplication with self.C
         self.FY = pd.concat([pd.DataFrame(0, self.F.index, self.Y.columns), self.FY])
@@ -1099,7 +1084,11 @@ class IOTables:
         I = pd.DataFrame(np.eye(len(self.A)), self.A.index, self.A.columns)
         self.L = pd.DataFrame(np.linalg.solve(I - self.A, I), self.A.index, I.columns)
         self.E = self.S.dot(self.L).dot(self.Y) + self.FY
-        self.D = self.C.dot(self.E)
+        if self.exiobase_folder:
+            self.E_INT_imports = self.S_INT_imports.dot(self.L).dot(self.Y)
+            self.D = self.C.dot(self.E) + self.C_INT_imports.dot(self.E_INT_imports)
+        else:
+            self.D = self.C.dot(self.E)
 
     def split_private_public_sectors(self, NAICS_code, IOIC_code):
         """
