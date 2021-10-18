@@ -1207,9 +1207,6 @@ class IOTables:
             print("Please enter a format")
             return
 
-        N = self.C.dot(self.S).dot(self.L)
-        B = self.S.dot(self.L)
-
         def flat_multiindex(df):
             df.index = df.index.tolist()
             df.columns = df.columns.tolist()
@@ -1219,11 +1216,6 @@ class IOTables:
         flat_multiindex(self.S)
         flat_multiindex(self.FY)
         flat_multiindex(self.C)
-        flat_multiindex(self.L)
-        flat_multiindex(self.E)
-        flat_multiindex(self.D)
-        flat_multiindex(B)
-        flat_multiindex(N)
 
         def remove_zeros(df):
             return df.replace({0: np.nan})
@@ -1233,11 +1225,6 @@ class IOTables:
         self.S = remove_zeros(self.S)
         self.FY = remove_zeros(self.FY)
         self.C = remove_zeros(self.C)
-        self.L = remove_zeros(self.L)
-        self.E = remove_zeros(self.E)
-        self.D = remove_zeros(self.D)
-        B = remove_zeros(B)
-        N = remove_zeros(N)
 
         if format == 'excel':
             writer = pd.ExcelWriter(filepath, engine='xlsxwriter')
@@ -1248,11 +1235,6 @@ class IOTables:
             self.S.to_excel(writer, 'S')
             self.FY.to_excel(writer, 'FY')
             self.C.to_excel(writer, 'C')
-            self.L.to_excel(writer, 'L')
-            self.E.to_excel(writer, 'E')
-            self.D.to_excel(writer, 'D')
-            B.to_excel(writer, 'B')
-            N.to_excel(writer, 'N')
 
             writer.save()
 
