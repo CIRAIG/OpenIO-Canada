@@ -55,13 +55,14 @@ class IOTables:
         self.FY = pd.DataFrame()
         self.C = pd.DataFrame()
         self.INT_imports = pd.DataFrame()
-        self.F_INT_imports = pd.DataFrame()
-        self.S_INT_imports = pd.DataFrame()
-        self.E_INT_imports = pd.DataFrame()
-        self.C_INT_imports = pd.DataFrame()
+        self.SL_INT = pd.DataFrame()
+        self.C_INT = pd.DataFrame()
+        self.IMP_matrix = pd.DataFrame()
+        self.Y_IMP = pd.DataFrame()
         self.L = pd.DataFrame()
         self.E = pd.DataFrame()
         self.D = pd.DataFrame()
+        self.who_uses_int_imports = pd.DataFrame()
 
         # metadata
         self.emission_metadata = pd.DataFrame()
@@ -515,8 +516,8 @@ class IOTables:
         Method executes two things:
         1. It removes international imports from the use table
         2. It estimates the emissions (or the impacts) from these international imports, based on exiobase
-        Resulting emissions are stored in self.F_INT_imports
-        :returns self.C_INT_imports, self.F_INT_imports, modified self.U
+        Resulting emissions are stored in self.SL_INT
+        :returns self.SL_INT, modified self.U
         """
 
         # 1. Removing international imports
@@ -526,15 +527,15 @@ class IOTables:
         # concat U and Y to look at all users (industry + final demand)
         U_Y = pd.concat([self.U, self.Y], axis=1)
         # weighted average of who is requiring the international imports, based on national use
-        who_uses_int_imports = (U_Y.T / U_Y.sum(1)).T * self.INT_imports.values
+        self.who_uses_int_imports = (U_Y.T / U_Y.sum(1)).T * self.INT_imports.values
         # remove international imports from national use
-        self.U = self.U - who_uses_int_imports.reindex(self.U.columns, axis=1)
+        self.U = self.U - self.who_uses_int_imports.reindex(self.U.columns, axis=1)
         # check no issues of negatives
         assert len(self.U[self.U < -1].dropna(how='all', axis=1).dropna(how='all', axis=0)) == 0
         self.U = self.U[self.U > 0].fillna(0)
         assert not self.U[self.U < 0].any().any()
         # remove international imports from final demand
-        self.Y = self.Y - who_uses_int_imports.reindex(self.Y.columns, axis=1)
+        self.Y = self.Y - self.who_uses_int_imports.reindex(self.Y.columns, axis=1)
         # remove negative artefacts (because of negative values in inventories)
         self.Y = pd.concat([self.Y[self.Y >= 0].fillna(0), self.Y[self.Y < -1].fillna(0)], axis=1)
         self.Y = self.Y.groupby(by=self.Y.columns, axis=1).sum()
@@ -556,27 +557,31 @@ class IOTables:
         ioic_exio = ioic_exio[2:].drop('IOIC Detail level - EXIOBASE', axis=1).set_index('Unnamed: 1').fillna(0)
         ioic_exio.index.name = None
 
-        norm_emissions_INT_imports = pd.DataFrame(0, io.satellite.S.index, [i[0] for i in self.commodities])
-        for product in norm_emissions_INT_imports.columns:
+        lifecycle_normalized_emissions_exiobase = io.satellite.S.dot(io.L)
+
+        self.SL_INT = pd.DataFrame(0, io.satellite.S.index, [i[0] for i in self.commodities])
+        for product in self.SL_INT.columns:
             if len(ioic_exio.loc[product][ioic_exio.loc[product] == 1].index) != 0:
                 df = io.x.loc(axis=0)[:, ioic_exio.loc[product][ioic_exio.loc[product] == 1].index]
                 df = df.loc[INT_countries] / df.loc[INT_countries].sum()
-                norm_emissions_INT_imports.loc[:, product] = (
-                    io.satellite.S.reindex(df.index, axis=1).dot(df)).values
-        norm_emissions_INT_imports = norm_emissions_INT_imports.fillna(0)
-        # exiobase in millions
-        norm_emissions_INT_imports[9:] /= 1000000
-        # exiobase in euros
-        norm_emissions_INT_imports *= 1.5
-        # from codes to names
-        norm_emissions_INT_imports.columns = [dict(self.commodities)[i] for i in norm_emissions_INT_imports.columns]
+                self.SL_INT.loc[:, product] = (
+                    lifecycle_normalized_emissions_exiobase.reindex(df.index, axis=1).dot(df)).values
 
-        for province in self.matching_dict:
-            diag = pd.DataFrame(np.diagflat(self.INT_imports.loc[province].to_numpy()),
-                                self.INT_imports.loc[province].index, self.INT_imports.loc[province].index)
-            dff = norm_emissions_INT_imports.dot(diag)
-            self.F_INT_imports = pd.concat([self.F_INT_imports, dff.T.set_index(
-                pd.MultiIndex.from_product([[province], dff.columns.tolist()])).T], axis=1)
+        self.SL_INT = self.SL_INT.fillna(0)
+        # exiobase in millions
+        self.SL_INT[9:] /= 1000000
+        # exiobase in euros
+        self.SL_INT /= 1.5
+        # from codes to names
+        self.SL_INT.columns = [dict(self.commodities)[i] for i in self.SL_INT.columns]
+        # RoW as the region (level 0 of multiindex)
+        self.SL_INT.columns = pd.MultiIndex.from_product([['RoW'], self.SL_INT.columns])
+
+        self.IMP_matrix = self.who_uses_int_imports.reindex(self.U.columns, axis=1).groupby(axis=0, level=1).sum()
+        self.IMP_matrix.index = pd.MultiIndex.from_product([['RoW'], self.IMP_matrix.index])
+
+        self.Y_IMP = self.who_uses_int_imports.reindex(self.Y.columns, axis=1).groupby(axis=0, level=1).sum()
+        self.Y_IMP.index = pd.MultiIndex.from_product([['RoW'], self.Y_IMP.index])
 
     def gimme_symmetric_iot(self):
         """
@@ -590,6 +595,7 @@ class IOTables:
         if self.assumption == "industry technology" and self.classification == "product":
             self.A = self.U.dot(self.inv_g.dot(self.V.T)).dot(self.inv_q)
             self.R = self.W.dot(self.inv_g.dot(self.V.T)).dot(self.inv_q)
+            self.IMP_matrix = self.IMP_matrix.dot(self.inv_g.dot(self.V.T)).dot(self.inv_q)
         elif self.assumption == "fixed industry sales structure" and self.classification == "industry":
             self.A = self.V.T.dot(self.inv_q).dot(self.U).dot(self.inv_g)
             self.R = self.W.dot(self.inv_g)
@@ -983,15 +989,15 @@ class IOTables:
                      'Water scarcity'], axis=0, level=0, inplace=True)
 
         # importing characterization matrix IMPACT World+/exiobase
-        self.C_INT_imports = pd.read_csv(pkg_resources.resource_stream(__name__, '/Data/C_exio_IW_1.30_1.48.csv'))
-        self.C_INT_imports.set_index('Unnamed: 0', inplace=True)
-        self.C_INT_imports.index.name = None
+        self.C_INT = pd.read_csv(pkg_resources.resource_stream(__name__, '/Data/C_exio_IW_1.30_1.48.csv'),
+                                         index_col='Unnamed: 0')
+        self.C_INT.index.name = None
 
-        self.C_INT_imports.index = pd.MultiIndex.from_tuples(list(zip(
-            [i.split(' (')[0] for i in self.C_INT_imports.index],
-            [i.split(' (')[1].split(')')[0] for i in self.C_INT_imports.index])))
+        self.C_INT.index = pd.MultiIndex.from_tuples(list(zip(
+            [i.split(' (')[0] for i in self.C_INT.index],
+            [i.split(' (')[1].split(')')[0] for i in self.C_INT.index])))
 
-        self.C_INT_imports.drop(['Fossil and nuclear energy use',
+        self.C_INT.drop(['Fossil and nuclear energy use',
                                  'Ionizing radiations',
                                  'Ionizing radiation, ecosystem quality',
                                  'Ionizing radiation, human health',
@@ -1006,13 +1012,13 @@ class IOTables:
         # adding water use to exiobase flows to match with water use from STATCAN physical accounts
         # water use in exiobase is identified through "water withdrawal" and NOT "water consumption"
         adding_water_use = pd.DataFrame(0, index=pd.MultiIndex.from_product([['Water use'], ['m3']]),
-                                        columns=self.F_INT_imports.index)
+                                        columns=self.SL_INT.index)
         # STATCAN excluded water use due to hydroelectricity from their accounts, we keep consistency by removing them too
-        adding_water_use.loc[:, [i for i in self.F_INT_imports.index if 'Water Withdrawal' in i and (
+        adding_water_use.loc[:, [i for i in self.SL_INT.index if 'Water Withdrawal' in i and (
                 'hydro' not in i or 'tide' not in i)]] = 1
-        self.C_INT_imports = pd.concat([self.C_INT_imports, adding_water_use])
+        self.C_INT = pd.concat([self.C_INT, adding_water_use])
         # forcing the match with self.C (annoying parentheses for climate change long and short term)
-        self.C_INT_imports.index = self.C.index
+        self.C_INT.index = self.C.index
 
         self.methods_metadata = pd.DataFrame(self.C.index.tolist(), columns=['Impact category', 'unit'])
         self.methods_metadata = self.methods_metadata.set_index('Impact category')
@@ -1069,8 +1075,6 @@ class IOTables:
         if self.classification == 'product':
             self.F = self.F.dot(self.V.dot(self.inv_g).T)
             self.S = self.F.dot(self.inv_q)
-            if self.exiobase_folder:
-                self.S_INT_imports = self.F_INT_imports.dot(self.inv_q)
 
         # adding empty flows to FY to allow multiplication with self.C
         self.FY = pd.concat([pd.DataFrame(0, self.F.index, self.Y.columns), self.FY])
@@ -1085,8 +1089,9 @@ class IOTables:
         self.L = pd.DataFrame(np.linalg.solve(I - self.A, I), self.A.index, I.columns)
         self.E = self.S.dot(self.L).dot(self.Y) + self.FY
         if self.exiobase_folder:
-            self.E_INT_imports = self.S_INT_imports.dot(self.L).dot(self.Y)
-            self.D = self.C.dot(self.E) + self.C_INT_imports.dot(self.E_INT_imports)
+            self.D = (self.C.dot(self.E) +
+                      self.C_INT.dot(self.SL_INT).dot(self.IMP_matrix).dot(self.Y) +
+                      self.C_INT.dot(self.SL_INT).dot(self.Y_IMP))
         else:
             self.D = self.C.dot(self.E)
 
