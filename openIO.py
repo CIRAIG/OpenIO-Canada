@@ -595,7 +595,8 @@ class IOTables:
         if self.assumption == "industry technology" and self.classification == "product":
             self.A = self.U.dot(self.inv_g.dot(self.V.T)).dot(self.inv_q)
             self.R = self.W.dot(self.inv_g.dot(self.V.T)).dot(self.inv_q)
-            self.IMP_matrix = self.IMP_matrix.dot(self.inv_g.dot(self.V.T)).dot(self.inv_q)
+            if self.exiobase_folder:
+                self.IMP_matrix = self.IMP_matrix.dot(self.inv_g.dot(self.V.T)).dot(self.inv_q)
         elif self.assumption == "fixed industry sales structure" and self.classification == "industry":
             self.A = self.V.T.dot(self.inv_q).dot(self.U).dot(self.inv_g)
             self.R = self.W.dot(self.inv_g)
