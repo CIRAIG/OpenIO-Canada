@@ -457,7 +457,7 @@ class IOTables:
         for importing_province in province_trade.index:
             U_Y = pd.concat([self.U.loc[importing_province, importing_province],
                              self.Y.loc[importing_province, importing_province]], axis=1)
-            # not distributing interprovincial trade flows to negative values
+            # negative values represent sells, so it does not make sense to rebalance imports with them
             U_Y = U_Y[U_Y > 0].fillna(0)
             total_imports = province_trade.groupby(level=1, axis=1).sum().loc[importing_province]
             index_commodity = [i[1] for i in self.commodities]
@@ -526,17 +526,20 @@ class IOTables:
         self.INT_imports = self.INT_imports.groupby(axis=1, level=1).sum()
         # concat U and Y to look at all users (industry + final demand)
         U_Y = pd.concat([self.U, self.Y], axis=1)
+        # negative values represent sells, so it does not make sense to rebalance imports with them
+        U_Y = U_Y[U_Y > 0].fillna(0)
         # weighted average of who is requiring the international imports, based on national use
         self.who_uses_int_imports = (U_Y.T / U_Y.sum(1)).T * self.INT_imports.values
         # remove international imports from national use
         self.U = self.U - self.who_uses_int_imports.reindex(self.U.columns, axis=1)
-        # check no issues of negatives
+        # check that nothing fuzzy is happening with negative values that are not due to artefacts
         assert len(self.U[self.U < -1].dropna(how='all', axis=1).dropna(how='all', axis=0)) == 0
+        # remove negative artefacts (like 1e-10$)
         self.U = self.U[self.U > 0].fillna(0)
         assert not self.U[self.U < 0].any().any()
         # remove international imports from final demand
         self.Y = self.Y - self.who_uses_int_imports.reindex(self.Y.columns, axis=1)
-        # remove negative artefacts (because of negative values in inventories)
+        # remove negative artefacts
         self.Y = pd.concat([self.Y[self.Y >= 0].fillna(0), self.Y[self.Y < -1].fillna(0)], axis=1)
         self.Y = self.Y.groupby(by=self.Y.columns, axis=1).sum()
         self.Y.columns = pd.MultiIndex.from_tuples(self.Y.columns)
