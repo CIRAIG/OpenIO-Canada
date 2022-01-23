@@ -167,13 +167,26 @@ class IOTables:
         supply_table = su_tables['Supply'].copy()
         use_table = su_tables['Use_Basic'].copy()
 
+        if self.year in [2014, 2015, 2016, 2017]:
+            # starting_line is the line in which the Supply table starts (the first green row)
+            starting_line = 11
+            # starting_line_values is the line in which the first value appears
+            starting_line_values = 16
+
+        elif self.year in [2018]:
+            # starting_line is the line in which the Supply table starts (the first green row)
+            starting_line = 3
+            # starting_line_values is the line in which the first value appears
+            starting_line_values = 7
+
         if not self.industries:
             for i in range(0, len(supply_table.columns)):
-                if supply_table.iloc[11, i] == 'Total':
+                if supply_table.iloc[starting_line, i] == 'Total':
                     break
-                if supply_table.iloc[11, i] not in [np.nan, 'Industries']:
+                if supply_table.iloc[starting_line, i] not in [np.nan, 'Industries']:
                     # tuple with code + name (need code to deal with duplicate names in detailed levels)
-                    self.industries.append((supply_table.iloc[12, i], supply_table.iloc[11, i]))
+                    self.industries.append((supply_table.iloc[starting_line+1, i],
+                                            supply_table.iloc[starting_line, i]))
             # remove fictive sectors
             self.industries = [i for i in self.industries if not re.search(r'^F', i[0])]
 
@@ -188,20 +201,25 @@ class IOTables:
 
         final_demand = []
         for i in range(0, len(use_table.columns)):
-            if use_table.iloc[11, i] == 'Total use':
+            if use_table.iloc[starting_line, i] == 'Total use':
                 break
-            if use_table.iloc[11, i] not in [np.nan, 'Industries']:
-                final_demand.append((use_table.iloc[12, i], use_table.iloc[11, i]))
+            if use_table.iloc[starting_line, i] not in [np.nan, 'Industries']:
+                final_demand.append((use_table.iloc[starting_line+1, i],
+                                     use_table.iloc[starting_line, i]))
         final_demand = [i for i in final_demand if i not in self.industries and i[1] != 'Total']
 
-        df = supply_table.iloc[14:, 2:]
-        df.index = list(zip(supply_table.iloc[14:, 0].tolist(), supply_table.iloc[14:, 1].tolist()))
-        df.columns = list(zip(supply_table.iloc[12, 2:].tolist(), supply_table.iloc[11, 2:].tolist()))
+        df = supply_table.iloc[starting_line_values-2:, 2:]
+        df.index = list(zip(supply_table.iloc[starting_line_values-2:, 0].tolist(),
+                            supply_table.iloc[starting_line_values-2:, 1].tolist()))
+        df.columns = list(zip(supply_table.iloc[starting_line+1, 2:].tolist(),
+                              supply_table.iloc[starting_line, 2:].tolist()))
         supply_table = df
 
-        df = use_table.iloc[14:, 2:]
-        df.index = list(zip(use_table.iloc[14:, 0].tolist(), use_table.iloc[14:, 1].tolist()))
-        df.columns = list(zip(use_table.iloc[12, 2:].tolist(), use_table.iloc[11, 2:].tolist()))
+        df = use_table.iloc[starting_line_values-2:, 2:]
+        df.index = list(zip(use_table.iloc[starting_line_values-2:, 0].tolist(),
+                            use_table.iloc[starting_line_values-2:, 1].tolist()))
+        df.columns = list(zip(use_table.iloc[starting_line+1, 2:].tolist(),
+                              use_table.iloc[starting_line, 2:].tolist()))
         use_table = df
 
         # fill with zeros
@@ -500,6 +518,7 @@ class IOTables:
             # if some province buys more than they use, drop the value in "changes in inventories"
             # if it occurs, it's probably linked to the immediate re-export to other provinces
             if not len(self.U[self.U > -1].dropna()) == len(self.U):
+                print("Warning! Some province bought more than they used.")
                 product_creating_issue_index = self.U[self.U < -1].dropna(how='all').dropna(1).index
                 product_creating_issue_column = self.U[self.U < -1].dropna(how='all').dropna(1).columns
                 value_to_balance = self.U[self.U < -1].dropna(how='all').dropna(1).iloc[0, 0]
@@ -958,7 +977,8 @@ class IOTables:
         pivoting = pd.pivot_table(IW, values='CF value', index=('Impact category', 'CF unit'),
                                   columns=['Elem flow name', 'Compartment', 'Sub-compartment']).fillna(0)
 
-        concordance = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/NPRI_IW_concordance.xlsx'))
+        concordance = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/NPRI_IW_concordance.xlsx'),
+                                                                  str(self.year))
         concordance.set_index('NPRI flows', inplace=True)
 
         # adding GHGs to the list of pollutants
@@ -1038,29 +1058,56 @@ class IOTables:
         # VOCs
         rest_of_voc = [i for i in concordance.index if 'Speciated VOC' in i and concordance.loc[i].isna().iloc[0]]
         df = self.F.loc(axis=0)[:, rest_of_voc]
-        self.F.loc(axis=0)[:, 'Volatile organic compounds', 'Air'] += df.groupby(level=0).sum().values
+        try:
+            self.F.loc(axis=0)[:, 'Volatile organic compounds', 'Air'] += df.groupby(level=0).sum().values
+        except KeyError:
+            # name changed in 2018 version
+            self.F.loc(axis=0)[:, 'Volatile Organic Compounds (VOCs)', 'Air'] += df.groupby(level=0).sum().values
+
         self.F.drop(self.F.loc(axis=0)[:, rest_of_voc].index, inplace=True)
 
-        # PMs, only take highest value flow as suggested by the NPRI team:
-        # [https://www.canada.ca/en/environment-climate-change/services/national-pollutant-release-inventory/using-interpreting-data.html]
-        for sector in self.F.columns:
-            little_pm = self.F.loc[(sector[0], 'PM2.5', 'Air'), sector]
-            big_pm = self.F.loc[(sector[0], 'PM10', 'Air'), sector]
-            unknown_size = self.F.loc[(sector[0], 'Total particulate matter', 'Air'), sector]
-            if little_pm >= big_pm:
-                if little_pm >= unknown_size:
-                    self.F.loc[(sector[0], 'PM10', 'Air'), sector] = 0
-                    self.F.loc[(sector[0], 'Total particulate matter', 'Air'), sector] = 0
+        if self.year == 2018:
+            # PMs, only take highest value flow as suggested by the NPRI team:
+            # [https://www.canada.ca/en/environment-climate-change/services/national-pollutant-release-inventory/using-interpreting-data.html]
+            for sector in self.F.columns:
+                little_pm = self.F.loc[(sector[0], 'PM2.5 - Particulate Matter <= 2.5 Micrometers', 'Air'), sector]
+                big_pm = self.F.loc[(sector[0], 'PM10 - Particulate Matter <= 10 Micrometers', 'Air'), sector]
+                unknown_size = self.F.loc[(sector[0], 'Total particulate matter', 'Air'), sector]
+                if little_pm >= big_pm:
+                    if little_pm >= unknown_size:
+                        self.F.loc[(sector[0], 'PM10 - Particulate Matter <= 10 Micrometers', 'Air'), sector] = 0
+                        self.F.loc[(sector[0], 'Total particulate matter', 'Air'), sector] = 0
+                    else:
+                        self.F.loc[(sector[0], 'PM10 - Particulate Matter <= 10 Micrometers', 'Air'), sector] = 0
+                        self.F.loc[(sector[0], 'PM2.5 - Particulate Matter <= 2.5 Micrometers', 'Air'), sector] = 0
                 else:
-                    self.F.loc[(sector[0], 'PM10', 'Air'), sector] = 0
-                    self.F.loc[(sector[0], 'PM2.5', 'Air'), sector] = 0
-            else:
-                if big_pm > unknown_size:
-                    self.F.loc[(sector[0], 'PM2.5', 'Air'), sector] = 0
-                    self.F.loc[(sector[0], 'Total particulate matter', 'Air'), sector] = 0
+                    if big_pm > unknown_size:
+                        self.F.loc[(sector[0], 'PM2.5 - Particulate Matter <= 2.5 Micrometers', 'Air'), sector] = 0
+                        self.F.loc[(sector[0], 'Total particulate matter', 'Air'), sector] = 0
+                    else:
+                        self.F.loc[(sector[0], 'PM10 - Particulate Matter <= 10 Micrometers', 'Air'), sector] = 0
+                        self.F.loc[(sector[0], 'PM2.5 - Particulate Matter <= 2.5 Micrometers', 'Air'), sector] = 0
+        else:
+            # PMs, only take highest value flow as suggested by the NPRI team:
+            # [https://www.canada.ca/en/environment-climate-change/services/national-pollutant-release-inventory/using-interpreting-data.html]
+            for sector in self.F.columns:
+                little_pm = self.F.loc[(sector[0], 'PM2.5', 'Air'), sector]
+                big_pm = self.F.loc[(sector[0], 'PM10', 'Air'), sector]
+                unknown_size = self.F.loc[(sector[0], 'Total particulate matter', 'Air'), sector]
+                if little_pm >= big_pm:
+                    if little_pm >= unknown_size:
+                        self.F.loc[(sector[0], 'PM10', 'Air'), sector] = 0
+                        self.F.loc[(sector[0], 'Total particulate matter', 'Air'), sector] = 0
+                    else:
+                        self.F.loc[(sector[0], 'PM10', 'Air'), sector] = 0
+                        self.F.loc[(sector[0], 'PM2.5', 'Air'), sector] = 0
                 else:
-                    self.F.loc[(sector[0], 'PM10', 'Air'), sector] = 0
-                    self.F.loc[(sector[0], 'PM2.5', 'Air'), sector] = 0
+                    if big_pm > unknown_size:
+                        self.F.loc[(sector[0], 'PM2.5', 'Air'), sector] = 0
+                        self.F.loc[(sector[0], 'Total particulate matter', 'Air'), sector] = 0
+                    else:
+                        self.F.loc[(sector[0], 'PM10', 'Air'), sector] = 0
+                        self.F.loc[(sector[0], 'PM2.5', 'Air'), sector] = 0
 
         # we modified flows in self.F, modify self.C accordingly
         self.C = self.C.loc[:, self.F.index].fillna(0)
