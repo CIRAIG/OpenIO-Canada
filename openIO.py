@@ -92,10 +92,12 @@ class IOTables:
         try:
             self.NPRI = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/NPRI-INRP_DataDonnées_' +
                                                                     str(self.year) + '.xlsx'), None)
+            self.NPRI_file_year = self.year
         # 2017 by default
         except FileNotFoundError:
             self.NPRI = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/NPRI-INRP_DataDonnées_2017.xlsx'),
                                       None)
+            self.NPRI_file_year = 2017
 
         print("Formatting the Supply and Use tables...")
         for province_data in files:
@@ -977,8 +979,13 @@ class IOTables:
         pivoting = pd.pivot_table(IW, values='CF value', index=('Impact category', 'CF unit'),
                                   columns=['Elem flow name', 'Compartment', 'Sub-compartment']).fillna(0)
 
-        concordance = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/NPRI_IW_concordance.xlsx'),
-                                                                  str(self.year))
+        #TODO horrible short term fix. Gotta define NPRI/IW concordances for years 2014, 2015 and 2016
+        try:
+            concordance = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/NPRI_IW_concordance.xlsx'),
+                                                                      str(self.NPRI_file_year))
+        except ValueError:
+            concordance = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/NPRI_IW_concordance.xlsx'),
+                                                                      '2017')
         concordance.set_index('NPRI flows', inplace=True)
 
         # adding GHGs to the list of pollutants
