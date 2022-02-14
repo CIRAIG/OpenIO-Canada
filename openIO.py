@@ -152,14 +152,14 @@ class IOTables:
         print("Matching GHG accounts to IOT sectors...")
         self.match_ghg_accounts_to_iots()
 
-        # print("Matching water accounts to IOT sectors...")
-        # self.match_water_accounts_to_iots()
-        #
-        # print("Creating the characterization matrix...")
-        # self.characterization_matrix()
-        #
-        # print("Normalizing emissions...")
-        # self.normalize_flows()
+        print("Matching water accounts to IOT sectors...")
+        self.match_water_accounts_to_iots()
+
+        print("Creating the characterization matrix...")
+        self.characterization_matrix()
+
+        print("Normalizing emissions...")
+        self.normalize_flows()
 
         print('Took '+str(time()-start)+' seconds')
 
@@ -914,8 +914,7 @@ class IOTables:
 
             # create FY and update it with GHG emissions from households
             self.FY = pd.DataFrame(0, index=pd.MultiIndex.from_product(
-                [self.matching_dict, ['Carbon dioxide', 'Methane', 'Dinitrogen monoxide'],
-                 ['Air', 'Water', 'Soil']]).drop_duplicates(),
+                [self.matching_dict, ['Carbon dioxide', 'Methane', 'Dinitrogen monoxide'], ['Air']]).drop_duplicates(),
                                    columns=self.Y.columns)
             self.FY.update(Household_GHG)
         else:
@@ -1043,21 +1042,41 @@ class IOTables:
         # convert into cubic meters
         water.VALUE *= 1000
 
-        # water use from households
-        FD_water = water.loc[[i for i in water.index if water.Sector[i] == 'Households']]
-        # national water use will be distributed depending on the amount of $ spent by households in a given province
-        provincial_FD_consumption_distribution = self.Y.loc(axis=1)[:,
-                                                 'Household final consumption expenditure'].sum() / self.Y.loc(
-            axis=1)[:, 'Household final consumption expenditure'].sum().sum()
-        FD_water = provincial_FD_consumption_distribution * FD_water.VALUE.values
-        # spatializing
-        FD_water = pd.concat([FD_water] * len(FD_water.index.levels[0]), axis=1)
-        FD_water.columns = pd.MultiIndex.from_product([self.matching_dict.keys(), ['Water'], ['Water']])
-        FD_water = FD_water.T
-        for province in FD_water.index.levels[0]:
-            FD_water.loc[province, [i for i in FD_water.columns if i[0] != province]] = 0
-        FD_water = FD_water.T.reindex(self.Y.columns).T.fillna(0)
-        self.FY = pd.concat([self.FY, FD_water])
+        if not self.final_demand_aggregated and self.level_of_detail not in ['Summary level','Link-1961 level']:
+            fd_water = water.loc[[i for i in water.index if water.Sector[i] == 'Households']]
+            water_provincial_use_distribution = self.Y.loc(axis=0)[:,
+                                                'Water delivered by water works and irrigation systems'].loc(axis=1)[:,
+                                                'Household final consumption expenditure'].sum(axis=1)
+            water_provincial_use_distribution /= water_provincial_use_distribution.sum()
+            water_provincial_use_distribution *= fd_water.VALUE.iloc[0]
+            water_provincial_use_distribution = pd.DataFrame(water_provincial_use_distribution, columns=['Water']).T
+            water_provincial_use_distribution = pd.concat([water_provincial_use_distribution] * len(self.matching_dict))
+            water_provincial_use_distribution.index = pd.MultiIndex.from_product([self.matching_dict,
+                                                                                  water_provincial_use_distribution.index,
+                                                                                  ['Water']]).drop_duplicates()
+            for province in water_provincial_use_distribution.index.levels[0]:
+                water_provincial_use_distribution.loc[
+                    province, [i for i in water_provincial_use_distribution.columns if i[0] != province]] = 0
+            water_provincial_use_distribution.columns = pd.MultiIndex.from_product([self.matching_dict,
+                                                                                    ["Household final consumption expenditure"],
+                                                                                    ["Water supply and sanitation services"]])
+            self.FY = pd.concat([self.FY, water_provincial_use_distribution.reindex(self.Y.columns, axis=1).fillna(0)])
+        else:
+            # water use from households
+            FD_water = water.loc[[i for i in water.index if water.Sector[i] == 'Households']]
+            # national water use will be distributed depending on the amount of $ spent by households in a given province
+            provincial_FD_consumption_distribution = self.Y.loc(axis=1)[:,
+                                                     'Household final consumption expenditure'].sum() / self.Y.loc(
+                axis=1)[:, 'Household final consumption expenditure'].sum().sum()
+            FD_water = provincial_FD_consumption_distribution * FD_water.VALUE.values
+            # spatializing
+            FD_water = pd.concat([FD_water] * len(FD_water.index.levels[0]), axis=1)
+            FD_water.columns = pd.MultiIndex.from_product([self.matching_dict.keys(), ['Water'], ['Water']])
+            FD_water = FD_water.T
+            for province in FD_water.index.levels[0]:
+                FD_water.loc[province, [i for i in FD_water.columns if i[0] != province]] = 0
+            FD_water = FD_water.T.reindex(self.Y.columns).T.fillna(0)
+            self.FY = pd.concat([self.FY, FD_water])
 
         # format the names of the sector to match those used up till then
         water = water.loc[[i for i in water.index if '[' in water.Sector[i]]]
