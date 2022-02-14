@@ -31,6 +31,7 @@ class IOTables:
         self.level_of_detail = [i for i in folder_path.split('/') if 'level' in i][0]
         self.classification = classification
         self.exiobase_folder = exiobase_folder
+        self.final_demand_aggregated = final_demand_aggregated
 
         if self.classification == "product":
             self.assumption = 'industry technology'
@@ -116,7 +117,7 @@ class IOTables:
         print("Modifying names of duplicated sectors...")
         self.dealing_with_duplicated_names()
 
-        if final_demand_aggregated:
+        if self.final_demand_aggregated:
             print('Aggregating final demand sectors...')
             self.aggregate_final_demand()
         else:
@@ -126,31 +127,31 @@ class IOTables:
         print('Removing IOIC codes from index...')
         self.remove_codes()
 
-        # print("Balancing inter-provincial trade...")
-        # self.province_import_export(
-        #     pd.read_excel(
-        #         folder_path+[i for i in [j for j in os.walk(folder_path)][0][2] if 'Provincial_trade_flow' in i][0],
-        #         'Data'))
-        #
-        # if self.exiobase_folder:
-        #     print('Linking international imports to Exiobase...')
-        #     self.international_import_export()
-        #
-        # print("Building the symmetric tables...")
-        # self.gimme_symmetric_iot()
-        #
-        # print("Balancing value added...")
-        # self.balance_value_added()
-        #
-        # print("Extracting and formatting environmental data from the NPRI file...")
-        # self.extract_environmental_data()
-        #
-        # print("Matching emission data from NPRI to IOT sectors...")
-        # self.match_npri_data_to_iots()
-        #
-        # print("Matching GHG accounts to IOT sectors...")
-        # self.match_ghg_accounts_to_iots()
-        #
+        print("Balancing inter-provincial trade...")
+        self.province_import_export(
+            pd.read_excel(
+                folder_path+[i for i in [j for j in os.walk(folder_path)][0][2] if 'Provincial_trade_flow' in i][0],
+                'Data'))
+
+        if self.exiobase_folder:
+            print('Linking international imports to Exiobase...')
+            self.international_import_export()
+
+        print("Building the symmetric tables...")
+        self.gimme_symmetric_iot()
+
+        print("Balancing value added...")
+        self.balance_value_added()
+
+        print("Extracting and formatting environmental data from the NPRI file...")
+        self.extract_environmental_data()
+
+        print("Matching emission data from NPRI to IOT sectors...")
+        self.match_npri_data_to_iots()
+
+        print("Matching GHG accounts to IOT sectors...")
+        self.match_ghg_accounts_to_iots()
+
         # print("Matching water accounts to IOT sectors...")
         # self.match_water_accounts_to_iots()
         #
@@ -417,8 +418,22 @@ class IOTables:
         Extract the final demand sectors. These will be disaggregated. If you do not want the detail, use
         self.aggregated_final_demand()
         Provincial exports will be included in self.U and are thus excluded from self.Y
-        :return: self.Y updated
+        :return: self.Y & self.WY updated
         """
+
+        # dealing with duplicate names of disaggregated final demand sector names separately
+        self.Y.columns = [(i[0], (i[1][0], i[1][1] + ' (private)')) if re.search(r'^COB61|^MEB61|^IPB61|^MEBU', i[1][0])
+                          else i for i in self.Y.columns]
+        self.Y.columns = [(i[0], (i[1][0], i[1][1] + ' (public)')) if re.search(r'^COG61|^MEG61|^IPG61|^MEGU', i[1][0])
+                          else i for i in self.Y.columns]
+        self.Y.columns = [(i[0], (i[1][0], i[1][1] + ' (non-profit)')) if re.search(r'^MENU', i[1][0])
+                          else i for i in self.Y.columns]
+        self.WY.columns = [(i[0], (i[1][0], i[1][1] + ' (private)')) if re.search(r'^COB61|^MEB61|^IPB61|^MEBU', i[1][0])
+                          else i for i in self.WY.columns]
+        self.WY.columns = [(i[0], (i[1][0], i[1][1] + ' (public)')) if re.search(r'^COG61|^MEG61|^IPG61|^MEGU', i[1][0])
+                          else i for i in self.WY.columns]
+        self.WY.columns = [(i[0], (i[1][0], i[1][1] + ' (non-profit)')) if re.search(r'^MENU', i[1][0])
+                          else i for i in self.WY.columns]
 
         Y = pd.DataFrame()
 
@@ -463,6 +478,50 @@ class IOTables:
         Y = pd.concat([Y, df], axis=1)
 
         self.Y = Y
+
+        WY = pd.DataFrame()
+
+        fd_households = [i for i in self.WY.columns if re.search(r'^PEC\w*\d', i[1][0])]
+        df = self.WY.loc[:, fd_households].copy()
+        df.columns = [(i[0], "Household final consumption expenditure", i[1][1]) for i in fd_households]
+        WY = pd.concat([WY, df], axis=1)
+
+        fd_npish = [i for i in self.WY.columns if re.search(r'^CEN\w*\d', i[1][0])]
+        df = self.WY.loc[:, fd_npish].copy()
+        df.columns = [(i[0], i[1][1], 'NPISH') for i in fd_npish]
+        WY = pd.concat([WY, df], axis=1)
+
+        fd_gov = [i for i in self.WY.columns if re.search(r'^CEG\w*\d', i[1][0])]
+        df = self.WY.loc[:, fd_gov].copy()
+        df.columns = [(i[0], "Governments final consumption expenditure", i[1][1]) for i in fd_gov]
+        WY = pd.concat([WY, df], axis=1)
+
+        fd_construction = [i for i in self.WY.columns if re.search(r'^CO\w*\d', i[1][0])]
+        df = self.WY.loc[:, fd_construction].copy()
+        df.columns = [(i[0], "Gross fixed capital formation, Construction", i[1][1]) for i in fd_construction]
+        WY = pd.concat([WY, df], axis=1)
+
+        fd_machinery = [i for i in self.WY.columns if re.search(r'^ME\w*\d', i[1][0])]
+        df = self.WY.loc[:, fd_machinery].copy()
+        df.columns = [(i[0], "Gross fixed capital formation, Machinery and equipment", i[1][1]) for i in fd_machinery]
+        WY = pd.concat([WY, df], axis=1)
+
+        fd_ip = [i for i in self.WY.columns if re.search(r'^IP\w[T]*\d', i[1][0])]
+        df = self.WY.loc[:, fd_ip].copy()
+        df.columns = [(i[0], "Gross fixed capital formation, Intellectual property products", i[1][1]) for i in fd_ip]
+        WY = pd.concat([WY, df], axis=1)
+
+        fd_inv = [i for i in self.WY.columns if re.search(r'^INV\w*\d', i[1][0])]
+        df = self.WY.loc[:, fd_inv].copy()
+        df.columns = [(i[0], "Changes in inventories", i[1][1]) for i in fd_inv]
+        WY = pd.concat([WY, df], axis=1)
+
+        fd_int = [i for i in self.WY.columns if re.search(r'^INT\w*', i[1][0])]
+        df = self.WY.loc[:, fd_int].copy()
+        df.columns = [(i[0], "International exports", i[1][1].split(' ')[1].capitalize()) for i in fd_int]
+        WY = pd.concat([WY, df], axis=1)
+
+        self.WY = WY
 
     def remove_codes(self):
         """
@@ -601,6 +660,9 @@ class IOTables:
 
         # aggregating international imports in 1 column
         self.INT_imports = self.INT_imports.groupby(axis=1, level=1).sum()
+        # need to flatten multiindex for the concatenation to work properly
+        self.Y.columns = self.Y.columns.tolist()
+        self.U.columns = self.U.columns.tolist()
         # concat U and Y to look at all users (industry + final demand)
         U_Y = pd.concat([self.U, self.Y], axis=1)
         # negative values represent sells, so it does not make sense to rebalance imports with them
@@ -829,21 +891,49 @@ class IOTables:
         # kilotonnes to kgs
         GHG.loc[:, ['CO2', 'CH4', 'N2O']] *= 1000000
 
-        # start with the households emissions
-        Household_GHG = GHG.loc[[i for i in GHG.index if 'PEH' in GHG.loc[i, 'IOIC']]]
-        Household_GHG = Household_GHG.groupby('Geography').sum().drop('Reference Year', axis=1).T
-        Household_GHG.index = ['Carbon dioxide', 'Methane', 'Dinitrogen monoxide']
-        Household_GHG.columns = [{v: k for k, v in self.matching_dict.items()}[i] for i in Household_GHG.columns]
-        Household_GHG.columns = pd.MultiIndex.from_product(
-            [Household_GHG.columns, ['Household final consumption expenditure']])
-        self.FY = pd.DataFrame(0, Household_GHG.index, self.Y.columns).merge(Household_GHG, 'right').fillna(0)
-        self.FY.index = pd.MultiIndex.from_product([Household_GHG.index.tolist(), ['Air']])
-        # spatialization
-        self.FY = pd.concat([self.FY] * len(self.FY.columns.levels[0]), axis=0)
-        self.FY.index = pd.MultiIndex.from_product(
-            [list(self.matching_dict.keys()), ['Carbon dioxide', 'Methane', 'Dinitrogen monoxide'], ['Air']])
-        for province in self.FY.columns.levels[0]:
-            self.FY.loc[[i for i in self.FY.index.levels[0] if i != province], province] = 0
+        if not self.final_demand_aggregated and self.level_of_detail not in ['Summary level', 'Link-1961 level']:
+            # start with the households emissions
+            Household_GHG = GHG.loc[[i for i in GHG.index if 'PEH' in GHG.loc[i, 'IOIC']]]
+            Household_GHG.drop(['Reference Year', 'Description', 'F_Description'], axis=1, inplace=True)
+            # assume all direct emissions from home appliances come from "Other fuels"
+            Household_GHG.IOIC = ['Other fuels' if i == 'PEH1' else 'Fuels and lubricants' for i in Household_GHG.IOIC]
+            Household_GHG.Geography = [{v: k for k, v in self.matching_dict.items()}[i] for i in
+                                       Household_GHG.Geography]
+            Household_GHG = pd.pivot_table(data=Household_GHG, values=['CO2', 'CH4', 'N2O'],
+                                           columns=['Geography', 'IOIC'])
+            Household_GHG.columns = [(i[0], "Household final consumption expenditure", i[1]) for i in
+                                     Household_GHG.columns]
+            Household_GHG = Household_GHG.reindex(self.Y.columns, axis=1).fillna(0)
+            # spatialization
+            Household_GHG = pd.concat([Household_GHG] * len(self.matching_dict))
+            Household_GHG.index = pd.MultiIndex.from_product([self.matching_dict,
+                                                              ['Carbon dioxide', 'Methane', 'Dinitrogen monoxide'],
+                                                              ['Air']]).drop_duplicates()
+            for province in Household_GHG.columns.levels[0]:
+                Household_GHG.loc[[i for i in Household_GHG.columns.levels[0] if i != province], province] = 0
+
+            # create FY and update it with GHG emissions from households
+            self.FY = pd.DataFrame(0, index=pd.MultiIndex.from_product(
+                [self.matching_dict, ['Carbon dioxide', 'Methane', 'Dinitrogen monoxide'],
+                 ['Air', 'Water', 'Soil']]).drop_duplicates(),
+                                   columns=self.Y.columns)
+            self.FY.update(Household_GHG)
+        else:
+            # start with the households emissions
+            Household_GHG = GHG.loc[[i for i in GHG.index if 'PEH' in GHG.loc[i, 'IOIC']]]
+            Household_GHG = Household_GHG.groupby('Geography').sum().drop('Reference Year', axis=1).T
+            Household_GHG.index = ['Carbon dioxide', 'Methane', 'Dinitrogen monoxide']
+            Household_GHG.columns = [{v: k for k, v in self.matching_dict.items()}[i] for i in Household_GHG.columns]
+            Household_GHG.columns = pd.MultiIndex.from_product(
+                [Household_GHG.columns, ['Household final consumption expenditure']])
+            self.FY = pd.DataFrame(0, Household_GHG.index, self.Y.columns).merge(Household_GHG, 'right').fillna(0)
+            self.FY.index = pd.MultiIndex.from_product([Household_GHG.index.tolist(), ['Air']])
+            # spatialization
+            self.FY = pd.concat([self.FY] * len(self.FY.columns.levels[0]), axis=0)
+            self.FY.index = pd.MultiIndex.from_product(
+                [list(self.matching_dict.keys()), ['Carbon dioxide', 'Methane', 'Dinitrogen monoxide'], ['Air']])
+            for province in self.FY.columns.levels[0]:
+                self.FY.loc[[i for i in self.FY.index.levels[0] if i != province], province] = 0
 
         # Now the emissions from production
         GHG.set_index(pd.MultiIndex.from_tuples(tuple(
