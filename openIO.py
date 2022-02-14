@@ -18,7 +18,7 @@ import pymrio
 
 
 class IOTables:
-    def __init__(self, folder_path, classification, exiobase_folder=None):
+    def __init__(self, folder_path, classification, exiobase_folder=None, final_demand_aggregated=True):
         """
         :param folder_path: [string] the path to the folder with the economic data (e.g. /../Detail level/)
         :param classification: [string] the type of classification to adopt for the symmetric IOT ("product" or "industry")
@@ -116,45 +116,49 @@ class IOTables:
         print("Modifying names of duplicated sectors...")
         self.dealing_with_duplicated_names()
 
-        print('Aggregating final demand sectors...')
-        self.aggregate_final_demand()
+        if final_demand_aggregated:
+            print('Aggregating final demand sectors...')
+            self.aggregate_final_demand()
+        else:
+            print('Organized final demand sectors...')
+            self.organize_final_demand()
 
         print('Removing IOIC codes from index...')
         self.remove_codes()
 
-        print("Balancing inter-provincial trade...")
-        self.province_import_export(
-            pd.read_excel(
-                folder_path+[i for i in [j for j in os.walk(folder_path)][0][2] if 'Provincial_trade_flow' in i][0],
-                'Data'))
-
-        if self.exiobase_folder:
-            print('Linking international imports to Exiobase...')
-            self.international_import_export()
-
-        print("Building the symmetric tables...")
-        self.gimme_symmetric_iot()
-
-        print("Balancing value added...")
-        self.balance_value_added()
-
-        print("Extracting and formatting environmental data from the NPRI file...")
-        self.extract_environmental_data()
-
-        print("Matching emission data from NPRI to IOT sectors...")
-        self.match_npri_data_to_iots()
-
-        print("Matching GHG accounts to IOT sectors...")
-        self.match_ghg_accounts_to_iots()
-
-        print("Matching water accounts to IOT sectors...")
-        self.match_water_accounts_to_iots()
-
-        print("Creating the characterization matrix...")
-        self.characterization_matrix()
-
-        print("Normalizing emissions...")
-        self.normalize_flows()
+        # print("Balancing inter-provincial trade...")
+        # self.province_import_export(
+        #     pd.read_excel(
+        #         folder_path+[i for i in [j for j in os.walk(folder_path)][0][2] if 'Provincial_trade_flow' in i][0],
+        #         'Data'))
+        #
+        # if self.exiobase_folder:
+        #     print('Linking international imports to Exiobase...')
+        #     self.international_import_export()
+        #
+        # print("Building the symmetric tables...")
+        # self.gimme_symmetric_iot()
+        #
+        # print("Balancing value added...")
+        # self.balance_value_added()
+        #
+        # print("Extracting and formatting environmental data from the NPRI file...")
+        # self.extract_environmental_data()
+        #
+        # print("Matching emission data from NPRI to IOT sectors...")
+        # self.match_npri_data_to_iots()
+        #
+        # print("Matching GHG accounts to IOT sectors...")
+        # self.match_ghg_accounts_to_iots()
+        #
+        # print("Matching water accounts to IOT sectors...")
+        # self.match_water_accounts_to_iots()
+        #
+        # print("Creating the characterization matrix...")
+        # self.characterization_matrix()
+        #
+        # print("Normalizing emissions...")
+        # self.normalize_flows()
 
         print('Took '+str(time()-start)+' seconds')
 
@@ -408,6 +412,58 @@ class IOTables:
                 "International exports"
             ]]) == 0
 
+    def organize_final_demand(self):
+        """
+        Extract the final demand sectors. These will be disaggregated. If you do not want the detail, use
+        self.aggregated_final_demand()
+        Provincial exports will be included in self.U and are thus excluded from self.Y
+        :return: self.Y updated
+        """
+
+        Y = pd.DataFrame()
+
+        fd_households = [i for i in self.Y.columns if re.search(r'^PEC\w*\d', i[1][0])]
+        df = self.Y.loc[:, fd_households].copy()
+        df.columns = [(i[0], "Household final consumption expenditure", i[1][1]) for i in fd_households]
+        Y = pd.concat([Y, df], axis=1)
+
+        fd_npish = [i for i in self.Y.columns if re.search(r'^CEN\w*\d', i[1][0])]
+        df = self.Y.loc[:, fd_npish].copy()
+        df.columns = [(i[0], i[1][1], 'NPISH') for i in fd_npish]
+        Y = pd.concat([Y, df], axis=1)
+
+        fd_gov = [i for i in self.Y.columns if re.search(r'^CEG\w*\d', i[1][0])]
+        df = self.Y.loc[:, fd_gov].copy()
+        df.columns = [(i[0], "Governments final consumption expenditure", i[1][1]) for i in fd_gov]
+        Y = pd.concat([Y, df], axis=1)
+
+        fd_construction = [i for i in self.Y.columns if re.search(r'^CO\w*\d', i[1][0])]
+        df = self.Y.loc[:, fd_construction].copy()
+        df.columns = [(i[0], "Gross fixed capital formation, Construction", i[1][1]) for i in fd_construction]
+        Y = pd.concat([Y, df], axis=1)
+
+        fd_machinery = [i for i in self.Y.columns if re.search(r'^ME\w*\d', i[1][0])]
+        df = self.Y.loc[:, fd_machinery].copy()
+        df.columns = [(i[0], "Gross fixed capital formation, Machinery and equipment", i[1][1]) for i in fd_machinery]
+        Y = pd.concat([Y, df], axis=1)
+
+        fd_ip = [i for i in self.Y.columns if re.search(r'^IP\w[T]*\d', i[1][0])]
+        df = self.Y.loc[:, fd_ip].copy()
+        df.columns = [(i[0], "Gross fixed capital formation, Intellectual property products", i[1][1]) for i in fd_ip]
+        Y = pd.concat([Y, df], axis=1)
+
+        fd_inv = [i for i in self.Y.columns if re.search(r'^INV\w*\d', i[1][0])]
+        df = self.Y.loc[:, fd_inv].copy()
+        df.columns = [(i[0], "Changes in inventories", i[1][1]) for i in fd_inv]
+        Y = pd.concat([Y, df], axis=1)
+
+        fd_int = [i for i in self.Y.columns if re.search(r'^INT\w*', i[1][0])]
+        df = self.Y.loc[:, fd_int].copy()
+        df.columns = [(i[0], "International exports", i[1][1].split(' ')[1].capitalize()) for i in fd_int]
+        Y = pd.concat([Y, df], axis=1)
+
+        self.Y = Y
+
     def remove_codes(self):
         """
         Removes the IOIC codes from the index to only leave the name.
@@ -521,9 +577,9 @@ class IOTables:
             # if it occurs, it's probably linked to the immediate re-export to other provinces
             if not len(self.U[self.U > -1].dropna()) == len(self.U):
                 print("Warning! Some province bought more than they used.")
-                product_creating_issue_index = self.U[self.U < -1].dropna(how='all').dropna(1).index
-                product_creating_issue_column = self.U[self.U < -1].dropna(how='all').dropna(1).columns
-                value_to_balance = self.U[self.U < -1].dropna(how='all').dropna(1).iloc[0, 0]
+                product_creating_issue_index = self.U[self.U < -1].dropna(how='all').dropna(axis=1).index
+                product_creating_issue_column = self.U[self.U < -1].dropna(how='all').dropna(axis=1).columns
+                value_to_balance = self.U[self.U < -1].dropna(how='all').dropna(axis=1).iloc[0, 0]
                 self.U.loc[product_creating_issue_index, product_creating_issue_column] = 0
                 self.Y.loc[product_creating_issue_index, (product_creating_issue_index[0][0],
                                                           'Changes in inventories')] += - value_to_balance
