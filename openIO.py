@@ -620,17 +620,32 @@ class IOTables:
                     self.U.loc[exporting_province, importing_province] = df.loc[:,
                                                                          self.U.columns.levels[1]].reindex(
                         self.U.loc[exporting_province, importing_province].columns, axis=1).values
-                    self.Y.loc[exporting_province, importing_province].update(df.loc[:, final_demand_imports])
+                    if self.final_demand_aggregated:
+                        self.Y.loc[exporting_province, importing_province].update(df.loc[:, final_demand_imports])
+                    else:
+                        # special data treatment if final demand sectors are disaggregated
+                        dff = df.loc[:, final_demand_imports]
+                        dff.columns = pd.MultiIndex.from_tuples(dff.columns)
+                        dff = pd.concat([dff], keys=[importing_province], axis=1)
+                        dff = pd.concat([dff], keys=[exporting_province], axis=0)
+                        self.Y.update(dff)
 
             # remove interprovincial from intraprovincial to not double count
             self.U.loc[importing_province, importing_province].update(
                 self.U.loc[importing_province, importing_province] - self.U.loc[
                     [i for i in self.matching_dict if i != importing_province], importing_province].groupby(
                     level=1).sum())
-            self.Y.loc[importing_province, importing_province].update(
-                self.Y.loc[importing_province, importing_province] - self.Y.loc[
-                    [i for i in self.matching_dict if i != importing_province], importing_province].groupby(
-                    level=1).sum())
+            if self.final_demand_aggregated:
+                self.Y.loc[importing_province, importing_province].update(
+                    self.Y.loc[importing_province, importing_province] - self.Y.loc[
+                        [i for i in self.matching_dict if i != importing_province], importing_province].groupby(
+                        level=1).sum())
+            else:
+                df = self.Y.loc[importing_province, importing_province] - self.Y.loc[
+                    [i for i in self.matching_dict if i != importing_province], importing_province].groupby(level=1).sum()
+                df = pd.concat([df], keys=[importing_province], axis=1)
+                df = pd.concat([df], keys=[importing_province], axis=0)
+                self.Y.update(df)
 
             # if some province buys more than they use, drop the value in "changes in inventories"
             # if it occurs, it's probably linked to the immediate re-export to other provinces
