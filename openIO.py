@@ -149,17 +149,17 @@ class IOTables:
         print("Matching emission data from NPRI to IOT sectors...")
         self.match_npri_data_to_iots()
 
-        print("Matching GHG accounts to IOT sectors...")
-        self.match_ghg_accounts_to_iots()
-
-        print("Matching water accounts to IOT sectors...")
-        self.match_water_accounts_to_iots()
-
-        print("Creating the characterization matrix...")
-        self.characterization_matrix()
-
-        print("Normalizing emissions...")
-        self.normalize_flows()
+        # print("Matching GHG accounts to IOT sectors...")
+        # self.match_ghg_accounts_to_iots()
+        #
+        # print("Matching water accounts to IOT sectors...")
+        # self.match_water_accounts_to_iots()
+        #
+        # print("Creating the characterization matrix...")
+        # self.characterization_matrix()
+        #
+        # print("Normalizing emissions...")
+        # self.normalize_flows()
 
         print('Took '+str(time()-start)+' seconds')
 
@@ -907,7 +907,7 @@ class IOTables:
             # spatialization
             Household_GHG = pd.concat([Household_GHG] * len(self.matching_dict))
             Household_GHG.index = pd.MultiIndex.from_product([self.matching_dict,
-                                                              ['Carbon dioxide', 'Methane', 'Dinitrogen monoxide'],
+                                                              ['Methane', 'Carbon dioxide', 'Dinitrogen monoxide'],
                                                               ['Air']]).drop_duplicates()
             for province in Household_GHG.columns.levels[0]:
                 Household_GHG.loc[[i for i in Household_GHG.columns.levels[0] if i != province], province] = 0
