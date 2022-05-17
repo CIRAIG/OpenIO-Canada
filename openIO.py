@@ -1160,10 +1160,10 @@ class IOTables:
                                   columns=['Elem flow name', 'Compartment', 'Sub-compartment']).fillna(0)
 
         #TODO horrible short term fix. Gotta define NPRI/IW concordances for years 2014, 2015 and 2016
-        try:
+        if self.NPRI_file_year == 2018:
             concordance = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/NPRI_IW_concordance.xlsx'),
                                                                       str(self.NPRI_file_year))
-        except ValueError:
+        else:
             concordance = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/NPRI_IW_concordance.xlsx'),
                                                                       '2017')
         concordance.set_index('NPRI flows', inplace=True)
