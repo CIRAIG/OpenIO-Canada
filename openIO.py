@@ -155,6 +155,9 @@ class IOTables:
         print("Matching water accounts to IOT sectors...")
         self.match_water_accounts_to_iots()
 
+        print("Matching energy accounts to IOT sectors...")
+        self.match_energy_accounts_to_iots()
+
         print("Creating the characterization matrix...")
         self.characterization_matrix()
 
@@ -1146,6 +1149,91 @@ class IOTables:
         # fillna(0) for cannabis industries
         self.F = pd.concat([self.F, water_flows]).fillna(0)
 
+    def match_energy_accounts_to_iots(self):
+        """
+        Method matching energy accounts to IOIC classification selected by the user
+        :return: self.F and self.FY with GHG flows included
+        """
+        NRG = pd.read_csv(pkg_resources.resource_stream(__name__, '/Data/Energy_use.csv'))
+        # select year of study
+        NRG = NRG.loc[[i for i in NRG.index if NRG.REF_DATE[i] == self.year]]
+        # keep households energy consumption in a specific dataframe
+        NRG_FD = NRG.loc[[i for i in NRG.index if 'Households' in NRG.Sector[i]]]
+        # keep industry energy consumption
+        NRG = NRG.loc[[i for i in NRG.index if '[' in NRG.Sector[i]]]
+        # extract sector codes
+        NRG.Sector = [i.split('[')[1].split(']')[0] for i in NRG.Sector]
+        # pivot into a dataframe
+        NRG = NRG.pivot_table(values='VALUE', index=['Sector'], dropna=False).fillna(0)
+        # remove fictive sectors
+        NRG.drop([i for i in NRG.index if re.search(r'^FC', i)], inplace=True)
+
+        # ------------ Industries ----------------
+
+        # load concordance file
+        concordance = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Energy_concordance.xlsx'),
+                                    self.level_of_detail)
+        concordance.set_index('NRG codes', inplace=True)
+        # dropping empty sectors (mostly Cannabis related)
+        to_drop = concordance.loc[concordance.loc[:, 'IOIC'].isna()].index
+        concordance.drop(to_drop, inplace=True)
+
+        # distributing energy use to more precise classifications based on market shares
+        nrg = pd.DataFrame()
+        for code in concordance.index:
+            sectors_to_split = [i[1] for i in self.industries if
+                                i[0] in concordance.loc[code].dropna().values.tolist()]
+            output_sectors_to_split = self.V.loc[:,
+                                      [i for i in self.V.columns if i[1] in sectors_to_split]].sum()
+            output_sectors_to_split = output_sectors_to_split.groupby(axis=0, level=1).sum()
+            share_sectors_to_split = output_sectors_to_split / output_sectors_to_split.sum()
+            share_sectors_to_split *= NRG.loc[code, 'VALUE']
+            nrg = pd.concat([nrg, share_sectors_to_split])
+
+        # distributing national energy use to provinces based on market shares
+        nrg_provincial = pd.DataFrame(0, index=pd.MultiIndex.from_product([self.matching_dict, nrg.index]),
+                                      columns=['Energy'])
+
+        for sector in nrg.index:
+            share_province = self.g.loc(axis=1)[:, sector].sum(0) / self.g.loc(axis=1)[:, sector].sum(1).sum() * \
+                             nrg.loc[sector].iloc[0]
+            nrg_provincial.loc[share_province.index] = pd.DataFrame(share_province, columns=['Energy'])
+
+        # adding to self.F
+        self.F = pd.concat([self.F, nrg_provincial.reindex(self.F.columns).T])
+        # cannabis stores are NaN values, we change that to zero values
+        self.F = self.F.fillna(0)
+
+        # ------------- Final demand -------------
+
+        # pivot into a dataframe
+        NRG_FD = NRG_FD.pivot_table(values='VALUE', index=['Sector'], dropna=False).fillna(0)
+        # rename index to IOIC FD classification
+        NRG_FD.index = ['Other fuels', 'Fuels and lubricants']
+
+        if self.final_demand_aggregated:
+            # distributing national final demand energy use to provinces based on market shares
+            nrg_fd_provincial = pd.DataFrame(0, index=pd.MultiIndex.from_product(
+                [self.matching_dict, ['Household final consumption expenditure']]), columns=['Energy'])
+            share_province = self.Y.loc(axis=1)[:, 'Household final consumption expenditure'].sum() / self.Y.loc(
+                axis=1)[:,'Household final consumption expenditure'].sum().sum() * NRG_FD.sum().sum()
+            nrg_fd_provincial.loc[share_province.index] = pd.DataFrame(share_province, columns=['Energy'])
+        else:
+            # distributing national final demand energy use to provinces based on market shares
+            nrg_fd_provincial = pd.DataFrame(0, index=pd.MultiIndex.from_product(
+                [self.matching_dict, ['Household final consumption expenditure'], NRG_FD.index]), columns=['Energy'])
+
+            for fd_sector in NRG_FD.index:
+                share_province = self.Y.loc(axis=1)[:, :, fd_sector].sum() / self.Y.loc(axis=1)[:, :,
+                                                                             fd_sector].sum().sum() * NRG_FD.loc[
+                                     fd_sector, 'VALUE']
+                nrg_fd_provincial.loc[share_province.index] = pd.DataFrame(share_province, columns=['Energy'])
+
+        # adding to self.FY
+        self.FY = pd.concat([self.FY, nrg_fd_provincial.reindex(self.Y.columns).fillna(0).T])
+        # cannabis stores are NaN values, we change that to zero values
+        self.FY = self.FY.fillna(0)
+
     def characterization_matrix(self):
         """
         Produces a characterization matrix from IMPACT World+ file
@@ -1177,13 +1265,15 @@ class IOTables:
         for flow in self.C.columns:
             try:
                 if concordance.loc[flow[1], 'IMPACT World+ flows'] is not None:
-                    self.C.loc[:, flow] = pivoting.loc[:,
+                    self.C.loc[:, [flow]] = pivoting.loc[:,
                                           [(concordance.loc[flow[1], 'IMPACT World+ flows'], flow[2],
                                             '(unspecified)')]].values
             except KeyError:
                 pass
 
         self.C.loc[('Water use', 'm3'), [i for i in self.C.columns if i[1] == 'Water']] = 1
+        self.C.loc[('Energy use', 'TJ'), [i for i in self.C.columns if i == 'Energy']] = 1
+        self.C = self.C.fillna(0)
 
         # some methods of IMPACT World+ do not make sense in our context, remove them
         self.C.drop(['Fossil and nuclear energy use',
@@ -1227,7 +1317,14 @@ class IOTables:
         # STATCAN excluded water use due to hydroelectricity from their accounts, we keep consistency by removing them too
         adding_water_use.loc[:, [i for i in self.SL_INT.index if 'Water Withdrawal' in i and (
                 'hydro' not in i or 'tide' not in i)]] = 1
-        self.C_INT = pd.concat([self.C_INT, adding_water_use])
+
+        # adding energy use to exiobase flows to match with energy use from STATCAN physical accounts
+        # energy use in exiobase is identified through "Energy Carrier Use: Total"
+        # note that STATCAN only covers energy use, thus energy supply, loss, etc. flows from exiobase are excluded
+        adding_energy_use = pd.DataFrame(0, index=pd.MultiIndex.from_product([['Energy'], ['TJ']]),
+                                        columns=self.SL_INT.index)
+        adding_energy_use.loc[:, [i for i in self.SL_INT.index if 'Energy Carrier Use: Total' in i]] = 1
+        self.C_INT = pd.concat([self.C_INT, adding_water_use, adding_energy_use])
         # forcing the match with self.C (annoying parentheses for climate change long and short term)
         self.C_INT.index = self.C.index
 
@@ -1242,61 +1339,73 @@ class IOTables:
         :return: balanced self.F
         """
 
+        # having the Energy flow prevents us from using very handy multi-index features so we remove that flow and plug it back at the end
+        F_without_nrg = self.F.drop('Energy')
+        F_without_nrg.index = pd.MultiIndex.from_tuples(F_without_nrg.index)
+
         # VOCs
         rest_of_voc = [i for i in concordance.index if 'Speciated VOC' in i and concordance.loc[i].isna().iloc[0]]
-        df = self.F.loc(axis=0)[:, rest_of_voc]
+        df = F_without_nrg.loc[[i for i in F_without_nrg.index if i[1] in rest_of_voc]]
+
         try:
-            self.F.loc(axis=0)[:, 'Volatile organic compounds', 'Air'] += df.groupby(level=0).sum().values
+            F_without_nrg.loc[:, 'Volatile organic compounds', 'Air'] += df.groupby(level=0).sum().values
         except KeyError:
             # name changed in 2018 version
-            self.F.loc(axis=0)[:, 'Volatile Organic Compounds (VOCs)', 'Air'] += df.groupby(level=0).sum().values
+            F_without_nrg.loc(axis=0)[:, 'Volatile Organic Compounds (VOCs)', 'Air'] += df.groupby(level=0).sum().values
 
-        self.F.drop(self.F.loc(axis=0)[:, rest_of_voc].index, inplace=True)
+        F_without_nrg.drop(F_without_nrg.loc(axis=0)[:, rest_of_voc].index, inplace=True)
 
         if self.year == 2018:
             # PMs, only take highest value flow as suggested by the NPRI team:
             # [https://www.canada.ca/en/environment-climate-change/services/national-pollutant-release-inventory/using-interpreting-data.html]
-            for sector in self.F.columns:
-                little_pm = self.F.loc[(sector[0], 'PM2.5 - Particulate Matter <= 2.5 Micrometers', 'Air'), sector]
-                big_pm = self.F.loc[(sector[0], 'PM10 - Particulate Matter <= 10 Micrometers', 'Air'), sector]
-                unknown_size = self.F.loc[(sector[0], 'Total particulate matter', 'Air'), sector]
+            for sector in F_without_nrg.columns:
+                little_pm = F_without_nrg.loc[
+                    (sector[0], 'PM2.5 - Particulate Matter <= 2.5 Micrometers', 'Air'), sector]
+                big_pm = F_without_nrg.loc[(sector[0], 'PM10 - Particulate Matter <= 10 Micrometers', 'Air'), sector]
+                unknown_size = F_without_nrg.loc[(sector[0], 'Total particulate matter', 'Air'), sector]
                 if little_pm >= big_pm:
                     if little_pm >= unknown_size:
-                        self.F.loc[(sector[0], 'PM10 - Particulate Matter <= 10 Micrometers', 'Air'), sector] = 0
-                        self.F.loc[(sector[0], 'Total particulate matter', 'Air'), sector] = 0
+                        F_without_nrg.loc[(sector[0], 'PM10 - Particulate Matter <= 10 Micrometers', 'Air'), sector] = 0
+                        F_without_nrg.loc[(sector[0], 'Total particulate matter', 'Air'), sector] = 0
                     else:
-                        self.F.loc[(sector[0], 'PM10 - Particulate Matter <= 10 Micrometers', 'Air'), sector] = 0
-                        self.F.loc[(sector[0], 'PM2.5 - Particulate Matter <= 2.5 Micrometers', 'Air'), sector] = 0
+                        F_without_nrg.loc[(sector[0], 'PM10 - Particulate Matter <= 10 Micrometers', 'Air'), sector] = 0
+                        F_without_nrg.loc[
+                            (sector[0], 'PM2.5 - Particulate Matter <= 2.5 Micrometers', 'Air'), sector] = 0
                 else:
                     if big_pm > unknown_size:
-                        self.F.loc[(sector[0], 'PM2.5 - Particulate Matter <= 2.5 Micrometers', 'Air'), sector] = 0
-                        self.F.loc[(sector[0], 'Total particulate matter', 'Air'), sector] = 0
+                        F_without_nrg.loc[
+                            (sector[0], 'PM2.5 - Particulate Matter <= 2.5 Micrometers', 'Air'), sector] = 0
+                        F_without_nrg.loc[(sector[0], 'Total particulate matter', 'Air'), sector] = 0
                     else:
-                        self.F.loc[(sector[0], 'PM10 - Particulate Matter <= 10 Micrometers', 'Air'), sector] = 0
-                        self.F.loc[(sector[0], 'PM2.5 - Particulate Matter <= 2.5 Micrometers', 'Air'), sector] = 0
+                        F_without_nrg.loc[(sector[0], 'PM10 - Particulate Matter <= 10 Micrometers', 'Air'), sector] = 0
+                        F_without_nrg.loc[
+                            (sector[0], 'PM2.5 - Particulate Matter <= 2.5 Micrometers', 'Air'), sector] = 0
         else:
             # PMs, only take highest value flow as suggested by the NPRI team:
             # [https://www.canada.ca/en/environment-climate-change/services/national-pollutant-release-inventory/using-interpreting-data.html]
-            for sector in self.F.columns:
-                little_pm = self.F.loc[(sector[0], 'PM2.5', 'Air'), sector]
-                big_pm = self.F.loc[(sector[0], 'PM10', 'Air'), sector]
-                unknown_size = self.F.loc[(sector[0], 'Total particulate matter', 'Air'), sector]
+            for sector in F_without_nrg.columns:
+                little_pm = F_without_nrg.loc[(sector[0], 'PM2.5', 'Air'), sector]
+                big_pm = F_without_nrg.loc[(sector[0], 'PM10', 'Air'), sector]
+                unknown_size = F_without_nrg.loc[(sector[0], 'Total particulate matter', 'Air'), sector]
                 if little_pm >= big_pm:
                     if little_pm >= unknown_size:
-                        self.F.loc[(sector[0], 'PM10', 'Air'), sector] = 0
-                        self.F.loc[(sector[0], 'Total particulate matter', 'Air'), sector] = 0
+                        F_without_nrg.loc[(sector[0], 'PM10', 'Air'), sector] = 0
+                        F_without_nrg.loc[(sector[0], 'Total particulate matter', 'Air'), sector] = 0
                     else:
-                        self.F.loc[(sector[0], 'PM10', 'Air'), sector] = 0
-                        self.F.loc[(sector[0], 'PM2.5', 'Air'), sector] = 0
+                        F_without_nrg.loc[(sector[0], 'PM10', 'Air'), sector] = 0
+                        F_without_nrg.loc[(sector[0], 'PM2.5', 'Air'), sector] = 0
                 else:
                     if big_pm > unknown_size:
-                        self.F.loc[(sector[0], 'PM2.5', 'Air'), sector] = 0
-                        self.F.loc[(sector[0], 'Total particulate matter', 'Air'), sector] = 0
+                        F_without_nrg.loc[(sector[0], 'PM2.5', 'Air'), sector] = 0
+                        F_without_nrg.loc[(sector[0], 'Total particulate matter', 'Air'), sector] = 0
                     else:
-                        self.F.loc[(sector[0], 'PM10', 'Air'), sector] = 0
-                        self.F.loc[(sector[0], 'PM2.5', 'Air'), sector] = 0
+                        F_without_nrg.loc[(sector[0], 'PM10', 'Air'), sector] = 0
+                        F_without_nrg.loc[(sector[0], 'PM2.5', 'Air'), sector] = 0
 
-        # we modified flows in self.F, modify self.C accordingly
+        # plug back the Energy flow
+        self.F = pd.concat([F_without_nrg, pd.DataFrame(self.F.loc['Energy']).T])
+
+        # we modified flows names in self.F, modify self.C accordingly
         self.C = self.C.loc[:, self.F.index].fillna(0)
 
     def normalize_flows(self):
@@ -1304,8 +1413,6 @@ class IOTables:
         Produce normalized environmental extensions
         :return: self.S and self.F with product classification if it's been selected
         """
-
-        self.F = self.F.sort_index()
 
         if self.classification == 'industry':
             self.S = self.F.dot(self.inv_g)
@@ -1317,6 +1424,7 @@ class IOTables:
         # adding empty flows to FY to allow multiplication with self.C
         self.FY = pd.concat([pd.DataFrame(0, self.F.index, self.Y.columns), self.FY])
         self.FY = self.FY.groupby(self.FY.index).sum()
+        self.FY = self.FY.reindex(self.C.columns)
 
     def calc(self):
         """
