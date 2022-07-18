@@ -57,13 +57,17 @@ class IOTables:
         self.C = pd.DataFrame()
         self.INT_imports = pd.DataFrame()
         self.SL_INT = pd.DataFrame()
-        self.C_INT = pd.DataFrame()
+        self.C_exio = pd.DataFrame()
         self.IMP_matrix = pd.DataFrame()
         self.Y_IMP = pd.DataFrame()
         self.L = pd.DataFrame()
         self.E = pd.DataFrame()
         self.D = pd.DataFrame()
         self.who_uses_int_imports = pd.DataFrame()
+        self.link_A = pd.DataFrame()
+        self.A_exio = pd.DataFrame()
+        self.S_exio = pd.DataFrame()
+        self.C_exio = pd.DataFrame()
 
         # metadata
         self.emission_metadata = pd.DataFrame()
@@ -140,8 +144,8 @@ class IOTables:
         print("Building the symmetric tables...")
         self.gimme_symmetric_iot()
 
-        print("Balancing value added...")
-        self.balance_value_added()
+        print("Balancing the model...")
+        self.balance_model()
 
         print("Extracting and formatting environmental data from the NPRI file...")
         self.extract_environmental_data()
@@ -705,7 +709,6 @@ class IOTables:
 
         # importing exiobase
         io = pymrio.parse_exiobase3(self.exiobase_folder)
-        io.calc_all()
 
         # selecting the countries which make up the international imports
         INT_countries = [i for i in io.get_regions().tolist() if i != 'CA']
@@ -717,31 +720,32 @@ class IOTables:
         ioic_exio = ioic_exio[2:].drop('IOIC Detail level - EXIOBASE', axis=1).set_index('Unnamed: 1').fillna(0)
         ioic_exio.index.name = None
 
-        lifecycle_normalized_emissions_exiobase = io.satellite.S.dot(io.L)
+        # we create the matrix which represents the interactions of the openIO-Canada model with the exiobase model
+        self.link_A = pd.DataFrame(0, io.A.index,
+                                 pd.MultiIndex.from_product([self.matching_dict, [i[0] for i in self.commodities]]))
 
-        self.SL_INT = pd.DataFrame(0, io.satellite.S.index, [i[0] for i in self.commodities])
-        for product in self.SL_INT.columns:
-            if len(ioic_exio.loc[product][ioic_exio.loc[product] == 1].index) != 0:
-                df = io.x.loc(axis=0)[:, ioic_exio.loc[product][ioic_exio.loc[product] == 1].index]
+        # this matrix is populated using the market distribution according to exiobase
+        for product in self.link_A.columns:
+            if len(ioic_exio.loc[product[1]][ioic_exio.loc[product[1]] == 1].index) != 0:
+                df = io.x.loc(axis=0)[:, ioic_exio.loc[product[1]][ioic_exio.loc[product[1]] == 1].index]
                 df = df.loc[INT_countries] / df.loc[INT_countries].sum()
-                self.SL_INT.loc[:, product] = (
-                    lifecycle_normalized_emissions_exiobase.reindex(df.index, axis=1).dot(df)).values
+                self.link_A.loc[:, product].update((io.A.reindex(df.index, axis=1).dot(df)).iloc[:, 0])
 
-        self.SL_INT = self.SL_INT.fillna(0)
-        # exiobase in millions
-        self.SL_INT[9:] /= 1000000
-        # exiobase in euros
-        self.SL_INT /= 1.5
-        # from codes to names
-        self.SL_INT.columns = [dict(self.commodities)[i] for i in self.SL_INT.columns]
-        # RoW as the region (level 0 of multiindex)
-        self.SL_INT.columns = pd.MultiIndex.from_product([['RoW'], self.SL_INT.columns])
+        # index the link matrices properly
+        self.link_A.columns = pd.MultiIndex.from_product([self.matching_dict, [i[1] for i in self.commodities]])
 
+        # save the quantity of imported goods by sectors of openIO-Canada
         self.IMP_matrix = self.who_uses_int_imports.reindex(self.U.columns, axis=1).groupby(axis=0, level=1).sum()
-        self.IMP_matrix.index = pd.MultiIndex.from_product([['RoW'], self.IMP_matrix.index])
 
-        self.Y_IMP = self.who_uses_int_imports.reindex(self.Y.columns, axis=1).groupby(axis=0, level=1).sum()
-        self.Y_IMP.index = pd.MultiIndex.from_product([['RoW'], self.Y_IMP.index])
+        # save the matrices from exiobse before deleting them to save space
+        self.A_exio = io.A.copy()
+        self.S_exio = io.satellite.S.copy()
+        # millions euros to euros
+        self.S_exio.iloc[9:] /= 1000000
+        # convert euros to canadian dollars
+        self.S_exio /= 1.5
+        del io.A
+        del io.satellite.S
 
     def gimme_symmetric_iot(self):
         """
@@ -763,23 +767,37 @@ class IOTables:
             # TODO check the Y in industries transformation
             self.Y = self.V.dot(self.inv_g).T.dot(self.Y)
 
-    def balance_value_added(self):
+    def balance_model(self):
         """
-        Making sure A+R sums up to 1. Balancing on value added because no impacts on the environment is associated to
-        value added.
-        :return: updated self.R
+        Balance the system so that the financial balance is kept.
+        :return:
         """
 
-        new_value_added_value = 1 - self.A.sum()
+        # rescale self.link_A columns sum to match what is actually imported according to openIO-Canada
+        for col in self.link_A.columns:
+            self.link_A.loc[:, col] = self.link_A.loc[:, col] / self.link_A.loc[:, col].sum() * self.IMP_matrix.loc[:,
+                                                                                          col].sum()
+        self.link_A = self.link_A.fillna(0)
+        # concat international trade with interprovincial trade
+        self.A = pd.concat([self.A, self.link_A])
+        # provinces from openIO-Canada are allowed to trade with the Canada region from exiobase
+        self.A.loc['CA'] = 0
+        # concat openIO-Canada with exiobase to get the full technology matrix
+        df = pd.concat([pd.DataFrame(0, index=self.A.columns, columns=self.A_exio.columns), self.A_exio])
+        self.A = pd.concat([self.A, df], axis=1)
 
-        updated_R = (self.R / self.R.sum()) * new_value_added_value
-        updated_R = updated_R.fillna(0)
-
-        # checking that is the balance value is different than 1, it's because it's empty industries
-        balance = self.A.sum() + updated_R.sum()
-        assert balance.loc[~np.isclose(balance, 1)].sum() == 0
-
-        self.R = updated_R
+        # we do the same exercise for final demand
+        df = self.who_uses_int_imports.reindex(self.Y.columns, axis=1).fillna(0)
+        # translate the purchases of the final demands from openIO-Canada sectors to exiobase sectors
+        exio_Y = self.link_A.dot(df)
+        # rescale the resulting matrix to match the quantity of what is purchased according to openIO-Canada
+        for col in exio_Y.columns:
+            exio_Y.loc[:, col] = exio_Y.loc[:, col] / exio_Y.loc[:, col].sum() * df.loc[:, col].sum()
+        exio_Y = exio_Y.fillna(0)
+        # concat interprovincial and international trade for final demands
+        self.Y = pd.concat([self.Y, exio_Y])
+        # provinces from openIO-Canada are not allowed to trade with the Canada region from exiobase
+        self.Y.loc['CA'] = 0
 
     def extract_environmental_data(self):
         """
@@ -1290,48 +1308,51 @@ class IOTables:
                      'Water scarcity'], axis=0, level=0, inplace=True)
 
         # importing characterization matrix IMPACT World+/exiobase
-        self.C_INT = pd.read_csv(pkg_resources.resource_stream(__name__, '/Data/C_exio_IW_1.30_1.48.csv'),
+        self.C_exio = pd.read_csv(pkg_resources.resource_stream(__name__, '/Data/C_exio_IW_1.30_1.48.csv'),
                                          index_col='Unnamed: 0')
-        self.C_INT.index.name = None
+        self.C_exio.index.name = None
 
-        self.C_INT.index = pd.MultiIndex.from_tuples(list(zip(
-            [i.split(' (')[0] for i in self.C_INT.index],
-            [i.split(' (')[1].split(')')[0] for i in self.C_INT.index])))
+        self.C_exio.index = pd.MultiIndex.from_tuples(list(zip(
+            [i.split(' (')[0] for i in self.C_exio.index],
+            [i.split(' (')[1].split(')')[0] for i in self.C_exio.index])))
 
-        self.C_INT.drop(['Fossil and nuclear energy use',
-                                 'Ionizing radiations',
-                                 'Ionizing radiation, ecosystem quality',
-                                 'Ionizing radiation, human health',
-                                 'Land occupation, biodiversity',
-                                 'Land transformation, biodiversity',
-                                 'Mineral resources use',
-                                 'Thermally polluted water',
-                                 'Water availability, freshwater ecosystem',
-                                 'Water availability, human health',
-                                 'Water availability, terrestrial ecosystem',
-                                 'Water scarcity'], axis=0, level=0, inplace=True)
+        self.C_exio.drop(['Fossil and nuclear energy use',
+                         'Ionizing radiations',
+                         'Ionizing radiation, ecosystem quality',
+                         'Ionizing radiation, human health',
+                         'Land occupation, biodiversity',
+                         'Land transformation, biodiversity',
+                         'Mineral resources use',
+                         'Thermally polluted water',
+                         'Water availability, freshwater ecosystem',
+                         'Water availability, human health',
+                         'Water availability, terrestrial ecosystem',
+                         'Water scarcity'], axis=0, level=0, inplace=True)
         # adding water use to exiobase flows to match with water use from STATCAN physical accounts
         # water use in exiobase is identified through "water withdrawal" and NOT "water consumption"
         adding_water_use = pd.DataFrame(0, index=pd.MultiIndex.from_product([['Water use'], ['m3']]),
-                                        columns=self.SL_INT.index)
+                                        columns=self.S_exio.index)
         # STATCAN excluded water use due to hydroelectricity from their accounts, we keep consistency by removing them too
-        adding_water_use.loc[:, [i for i in self.SL_INT.index if 'Water Withdrawal' in i and (
+        adding_water_use.loc[:, [i for i in self.S_exio.index if 'Water Withdrawal' in i and (
                 'hydro' not in i or 'tide' not in i)]] = 1
 
         # adding energy use to exiobase flows to match with energy use from STATCAN physical accounts
         # energy use in exiobase is identified through "Energy Carrier Use: Total"
         # note that STATCAN only covers energy use, thus energy supply, loss, etc. flows from exiobase are excluded
         adding_energy_use = pd.DataFrame(0, index=pd.MultiIndex.from_product([['Energy'], ['TJ']]),
-                                        columns=self.SL_INT.index)
-        adding_energy_use.loc[:, [i for i in self.SL_INT.index if 'Energy Carrier Use: Total' in i]] = 1
-        self.C_INT = pd.concat([self.C_INT, adding_water_use, adding_energy_use])
+                                        columns=self.S_exio.index)
+        adding_energy_use.loc[:, [i for i in self.S_exio.index if 'Energy Carrier Use: Total' in i]] = 1
+        self.C_exio = pd.concat([self.C_exio, adding_water_use, adding_energy_use])
         # forcing the match with self.C (annoying parentheses for climate change long and short term)
-        self.C_INT.index = self.C.index
+        self.C_exio.index = self.C.index
+        self.C_exio = self.C_exio.fillna(0)
 
         self.methods_metadata = pd.DataFrame(self.C.index.tolist(), columns=['Impact category', 'unit'])
         self.methods_metadata = self.methods_metadata.set_index('Impact category')
 
         self.balance_flows(concordance)
+
+        self.C = self.C.join(self.C_exio)
 
     def balance_flows(self, concordance):
         """
@@ -1420,11 +1441,13 @@ class IOTables:
         if self.classification == 'product':
             self.F = self.F.dot(self.V.dot(self.inv_g).T)
             self.S = self.F.dot(self.inv_q)
+            self.S = pd.concat([self.S, self.S_exio]).fillna(0)
+            self.S = self.S.reindex(self.A.columns, axis=1)
 
         # adding empty flows to FY to allow multiplication with self.C
         self.FY = pd.concat([pd.DataFrame(0, self.F.index, self.Y.columns), self.FY])
         self.FY = self.FY.groupby(self.FY.index).sum()
-        self.FY = self.FY.reindex(self.C.columns)
+        self.FY = self.FY.reindex(self.C.columns).fillna(0)
 
     def calc(self):
         """
@@ -1434,12 +1457,7 @@ class IOTables:
         I = pd.DataFrame(np.eye(len(self.A)), self.A.index, self.A.columns)
         self.L = pd.DataFrame(np.linalg.solve(I - self.A, I), self.A.index, I.columns)
         self.E = self.S.dot(self.L).dot(self.Y) + self.FY
-        if self.exiobase_folder:
-            self.D = (self.C.dot(self.E) +
-                      self.C_INT.dot(self.SL_INT).dot(self.IMP_matrix).dot(self.Y) +
-                      self.C_INT.dot(self.SL_INT).dot(self.Y_IMP))
-        else:
-            self.D = self.C.dot(self.E)
+        self.D = self.C.dot(self.E)
 
     def split_private_public_sectors(self, NAICS_code, IOIC_code):
         """
