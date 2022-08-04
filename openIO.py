@@ -64,7 +64,7 @@ class IOTables:
         self.E = pd.DataFrame()
         self.D = pd.DataFrame()
         self.who_uses_int_imports = pd.DataFrame()
-        self.link_A = pd.DataFrame()
+        self.link_openio_exio = pd.DataFrame()
         self.A_exio = pd.DataFrame()
         self.S_exio = pd.DataFrame()
         self.C_exio = pd.DataFrame()
@@ -721,21 +721,25 @@ class IOTables:
         ioic_exio.index.name = None
 
         # we create the matrix which represents the interactions of the openIO-Canada model with the exiobase model
-        self.link_A = pd.DataFrame(0, io.A.index,
+        self.link_openio_exio = pd.DataFrame(0, io.A.index,
                                  pd.MultiIndex.from_product([self.matching_dict, [i[0] for i in self.commodities]]))
 
         # this matrix is populated using the market distribution according to exiobase
-        for product in self.link_A.columns:
+        for product in self.link_openio_exio.columns:
             if len(ioic_exio.loc[product[1]][ioic_exio.loc[product[1]] == 1].index) != 0:
                 df = io.x.loc(axis=0)[:, ioic_exio.loc[product[1]][ioic_exio.loc[product[1]] == 1].index]
                 df = df.loc[INT_countries] / df.loc[INT_countries].sum()
-                self.link_A.loc[:, product].update((io.A.reindex(df.index, axis=1).dot(df)).iloc[:, 0])
+                self.link_openio_exio.loc[:, product].update((io.A.reindex(df.index, axis=1).dot(df)).iloc[:, 0])
 
         # index the link matrices properly
-        self.link_A.columns = pd.MultiIndex.from_product([self.matching_dict, [i[1] for i in self.commodities]])
+        self.link_openio_exio.columns = pd.MultiIndex.from_product([self.matching_dict, [i[1] for i in self.commodities]])
+
+        # self.link_openio_exio is currently in euros and includes the value added from exiobase
+        # we thus rescale on 1 euro (excluding value added from exiobase) and then convert to CAD (hence the 1.5)
+        self.link_openio_exio = (self.link_openio_exio/self.link_openio_exio.sum()/1.5).fillna(0)
 
         # save the quantity of imported goods by sectors of openIO-Canada
-        self.IMP_matrix = self.who_uses_int_imports.reindex(self.U.columns, axis=1).groupby(axis=0, level=1).sum()
+        self.IMP_matrix = self.who_uses_int_imports.reindex(self.U.columns, axis=1)
 
         # save the matrices from exiobse before deleting them to save space
         self.A_exio = io.A.copy()
@@ -773,29 +777,20 @@ class IOTables:
         :return:
         """
 
-        # rescale self.link_A columns sum to match what is actually imported according to openIO-Canada
-        for col in self.link_A.columns:
-            self.link_A.loc[:, col] = self.link_A.loc[:, col] / self.link_A.loc[:, col].sum() * self.IMP_matrix.loc[:,
-                                                                                          col].sum()
-        self.link_A = self.link_A.fillna(0)
+        # rescale self.link_openio_exio columns sum to match what is actually imported according to openIO-Canada
+        link_A = self.link_openio_exio.dot(self.IMP_matrix.fillna(0))
         # concat international trade with interprovincial trade
-        self.A = pd.concat([self.A, self.link_A])
-        # provinces from openIO-Canada are allowed to trade with the Canada region from exiobase
+        self.A = pd.concat([self.A, link_A])
+        # provinces from openIO-Canada are not allowed to trade with the Canada region from exiobase
         self.A.loc['CA'] = 0
         # concat openIO-Canada with exiobase to get the full technology matrix
         df = pd.concat([pd.DataFrame(0, index=self.A.columns, columns=self.A_exio.columns), self.A_exio])
         self.A = pd.concat([self.A, df], axis=1)
 
-        # we do the same exercise for final demand
-        df = self.who_uses_int_imports.reindex(self.Y.columns, axis=1).fillna(0)
-        # translate the purchases of the final demands from openIO-Canada sectors to exiobase sectors
-        exio_Y = self.link_A.dot(df)
-        # rescale the resulting matrix to match the quantity of what is purchased according to openIO-Canada
-        for col in exio_Y.columns:
-            exio_Y.loc[:, col] = exio_Y.loc[:, col] / exio_Y.loc[:, col].sum() * df.loc[:, col].sum()
-        exio_Y = exio_Y.fillna(0)
+        # same exercise for final demand
+        link_Y = self.link_openio_exio.dot(self.who_uses_int_imports.reindex(self.Y.columns, axis=1).fillna(0))
         # concat interprovincial and international trade for final demands
-        self.Y = pd.concat([self.Y, exio_Y])
+        self.Y = pd.concat([self.Y, link_Y])
         # provinces from openIO-Canada are not allowed to trade with the Canada region from exiobase
         self.Y.loc['CA'] = 0
 
