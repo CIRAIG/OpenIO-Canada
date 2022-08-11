@@ -168,6 +168,9 @@ class IOTables:
         print("Normalizing emissions...")
         self.normalize_flows()
 
+        print("Cleaning province and country names...")
+        self.differentiate_country_names_openio_exio()
+
         print('Took '+str(time()-start)+' seconds')
 
     def format_tables(self, su_tables, region):
@@ -773,7 +776,7 @@ class IOTables:
 
     def balance_model(self):
         """
-        Balance the system so that the financial balance is kept.
+        Balance the system so that the financial balance is kept. Also concatenate openIO with Exiobase.
         :return:
         """
 
@@ -1443,6 +1446,52 @@ class IOTables:
         self.FY = pd.concat([pd.DataFrame(0, self.F.index, self.Y.columns), self.FY])
         self.FY = self.FY.groupby(self.FY.index).sum()
         self.FY = self.FY.reindex(self.C.columns).fillna(0)
+
+    def differentiate_country_names_openio_exio(self):
+        """
+        Some province names are identical to country names in exiobase (e.g., 'SK' and 'NL'). So we changed province
+        names to, e.g., 'CA-SK'.
+        :return:
+        """
+
+        self.A.index = (pd.MultiIndex.from_product([['CA-' + i for i in self.matching_dict.keys()],
+                                                    [i[1] for i in self.commodities]]).tolist() +
+                        self.A_exio.index.tolist())
+        self.A.index = pd.MultiIndex.from_tuples(self.A.index)
+        self.A.columns = self.A.index
+        self.Y.index = self.A.index
+        self.Y.columns = [('CA-' + i[0], i[1], i[2]) for i in self.Y.columns]
+        self.Y.columns = pd.MultiIndex.from_tuples(self.Y.columns)
+        self.R.columns = pd.MultiIndex.from_product([['CA-' + i for i in self.matching_dict.keys()],
+                                                     [i[1] for i in self.commodities]]).tolist()
+        self.R.columns = pd.MultiIndex.from_tuples(self.R.columns)
+        self.R.index = [('CA-' + i[0], i[1]) for i in self.R.index]
+        self.R.index = pd.MultiIndex.from_tuples(self.R.index)
+        self.W.columns = [('CA-' + i[0], i[1]) for i in self.W.columns]
+        self.W.columns = pd.MultiIndex.from_tuples(self.W.columns)
+        self.W.index = [('CA-' + i[0], i[1]) for i in self.W.index]
+        self.W.index = pd.MultiIndex.from_tuples(self.W.index)
+        self.WY.columns = [('CA-' + i[0], i[1], i[2]) for i in self.WY.columns]
+        self.WY.columns = pd.MultiIndex.from_tuples(self.WY.columns)
+        self.WY.index = [('CA-' + i[0], i[1]) for i in self.WY.index]
+        self.WY.index = pd.MultiIndex.from_tuples(self.WY.index)
+        self.U.columns = [('CA-' + i[0], i[1]) for i in self.U.columns]
+        self.U.columns = pd.MultiIndex.from_tuples(self.U.columns)
+        self.U.index = [('CA-' + i[0], i[1]) for i in self.U.index]
+        self.U.index = pd.MultiIndex.from_tuples(self.U.index)
+        self.V.columns = [('CA-' + i[0], i[1]) for i in self.V.columns]
+        self.V.columns = pd.MultiIndex.from_tuples(self.V.columns)
+        self.V.index = [('CA-' + i[0], i[1]) for i in self.V.index]
+        self.V.index = pd.MultiIndex.from_tuples(self.V.index)
+        self.S.columns = self.A.columns
+        self.S.index = [('CA-' + i[0], i[1], i[2]) if len(i) == 3 else i for i in self.S.index]
+        self.F.columns = [('CA-' + i[0], i[1]) for i in self.F.columns]
+        self.F.columns = pd.MultiIndex.from_tuples(self.F.columns)
+        self.F.index = [('CA-' + i[0], i[1], i[2]) if len(i) == 3 else i for i in self.F.index]
+        self.FY.columns = [('CA-' + i[0], i[1], i[2]) for i in self.FY.columns]
+        self.FY.columns = pd.MultiIndex.from_tuples(self.FY.columns)
+        self.FY.index = [('CA-' + i[0], i[1], i[2]) if len(i) == 3 else i for i in self.FY.index]
+        self.C.columns = [('CA-' + i[0], i[1], i[2]) if len(i) == 3 else i for i in self.C.columns]
 
     def calc(self):
         """
