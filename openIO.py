@@ -849,8 +849,6 @@ class IOTables:
         self.S_exio = io.satellite.S.copy()
         # millions euros to euros
         self.S_exio.iloc[9:] /= 1000000
-        # convert euros to canadian dollars
-        self.S_exio /= 1.5
 
         # loading concordances between exiobase classification and IOIC
         ioic_exio = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/IOIC_EXIOBASE.xlsx'),
