@@ -723,36 +723,27 @@ class IOTables:
         conc = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/HS-IOIC.xlsx'))
 
         # load database
-        merchandise_database = pd.read_csv(pkg_resources.resource_stream(__name__, '/Data/Imports_' + str(self.year) +
-                                                                         '_HS06.csv'))
-
-        # drop useless columns
-        merchandise_database = merchandise_database.drop(['YearMonth/AnnéeMois', 'Province', 'State/État',
-                                                          'Quantity/Quantité','Unit of Measure/Unité de Mesure'],
-                                                         axis=1)
-
-        # drop international imports coming from Canada
-        merchandise_database = merchandise_database[merchandise_database['Country/Pays'] != 'CA']
-
-        # also drop nan countries for obvious reasons
-        merchandise_database = merchandise_database.dropna(subset=['Country/Pays'])
+        merchandise_database = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Imports_' + str(self.year) +
+                                                                         '_HS06_treated.xlsx'))
+        merchandise_database = merchandise_database.ffill()
+        merchandise_database.columns = ['Country', 'HS6', 'Value']
 
         # apply concordance
         merchandise_database = merchandise_database.merge(conc, on='HS6', how='left')
 
         # only keep useful information
-        merchandise_database = merchandise_database.loc[:, ['IOIC', 'Country/Pays', 'Value/Valeur', ]]
+        merchandise_database = merchandise_database.loc[:, ['IOIC', 'Country', 'Value']]
 
-        # drop sectors that are not matched to IOIC (None)
+        # remove HS sectors that cant be matched to IOIC (identified with "None")
         merchandise_database = merchandise_database.drop(
-            merchandise_database[merchandise_database['IOIC'] == 'None'].index)
+            [i for i in merchandise_database.index if merchandise_database.loc[i, 'IOIC'] == 'None'])
 
         # change IOIC codes to sector names
         code_to_name = {j[0]: j[1] for j in self.commodities}
         merchandise_database.IOIC = [code_to_name[i] for i in merchandise_database.IOIC]
 
         # set MultiIndex with country and classification
-        merchandise_database = merchandise_database.set_index(['Country/Pays', 'IOIC'])
+        merchandise_database = merchandise_database.set_index(['Country', 'IOIC'])
 
         # regroup purchases together (on country + IOIC sector)
         merchandise_database = merchandise_database.groupby(merchandise_database.index).sum()
@@ -2362,6 +2353,36 @@ def todf(data):
     if out.index.nlevels > 1:
         out = out.unstack()
     return out
+
+
+def treatment_import_data(original_file_path):
+    """Function used to treat the merchandise imports trade database file. FIle is way too big to be provided to
+    users through Github, so we treat the data to only keep what is relevant."""
+
+    # load database
+    merchandise_database = pd.read_csv(original_file_path)
+    # drop useless columns
+
+    merchandise_database = merchandise_database.drop(['YearMonth/AnnéeMois', 'Province', 'State/État',
+                                                      'Quantity/Quantité', 'Unit of Measure/Unité de Mesure'],
+                                                     axis=1)
+
+    # drop international imports coming from Canada
+    merchandise_database = merchandise_database[merchandise_database['Country/Pays'] != 'CA']
+
+    # also drop nan countries for obvious reasons
+    merchandise_database = merchandise_database.dropna(subset=['Country/Pays'])
+
+    # set the index as country/code multi-index
+    merchandise_database = merchandise_database.set_index(['Country/Pays', 'HS6'])
+
+    # regroup data from several months into a single yearly data
+    merchandise_database = merchandise_database.groupby(merchandise_database.index).sum()
+
+    # multi-index is cleaner
+    merchandise_database.index = pd.MultiIndex.from_tuples(merchandise_database.index)
+
+    return merchandise_database
 
 
 # pyomo optimization functions
