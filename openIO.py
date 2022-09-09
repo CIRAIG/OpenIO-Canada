@@ -16,6 +16,7 @@ import os
 from time import time
 import pymrio
 import json
+import country_converter as coco
 
 
 class IOTables:
@@ -68,6 +69,9 @@ class IOTables:
         self.merchandise_international_imports = pd.DataFrame()
         self.link_openio_exio_technosphere = pd.DataFrame()
         self.link_openio_exio_final_demands = pd.DataFrame()
+        self.merchandise_imports = pd.DataFrame()
+        self.merchandise_imports_scaled = pd.DataFrame()
+        self.merchandise_imports_intermediary_demand= pd.DataFrame()
 
         # metadata
         self.emission_metadata = pd.DataFrame()
@@ -141,14 +145,13 @@ class IOTables:
             print('Pre-treatment of international trade data...')
             self.determine_sectors_importing()
             self.load_merchandise_international_trade_database()
-
+            print("Linking international trade data to openIO-Canada...")
+            self.link_merchandise_database_to_openio()
 
         print("Building the symmetric tables...")
         self.gimme_symmetric_iot()
 
         if self.exiobase_folder:
-            print("Linking international trade data to openIO-Canada...")
-            self.link_merchandise_database_to_openio()
             print("Linking openIO-Canada to Exiobase...")
             self.link_international_trade_data_to_exiobase()
             self.concatenate_matrices()
@@ -712,34 +715,98 @@ class IOTables:
     def load_merchandise_international_trade_database(self):
         """
         Loading and treating the international trade merchandise database of Statistics Canada.
-        Original source: https://open.canada.ca/data/en/dataset/cf26a8f3-bf96-4fd3-8fa9-e0b4089b5866
+        Original source: https://open.canada.ca/data/en/dataset/b1126a07-fd85-4d56-8395-143aba1747a4
         :return:
         """
 
-        # load the merchandise international trade database from the openIO files
-        merchandise_database = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Imports.xlsx'))
-        merchandise_database.country = merchandise_database.country.ffill()
-        # load concordances between NAICS and IOIC to match the merch database to openIO sectors
-        conc = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/NAICS-IOIC.xlsx'))
-        # match the two product classifications
-        imports_industry_classification = merchandise_database.merge(conc, left_on="NAICS",
-                                                                     right_on="NAICS 6 Code").loc[:,
-                                          ['country', str(self.year), 'IOIC']]
-        imports_industry_classification = imports_industry_classification.set_index(['country', 'IOIC']).sort_index()
-        # country names also need to be matched with Exiobase countries
-        with open(pkg_resources.resource_filename(__name__, "Data/country_concordance_imports.json"), 'r') as f:
-            country_conc = json.load(f)
-        # match the two country classifications
-        imports_industry_classification.index = [(country_conc[i[0]], i[1]) for i in imports_industry_classification.index]
-        imports_industry_classification.index = pd.MultiIndex.from_tuples(imports_industry_classification.index)
-        # groupby to add all Rest-of-the-World regions together (i.e., WE, WF, WA, WL, WM)
-        imports_industry_classification = imports_industry_classification.groupby(imports_industry_classification.index).sum()
-        imports_industry_classification.index = pd.MultiIndex.from_tuples(imports_industry_classification.index)
-        # change industry codes for industry names
-        imports_industry_classification.index = [(i[0], {i[0]: i[1] for i in self.industries}[i[1]]) for i in imports_industry_classification.index]
-        imports_industry_classification.index = pd.MultiIndex.from_tuples(imports_industry_classification.index)
-        # drop Canada as we consider there cannot be international imports from Canada by Canada (?!?)
-        self.imports_industry_classification = imports_industry_classification.drop('CA', axis=0, level=0)
+        # load concordance between HS classification and IOIC classification
+        conc = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/HS-IOIC.xlsx'))
+
+        # load database
+        merchandise_database = pd.read_csv(pkg_resources.resource_stream(__name__, '/Data/Imports_' + str(self.year) +
+                                                                         '_HS06.csv'))
+
+        # drop useless columns
+        merchandise_database = merchandise_database.drop(['YearMonth/AnnéeMois', 'Province', 'State/État',
+                                                          'Quantity/Quantité','Unit of Measure/Unité de Mesure'],
+                                                         axis=1)
+
+        # drop international imports coming from Canada
+        merchandise_database = merchandise_database[merchandise_database['Country/Pays'] != 'CA']
+
+        # also drop nan countries for obvious reasons
+        merchandise_database = merchandise_database.dropna(subset=['Country/Pays'])
+
+        # apply concordance
+        merchandise_database = merchandise_database.merge(conc, on='HS6', how='left')
+
+        # only keep useful information
+        merchandise_database = merchandise_database.loc[:, ['IOIC', 'Country/Pays', 'Value/Valeur', ]]
+
+        # drop sectors that are not matched to IOIC (None)
+        merchandise_database = merchandise_database.drop(
+            merchandise_database[merchandise_database['IOIC'] == 'None'].index)
+
+        # change IOIC codes to sector names
+        code_to_name = {j[0]: j[1] for j in self.commodities}
+        merchandise_database.IOIC = [code_to_name[i] for i in merchandise_database.IOIC]
+
+        # set MultiIndex with country and classification
+        merchandise_database = merchandise_database.set_index(['Country/Pays', 'IOIC'])
+
+        # regroup purchases together (on country + IOIC sector)
+        merchandise_database = merchandise_database.groupby(merchandise_database.index).sum()
+
+        # set Multi-index
+        merchandise_database.index = pd.MultiIndex.from_tuples(merchandise_database.index)
+
+        # reset the index to apply country converter
+        merchandise_database = merchandise_database.reset_index()
+        # apply country converter
+        merchandise_database.level_0 = coco.convert(merchandise_database.level_0, to='EXIO3')
+        # restore index
+        merchandise_database = merchandise_database.set_index(['level_0', 'level_1'])
+        merchandise_database.index.names = None, None
+
+        # groupby on country/sector (e.g., there were multiple 'WL' after applying coco)
+        merchandise_database = merchandise_database.groupby(merchandise_database.index).sum()
+
+        # restore multi-index
+        merchandise_database.index = pd.MultiIndex.from_tuples(merchandise_database.index)
+
+        # reindexing to ensure all sectors are here, fill missing ones with zero values
+        self.merchandise_imports = merchandise_database.reindex(pd.MultiIndex.from_product([
+            merchandise_database.index.levels[0], [i[1] for i in self.commodities]])).fillna(0)
+
+    def link_merchandise_database_to_openio(self):
+        """
+        Linking the international trade merchandise database of Statistics Canada to openIO-Canada.
+        :return:
+        """
+
+        # the absolute values of self.merchandise_imports do not matter
+        # we only use those to calculate a weighted average of imports per country
+        for product in self.merchandise_imports.index.levels[1]:
+            total = self.merchandise_imports.loc(axis=0)[:, product].sum()
+            for region in self.merchandise_imports.index.levels[0]:
+                self.merchandise_imports.loc(axis=0)[region, product] /= total
+
+        # Nan values showing up from 0/0 operations
+        self.merchandise_imports = self.merchandise_imports.fillna(0)
+
+        # scale up international imports from international trade database to international imports according to openIO
+        self.merchandise_imports_scaled = pd.DataFrame()
+
+        df = self.who_uses_int_imports.groupby(axis=0, level=1).sum()
+        df = pd.concat([df] * len(self.merchandise_imports.index.levels[0]))
+        df.index = pd.MultiIndex.from_product(
+            [self.merchandise_imports.index.levels[0], self.who_uses_int_imports.index.levels[1]])
+
+        for product in self.merchandise_imports.index.levels[1]:
+            dff = (df.loc(axis=0)[:, product].T * self.merchandise_imports.loc(axis=0)[:, product].iloc[:, 0]).T
+            self.merchandise_imports_scaled = pd.concat([self.merchandise_imports_scaled, dff])
+
+        self.merchandise_imports_scaled = self.merchandise_imports_scaled.sort_index()
 
     def gimme_symmetric_iot(self):
         """
@@ -753,73 +820,24 @@ class IOTables:
         if self.assumption == "industry technology" and self.classification == "product":
             self.A = self.U.dot(self.inv_g.dot(self.V.T)).dot(self.inv_q)
             self.R = self.W.dot(self.inv_g.dot(self.V.T)).dot(self.inv_q)
+            if self.exiobase_folder:
+                intermediary_demand = self.merchandise_imports_scaled.reindex(self.U.columns,axis=1).dot(
+                    self.inv_g.dot(self.V.T)).dot(self.inv_q)
+                intermediary_demand.columns = intermediary_demand.columns.tolist()
+                self.merchandise_imports_scaled = pd.concat([intermediary_demand,
+                                                             self.merchandise_imports_scaled.reindex(
+                                                                 self.Y.columns,axis=1)], axis=1)
+
         elif self.assumption == "fixed industry sales structure" and self.classification == "industry":
             self.A = self.V.T.dot(self.inv_q).dot(self.U).dot(self.inv_g)
             self.R = self.W.dot(self.inv_g)
             # TODO check the Y in industries transformation
             self.Y = self.V.dot(self.inv_g).T.dot(self.Y)
 
-    def link_merchandise_database_to_openio(self):
-        """
-        Linking the international trade merchandise database of Statistics Canada to openIO-Canada.
-        :return:
-        """
-
-        # first, the merchandise database is in industry classification, we change it to commodity classification
-        industry_to_commodity = self.inv_g.dot(self.V.T).dot(self.inv_q).groupby(axis=0, level=1).sum().groupby(axis=1,
-                                                                                                                level=1).sum()
-        imports_commodity_classification = pd.DataFrame()
-        for region in self.imports_industry_classification.index.levels[0].drop('CA'):
-            df = self.imports_industry_classification.T.loc[:, region].reindex(industry_to_commodity.index, axis=1).fillna(0).dot(
-                industry_to_commodity)
-            df.columns = pd.MultiIndex.from_product([[region], df.columns])
-            imports_commodity_classification = pd.concat([imports_commodity_classification, df], axis=1)
-
-        # the absolute values of imports_commodity_classification do not mean a thing
-        # we only use those to calculate a weighted average of imports per country
-        for product in imports_commodity_classification.columns.levels[1]:
-            total = imports_commodity_classification.loc(axis=1)[:, product].sum(1)
-            for region in imports_commodity_classification.columns.levels[0]:
-                imports_commodity_classification.loc(axis=1)[region, product] /= total
-
-        imports_commodity_classification = imports_commodity_classification.dropna(axis=1).T
-
-        # now we link the merchandise trade data to importation values given in the supply & use tables
-        self.merchandise_international_imports = pd.DataFrame()
-
-        df = self.who_uses_int_imports.groupby(axis=0, level=1).sum()
-        df = pd.concat([df] * len(imports_commodity_classification.index.levels[0]))
-        df.index = pd.MultiIndex.from_product(
-            [imports_commodity_classification.index.levels[0], self.who_uses_int_imports.index.levels[1]])
-
-        for product in imports_commodity_classification.index.levels[1]:
-            try:
-                # if KeyError -> sector is not covered by merchandise trade data (i.e., service)
-                dff = (df.loc(axis=0)[:, product].T * imports_commodity_classification.loc(axis=0)[:, product].iloc[:, 0]).T
-                self.merchandise_international_imports = pd.concat([self.merchandise_international_imports, dff])
-            except KeyError:
-                pass
-
-        self.merchandise_international_imports = self.merchandise_international_imports.sort_index()
-
-        # check that all covered imports are distributed correctly in the imp_commodity_scale dataframes
-        assert np.isclose(self.merchandise_international_imports.sum().sum(),
-                          self.who_uses_int_imports.loc(axis=0)[:,
-                          self.merchandise_international_imports.index.levels[1]].sum().sum())
-
     def link_international_trade_data_to_exiobase(self):
         """
         Linking the data from the international merchandise trade database, which was previously linked to openIO-Canada,
         to exiobase.
-
-        Some links fail because of the transformation from industry classification to product. For instance, "Aviation
-        fuel" is produced from "Petroleum refineries" and "Basic chemicals manufacturing". When importing "Basic
-        chemicals manufacturing" from Luxembourg, a portion of that import is thus considered being "Aviation fuel".
-        And yet according to Exiobase, Luxembourg does not produce any fuel (no refineries in the country). Inconsistent
-        values like this were stored in a dictionary. These values SHOULD be redistributed to the different other
-        industries (i.e., to other products from "Basic chemicals manufacturing"). However the total value of these
-        inconsistent imports only represents 6,339,722 CAD, that is, 0.0008% of total import values. So they were just
-        ignored.
         :return:
         """
 
@@ -844,23 +862,30 @@ class IOTables:
         # determine the Canadian imports according to Exiobase
         canadian_imports_exio = io.A.loc[:, 'CA'].sum(1).drop('CA', axis=0, level=0)
 
+        all_imports = self.who_uses_int_imports.groupby(axis=0, level=1).sum().sum(1)
+        all_imports = all_imports[all_imports != 0].index.tolist()
+
+        covered = self.merchandise_imports_scaled[self.merchandise_imports_scaled != 0].dropna(how='all').groupby(
+            axis=0, level=1).sum().index.tolist()
+        uncovered = [i for i in all_imports if i not in covered]
+
         # link to exiobase
         link_openio_exio = pd.DataFrame()
         not_traded = {}
 
-        for merchandise in self.merchandise_international_imports.index.levels[1]:
+        for merchandise in self.merchandise_imports_scaled.index.levels[1]:
             # check if there is trading happening for the uncovered commodity or not
             if self.who_uses_int_imports.groupby(axis=0, level=1).sum().loc[merchandise].sum() != 0:
                 # 1 for 1 with exiobase -> easy
                 if ioic_exio.loc[merchandise].sum() == 1:
                     exio_sector = ioic_exio.loc[merchandise][ioic_exio.loc[merchandise] == 1].index[0]
-                    dff = self.merchandise_international_imports.loc(axis=0)[:, merchandise]
+                    dff = self.merchandise_imports_scaled.loc(axis=0)[:, merchandise]
                     dff.index = [(i[0], exio_sector) for i in dff.index]
                     link_openio_exio = pd.concat([link_openio_exio, dff])
                 # 1 for many with exiobase -> headscratcher
                 elif ioic_exio.loc[merchandise].sum() > 1:
                     exio_sector = ioic_exio.loc[merchandise][ioic_exio.loc[merchandise] == 1].index.tolist()
-                    dff = self.merchandise_international_imports.loc(axis=0)[:, merchandise].copy()
+                    dff = self.merchandise_imports_scaled.loc(axis=0)[:, merchandise].copy()
                     dff = pd.concat([dff] * len(exio_sector))
                     dff = dff.sort_index()
                     dff.index = pd.MultiIndex.from_product([dff.index.levels[0], exio_sector])
@@ -871,7 +896,7 @@ class IOTables:
                         # if our calculations shows imports (e.g., fertilizers from Bulgaria) for a product but there
                         # are not seen in exiobase, then we rely on io.x to distribute between commodities
                         if not np.isclose(
-                                self.merchandise_international_imports.loc(axis=0)[:,
+                                self.merchandise_imports_scaled.loc(axis=0)[:,
                                 merchandise].loc[region].sum().sum(), dfff.sum().sum()):
                             dfff = (dff.loc[region].T *
                                     (io.x.loc(axis=0)[region, exio_sector].iloc[:, 0] /
@@ -890,14 +915,12 @@ class IOTables:
         link_openio_exio.index = pd.MultiIndex.from_tuples(link_openio_exio.index)
         link_openio_exio = link_openio_exio.reindex(io.A.index).fillna(0)
 
-        # the marchandise database only covers imports of merchandise. For services we rely on Exiobase imports
-        covered = list(set([i[1] for i in self.merchandise_international_imports.index]))
-        uncovered = [i for i in [j[1] for j in self.commodities] if i not in covered]
-
         df = self.who_uses_int_imports.groupby(axis=0, level=1).sum()
-        df = pd.concat([df] * len(self.imports_industry_classification.index.levels[0].drop('CA')))
+        df = pd.concat([df] * len(self.merchandise_imports_scaled.index.levels[0]))
         df.index = pd.MultiIndex.from_product(
-            [self.imports_industry_classification.index.levels[0].drop('CA'), self.who_uses_int_imports.index.levels[1]])
+            [self.merchandise_imports_scaled.index.levels[0], self.who_uses_int_imports.index.levels[1]])
+
+        service_imports = pd.DataFrame()
 
         for sector in uncovered:
             # check if there is trading happening for the uncovered commodity or not
@@ -906,12 +929,11 @@ class IOTables:
                 if ioic_exio.loc[sector].sum() == 1:
                     exio_sector = ioic_exio.loc[sector][ioic_exio.loc[sector] == 1].index[0]
                     dff = canadian_imports_exio.loc(axis=0)[:, exio_sector]
+                    dff = dff.sort_index()
                     dff.index = df.loc(axis=0)[:, sector].index
                     dff = (df.loc(axis=0)[:, sector].T * dff / dff.sum()).T
                     dff.index = pd.MultiIndex.from_product([dff.index.levels[0], [exio_sector]])
-                    link_openio_exio.loc[dff.index] += dff
-                    assert np.isclose(self.who_uses_int_imports.groupby(axis=0, level=1).sum().loc[sector].sum(),
-                                      dff.sum().sum())
+                    service_imports = pd.concat([service_imports, dff.fillna(0)])
                 # 1 for many with exiobase -> headscratcher
                 else:
                     exio_sector = ioic_exio.loc[sector][ioic_exio.loc[sector] == 1].index.tolist()
@@ -923,18 +945,23 @@ class IOTables:
                     # if the product is simply not produced at all by the country according to exiobase, isolate the value in a dict
                     if not np.isclose(dff.loc[region].iloc[0].sum(), dff.sum().sum()):
                         not_traded[(region, merchandise)] = [exio_sector, dff.loc[region].iloc[0].sum()]
-                    link_openio_exio.loc[dff.index] += dff
+                    service_imports = pd.concat([service_imports, dff.fillna(0)])
+
+        service_imports_intermediary = service_imports.reindex(self.U.columns, axis=1).dot(
+            self.inv_g.dot(self.V.T)).dot(self.inv_q)
+        service_imports_intermediary.columns = service_imports_intermediary.columns.tolist()
+        service_imports = pd.concat([service_imports_intermediary, service_imports.reindex(self.Y.columns, axis=1)],
+                                    axis=1)
+        service_imports = service_imports.groupby(service_imports.index).sum()
+        service_imports = service_imports.reindex(link_openio_exio.index).fillna(0)
 
         # distribute the link matrix between industries and final demands
-        self.link_openio_exio_technosphere = link_openio_exio.reindex(self.U.columns, axis=1)
-        self.link_openio_exio_final_demands = link_openio_exio.reindex(self.Y.columns, axis=1)
-
-        # normalize the international imports for the technology matrix
-        self.link_openio_exio_technosphere = self.link_openio_exio_technosphere.dot(self.inv_g.dot(self.V.T)).dot(self.inv_q)
+        self.link_openio_exio_technosphere = (link_openio_exio + service_imports).reindex(self.A.columns, axis=1)
+        self.link_openio_exio_final_demands = (link_openio_exio + service_imports).reindex(self.Y.columns, axis=1)
 
         # check financial balance is respected before converting to euros
         assert (self.A.sum() + self.R.sum() + self.link_openio_exio_technosphere.sum())[
-                   (self.A.sum() + self.R.sum() + self.link_openio_exio_technosphere.sum()) < 0.999].sum() == 0
+                   (self.A.sum() + self.R.sum() + self.link_openio_exio_technosphere.sum()) < 0.98].sum() == 0
 
         # convert from CAD to EURO
         self.link_openio_exio_technosphere /= 1.5
@@ -2111,6 +2138,220 @@ class IOTables:
         self.Y = pd.concat([self.Y, link_Y])
         # provinces from openIO-Canada are not allowed to trade with the Canada region from exiobase
         self.Y.loc['CA'] = 0
+
+    def load_merchandise_international_trade_database_industry(self):
+        """
+        Loading and treating the international trade merchandise database of Statistics Canada.
+        Original source: https://open.canada.ca/data/en/dataset/cf26a8f3-bf96-4fd3-8fa9-e0b4089b5866
+        :return:
+        """
+
+        # load the merchandise international trade database from the openIO files
+        merchandise_database = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Imports.xlsx'))
+        merchandise_database.country = merchandise_database.country.ffill()
+        # load concordances between NAICS and IOIC to match the merch database to openIO sectors
+        conc = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/NAICS-IOIC.xlsx'))
+        # match the two product classifications
+        imports_industry_classification = merchandise_database.merge(conc, left_on="NAICS",
+                                                                     right_on="NAICS 6 Code").loc[:,
+                                          ['country', str(self.year), 'IOIC']]
+        imports_industry_classification = imports_industry_classification.set_index(['country', 'IOIC']).sort_index()
+        # country names also need to be matched with Exiobase countries
+        with open(pkg_resources.resource_filename(__name__, "Data/country_concordance_imports.json"), 'r') as f:
+            country_conc = json.load(f)
+        # match the two country classifications
+        imports_industry_classification.index = [(country_conc[i[0]], i[1]) for i in imports_industry_classification.index]
+        imports_industry_classification.index = pd.MultiIndex.from_tuples(imports_industry_classification.index)
+        # groupby to add all Rest-of-the-World regions together (i.e., WE, WF, WA, WL, WM)
+        imports_industry_classification = imports_industry_classification.groupby(imports_industry_classification.index).sum()
+        imports_industry_classification.index = pd.MultiIndex.from_tuples(imports_industry_classification.index)
+        # change industry codes for industry names
+        imports_industry_classification.index = [(i[0], {i[0]: i[1] for i in self.industries}[i[1]]) for i in imports_industry_classification.index]
+        imports_industry_classification.index = pd.MultiIndex.from_tuples(imports_industry_classification.index)
+        # drop Canada as we consider there cannot be international imports from Canada by Canada (?!?)
+        self.imports_industry_classification = imports_industry_classification.drop('CA', axis=0, level=0)
+
+    def link_merchandise_database_to_openio_industry(self):
+        """
+        Linking the international trade merchandise database of Statistics Canada to openIO-Canada.
+        :return:
+        """
+
+        # first, the merchandise database is in industry classification, we change it to commodity classification
+        industry_to_commodity = self.inv_g.dot(self.V.T).dot(self.inv_q).groupby(axis=0, level=1).sum().groupby(axis=1,
+                                                                                                                level=1).sum()
+        imports_commodity_classification = pd.DataFrame()
+        for region in self.imports_industry_classification.index.levels[0].drop('CA'):
+            df = self.imports_industry_classification.T.loc[:, region].reindex(industry_to_commodity.index, axis=1).fillna(0).dot(
+                industry_to_commodity)
+            df.columns = pd.MultiIndex.from_product([[region], df.columns])
+            imports_commodity_classification = pd.concat([imports_commodity_classification, df], axis=1)
+
+        # the absolute values of imports_commodity_classification do not mean a thing
+        # we only use those to calculate a weighted average of imports per country
+        for product in imports_commodity_classification.columns.levels[1]:
+            total = imports_commodity_classification.loc(axis=1)[:, product].sum(1)
+            for region in imports_commodity_classification.columns.levels[0]:
+                imports_commodity_classification.loc(axis=1)[region, product] /= total
+
+        imports_commodity_classification = imports_commodity_classification.dropna(axis=1).T
+
+        # now we link the merchandise trade data to importation values given in the supply & use tables
+        self.merchandise_international_imports = pd.DataFrame()
+
+        df = self.who_uses_int_imports.groupby(axis=0, level=1).sum()
+        df = pd.concat([df] * len(imports_commodity_classification.index.levels[0]))
+        df.index = pd.MultiIndex.from_product(
+            [imports_commodity_classification.index.levels[0], self.who_uses_int_imports.index.levels[1]])
+
+        for product in imports_commodity_classification.index.levels[1]:
+            try:
+                # if KeyError -> sector is not covered by merchandise trade data (i.e., service)
+                dff = (df.loc(axis=0)[:, product].T * imports_commodity_classification.loc(axis=0)[:, product].iloc[:, 0]).T
+                self.merchandise_international_imports = pd.concat([self.merchandise_international_imports, dff])
+            except KeyError:
+                pass
+
+        self.merchandise_international_imports = self.merchandise_international_imports.sort_index()
+
+        # check that all covered imports are distributed correctly in the imp_commodity_scale dataframes
+        assert np.isclose(self.merchandise_international_imports.sum().sum(),
+                          self.who_uses_int_imports.loc(axis=0)[:,
+                          self.merchandise_international_imports.index.levels[1]].sum().sum())
+
+    def link_international_trade_data_to_exiobase_industry(self):
+        """
+        Linking the data from the international merchandise trade database, which was previously linked to openIO-Canada,
+        to exiobase.
+
+        Some links fail because of the transformation from industry classification to product. For instance, "Aviation
+        fuel" is produced from "Petroleum refineries" and "Basic chemicals manufacturing". When importing "Basic
+        chemicals manufacturing" from Luxembourg, a portion of that import is thus considered being "Aviation fuel".
+        And yet according to Exiobase, Luxembourg does not produce any fuel (no refineries in the country). Inconsistent
+        values like this were stored in a dictionary. These values SHOULD be redistributed to the different other
+        industries (i.e., to other products from "Basic chemicals manufacturing"). However the total value of these
+        inconsistent imports only represents 6,339,722 CAD, that is, 0.0008% of total import values. So they were just
+        ignored.
+        :return:
+        """
+
+        # loading Exiobase
+        io = pymrio.parse_exiobase3(self.exiobase_folder)
+
+        # save the matrices from exiobase because we need them later
+        self.A_exio = io.A.copy()
+        self.S_exio = io.satellite.S.copy()
+        # millions euros to euros
+        self.S_exio.iloc[9:] /= 1000000
+        # convert euros to canadian dollars
+        self.S_exio /= 1.5
+
+        # loading concordances between exiobase classification and IOIC
+        ioic_exio = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/IOIC_EXIOBASE.xlsx'),
+                                  'commodities')
+        ioic_exio = ioic_exio[2:].drop('IOIC Detail level - EXIOBASE', axis=1).set_index('Unnamed: 1').fillna(0)
+        ioic_exio.index.name = None
+        ioic_exio.index = [{j[0]: j[1] for j in self.commodities}[i] for i in ioic_exio.index]
+
+        # determine the Canadian imports according to Exiobase
+        canadian_imports_exio = io.A.loc[:, 'CA'].sum(1).drop('CA', axis=0, level=0)
+
+        # link to exiobase
+        link_openio_exio = pd.DataFrame()
+        not_traded = {}
+
+        for merchandise in self.merchandise_international_imports.index.levels[1]:
+            # check if there is trading happening for the uncovered commodity or not
+            if self.who_uses_int_imports.groupby(axis=0, level=1).sum().loc[merchandise].sum() != 0:
+                # 1 for 1 with exiobase -> easy
+                if ioic_exio.loc[merchandise].sum() == 1:
+                    exio_sector = ioic_exio.loc[merchandise][ioic_exio.loc[merchandise] == 1].index[0]
+                    dff = self.merchandise_international_imports.loc(axis=0)[:, merchandise]
+                    dff.index = [(i[0], exio_sector) for i in dff.index]
+                    link_openio_exio = pd.concat([link_openio_exio, dff])
+                # 1 for many with exiobase -> headscratcher
+                elif ioic_exio.loc[merchandise].sum() > 1:
+                    exio_sector = ioic_exio.loc[merchandise][ioic_exio.loc[merchandise] == 1].index.tolist()
+                    dff = self.merchandise_international_imports.loc(axis=0)[:, merchandise].copy()
+                    dff = pd.concat([dff] * len(exio_sector))
+                    dff = dff.sort_index()
+                    dff.index = pd.MultiIndex.from_product([dff.index.levels[0], exio_sector])
+                    for region in dff.index.levels[0]:
+                        dfff = (dff.loc[region].T *
+                                (canadian_imports_exio.loc(axis=0)[region, exio_sector] /
+                                 canadian_imports_exio.loc(axis=0)[region, exio_sector].sum()).loc[region]).T
+                        # if our calculations shows imports (e.g., fertilizers from Bulgaria) for a product but there
+                        # are not seen in exiobase, then we rely on io.x to distribute between commodities
+                        if not np.isclose(
+                                self.merchandise_international_imports.loc(axis=0)[:,
+                                merchandise].loc[region].sum().sum(), dfff.sum().sum()):
+                            dfff = (dff.loc[region].T *
+                                    (io.x.loc(axis=0)[region, exio_sector].iloc[:, 0] /
+                                     io.x.loc(axis=0)[region, exio_sector].iloc[:, 0].sum()).loc[region]).T
+                        # if the product is simply not produced at all by the country according to exiobase, isolate the value in a dict
+                        if not np.isclose(dff.loc[region].iloc[0].sum(), dfff.sum().sum()):
+                            not_traded[(region, merchandise)] = [exio_sector, dff.loc[region].iloc[0].sum()]
+                        dfff.index = pd.MultiIndex.from_product([[region], dfff.index])
+                        link_openio_exio = pd.concat([link_openio_exio, dfff])
+                        link_openio_exio.index = pd.MultiIndex.from_tuples(link_openio_exio.index)
+                else:
+                    print(merchandise + ' is not linked to any Exiobase sector!')
+
+        link_openio_exio.index = pd.MultiIndex.from_tuples(link_openio_exio.index)
+        link_openio_exio = link_openio_exio.groupby(link_openio_exio.index).sum()
+        link_openio_exio.index = pd.MultiIndex.from_tuples(link_openio_exio.index)
+        link_openio_exio = link_openio_exio.reindex(io.A.index).fillna(0)
+
+        # the marchendise database only covers imports of merchandise. For services we rely on Exiobase imports
+        covered = list(set([i[1] for i in self.merchandise_international_imports.index]))
+        uncovered = [i for i in [j[1] for j in self.commodities] if i not in covered]
+
+        df = self.who_uses_int_imports.groupby(axis=0, level=1).sum()
+        df = pd.concat([df] * len(self.imports_industry_classification.index.levels[0].drop('CA')))
+        df.index = pd.MultiIndex.from_product(
+            [self.imports_industry_classification.index.levels[0].drop('CA'), self.who_uses_int_imports.index.levels[1]])
+
+        for sector in uncovered:
+            # check if there is trading happening for the uncovered commodity or not
+            if self.who_uses_int_imports.groupby(axis=0, level=1).sum().loc[sector].sum() != 0:
+                # 1 for 1 with exiobase -> easy
+                if ioic_exio.loc[sector].sum() == 1:
+                    exio_sector = ioic_exio.loc[sector][ioic_exio.loc[sector] == 1].index[0]
+                    dff = canadian_imports_exio.loc(axis=0)[:, exio_sector]
+                    dff.index = df.loc(axis=0)[:, sector].index
+                    dff = (df.loc(axis=0)[:, sector].T * dff / dff.sum()).T
+                    dff.index = pd.MultiIndex.from_product([dff.index.levels[0], [exio_sector]])
+                    link_openio_exio.loc[dff.index] += dff
+                    assert np.isclose(self.who_uses_int_imports.groupby(axis=0, level=1).sum().loc[sector].sum(),
+                                      dff.sum().sum())
+                # 1 for many with exiobase -> headscratcher
+                else:
+                    exio_sector = ioic_exio.loc[sector][ioic_exio.loc[sector] == 1].index.tolist()
+                    dff = pd.concat([df.loc(axis=0)[:, sector]] * len(exio_sector))
+                    dff.index = pd.MultiIndex.from_product([df.index.levels[0], exio_sector])
+                    dff = dff.sort_index()
+                    dff = (dff.T * (canadian_imports_exio.loc(axis=0)[:, exio_sector] /
+                                    canadian_imports_exio.loc(axis=0)[:, exio_sector].sum()).sort_index()).T
+                    # if the product is simply not produced at all by the country according to exiobase, isolate the value in a dict
+                    if not np.isclose(dff.loc[region].iloc[0].sum(), dff.sum().sum()):
+                        not_traded[(region, merchandise)] = [exio_sector, dff.loc[region].iloc[0].sum()]
+                    link_openio_exio.loc[dff.index] += dff
+
+        # distribute the link matrix between industries and final demands
+        self.link_openio_exio_technosphere = link_openio_exio.reindex(self.U.columns, axis=1)
+        self.link_openio_exio_final_demands = link_openio_exio.reindex(self.Y.columns, axis=1)
+
+        # normalize the international imports for the technology matrix
+        self.link_openio_exio_technosphere = self.link_openio_exio_technosphere.dot(self.inv_g.dot(self.V.T)).dot(self.inv_q)
+
+        # check financial balance is respected before converting to euros
+        assert (self.A.sum() + self.R.sum() + self.link_openio_exio_technosphere.sum())[
+                   (self.A.sum() + self.R.sum() + self.link_openio_exio_technosphere.sum()) < 0.999].sum() == 0
+
+        # convert from CAD to EURO
+        self.link_openio_exio_technosphere /= 1.5
+        self.link_openio_exio_final_demands /= 1.5
+
 
 def todf(data):
     """ Simple function to inspect pyomo element as Pandas DataFrame"""
