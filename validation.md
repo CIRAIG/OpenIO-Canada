@@ -1,11 +1,7 @@
-_Comparing aggregated GWP scores from open IO Canada year 2017, with international imports linked to Exiobase 3.8.1 2017, with Canadian GWP scores from Exiobase 3.8.1 2017_
+_Comparing aggregated GWP scores from openIO-Canada year 2018 with Canadian GWP scores from Exiobase3.8.2 2018_
 
-- The total Canadian footprint from open IO Canada (Detail level) is 5.0% higher than Exiobase's
+- The total Canadian footprint (consumption approach) from openIO-Canada is 4.3% higher than Exiobase (732MtCO2eq vs 702MtCO2eq)
 
-- GWP scores of households consumption from open IO Canada (Detail level) are 9.3% higher than Exiobase's
+- The direct emissions of final demands from openIO-Canada is 21.4% higher than Exiobase (153MtCO2eq vs 126MtCO2eq)
 
-- GWP score of government consumption from open IO Canada (Detail level) are 9.2% lower than Exiobase's
-
-- GWP scores of non-profit organizations from open IO Canada (Detail level) are 7894.4% higher than Exiobase's
-
-- GWP scores of capital formation from open IO Canada (Detail level) are 7.1% lower than Exiobase's
+- The indirect emissions of final demands from openIO-Canada is 0.5% higher than Exiobase (579MtCO2eq vs 576MtCO2eq)
