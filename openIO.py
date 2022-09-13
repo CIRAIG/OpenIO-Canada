@@ -20,7 +20,7 @@ import country_converter as coco
 
 
 class IOTables:
-    def __init__(self, folder_path, classification, exiobase_folder=None, final_demand_aggregated=True):
+    def __init__(self, folder_path, classification='product', exiobase_folder=None, final_demand_aggregated=True):
         """
         :param folder_path: [string] the path to the folder with the economic data (e.g. /../Detail level/)
         :param classification: [string] the type of classification to adopt for the symmetric IOT ("product" or "industry")
@@ -64,14 +64,12 @@ class IOTables:
         self.who_uses_int_imports = pd.DataFrame()
         self.A_exio = pd.DataFrame()
         self.S_exio = pd.DataFrame()
+        self.F_exio = pd.DataFrame()
         self.C_exio = pd.DataFrame()
-        self.imports_industry_classification = pd.DataFrame()
-        self.merchandise_international_imports = pd.DataFrame()
         self.link_openio_exio_technosphere = pd.DataFrame()
         self.link_openio_exio_final_demands = pd.DataFrame()
         self.merchandise_imports = pd.DataFrame()
         self.merchandise_imports_scaled = pd.DataFrame()
-        self.merchandise_imports_intermediary_demand= pd.DataFrame()
 
         # metadata
         self.emission_metadata = pd.DataFrame()
@@ -1487,10 +1485,8 @@ class IOTables:
                      'Water scarcity'], axis=0, level=0, inplace=True)
 
         # importing characterization matrix IMPACT World+/exiobase
-        self.C_exio = pd.read_csv(pkg_resources.resource_stream(__name__, '/Data/C_exio_IW_1.30_1.48.csv'),
+        self.C_exio = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/C_exio_IW_1.30_1.48.xlsx'),
                                          index_col='Unnamed: 0')
-        self.C_exio.index.name = None
-
         self.C_exio.index = pd.MultiIndex.from_tuples(list(zip(
             [i.split(' (')[0] for i in self.C_exio.index],
             [i.split(' (')[1].split(')')[0] for i in self.C_exio.index])))
@@ -1532,81 +1528,6 @@ class IOTables:
         self.balance_flows(concordance)
 
         self.C = self.C.join(self.C_exio)
-
-    def balance_flows(self, concordance):
-        """
-        Some flows from the NPRI trigger some double counting if left unattended. This method deals with these flows
-        :return: balanced self.F
-        """
-
-        # having the Energy flow prevents us from using very handy multi-index features so we remove that flow and plug it back at the end
-        F_without_nrg = self.F.drop('Energy')
-        F_without_nrg.index = pd.MultiIndex.from_tuples(F_without_nrg.index)
-
-        # VOCs
-        rest_of_voc = [i for i in concordance.index if 'Speciated VOC' in i and concordance.loc[i].isna().iloc[0]]
-        df = F_without_nrg.loc[[i for i in F_without_nrg.index if i[1] in rest_of_voc]]
-
-        try:
-            F_without_nrg.loc[:, 'Volatile organic compounds', 'Air'] += df.groupby(level=0).sum().values
-        except KeyError:
-            # name changed in 2018 version
-            F_without_nrg.loc(axis=0)[:, 'Volatile Organic Compounds (VOCs)', 'Air'] += df.groupby(level=0).sum().values
-
-        F_without_nrg.drop(F_without_nrg.loc(axis=0)[:, rest_of_voc].index, inplace=True)
-
-        if self.year == 2018:
-            # PMs, only take highest value flow as suggested by the NPRI team:
-            # [https://www.canada.ca/en/environment-climate-change/services/national-pollutant-release-inventory/using-interpreting-data.html]
-            for sector in F_without_nrg.columns:
-                little_pm = F_without_nrg.loc[
-                    (sector[0], 'PM2.5 - Particulate Matter <= 2.5 Micrometers', 'Air'), sector]
-                big_pm = F_without_nrg.loc[(sector[0], 'PM10 - Particulate Matter <= 10 Micrometers', 'Air'), sector]
-                unknown_size = F_without_nrg.loc[(sector[0], 'Total particulate matter', 'Air'), sector]
-                if little_pm >= big_pm:
-                    if little_pm >= unknown_size:
-                        F_without_nrg.loc[(sector[0], 'PM10 - Particulate Matter <= 10 Micrometers', 'Air'), sector] = 0
-                        F_without_nrg.loc[(sector[0], 'Total particulate matter', 'Air'), sector] = 0
-                    else:
-                        F_without_nrg.loc[(sector[0], 'PM10 - Particulate Matter <= 10 Micrometers', 'Air'), sector] = 0
-                        F_without_nrg.loc[
-                            (sector[0], 'PM2.5 - Particulate Matter <= 2.5 Micrometers', 'Air'), sector] = 0
-                else:
-                    if big_pm > unknown_size:
-                        F_without_nrg.loc[
-                            (sector[0], 'PM2.5 - Particulate Matter <= 2.5 Micrometers', 'Air'), sector] = 0
-                        F_without_nrg.loc[(sector[0], 'Total particulate matter', 'Air'), sector] = 0
-                    else:
-                        F_without_nrg.loc[(sector[0], 'PM10 - Particulate Matter <= 10 Micrometers', 'Air'), sector] = 0
-                        F_without_nrg.loc[
-                            (sector[0], 'PM2.5 - Particulate Matter <= 2.5 Micrometers', 'Air'), sector] = 0
-        else:
-            # PMs, only take highest value flow as suggested by the NPRI team:
-            # [https://www.canada.ca/en/environment-climate-change/services/national-pollutant-release-inventory/using-interpreting-data.html]
-            for sector in F_without_nrg.columns:
-                little_pm = F_without_nrg.loc[(sector[0], 'PM2.5', 'Air'), sector]
-                big_pm = F_without_nrg.loc[(sector[0], 'PM10', 'Air'), sector]
-                unknown_size = F_without_nrg.loc[(sector[0], 'Total particulate matter', 'Air'), sector]
-                if little_pm >= big_pm:
-                    if little_pm >= unknown_size:
-                        F_without_nrg.loc[(sector[0], 'PM10', 'Air'), sector] = 0
-                        F_without_nrg.loc[(sector[0], 'Total particulate matter', 'Air'), sector] = 0
-                    else:
-                        F_without_nrg.loc[(sector[0], 'PM10', 'Air'), sector] = 0
-                        F_without_nrg.loc[(sector[0], 'PM2.5', 'Air'), sector] = 0
-                else:
-                    if big_pm > unknown_size:
-                        F_without_nrg.loc[(sector[0], 'PM2.5', 'Air'), sector] = 0
-                        F_without_nrg.loc[(sector[0], 'Total particulate matter', 'Air'), sector] = 0
-                    else:
-                        F_without_nrg.loc[(sector[0], 'PM10', 'Air'), sector] = 0
-                        F_without_nrg.loc[(sector[0], 'PM2.5', 'Air'), sector] = 0
-
-        # plug back the Energy flow
-        self.F = pd.concat([F_without_nrg, pd.DataFrame(self.F.loc['Energy']).T])
-
-        # we modified flows names in self.F, modify self.C accordingly
-        self.C = self.C.loc[:, self.F.index].fillna(0)
 
     def better_distribution_for_agriculture_ghgs(self):
         """
@@ -1866,6 +1787,83 @@ class IOTables:
         self.E = self.S.dot(self.L).dot(self.Y) + self.FY
         self.D = self.C.dot(self.E)
 
+# -------------------------------------------------- SUPPORT ----------------------------------------------------------
+
+    def balance_flows(self, concordance):
+        """
+        Some flows from the NPRI trigger some double counting if left unattended. This method deals with these flows
+        :return: balanced self.F
+        """
+
+        # having the Energy flow prevents us from using very handy multi-index features so we remove that flow and plug it back at the end
+        F_without_nrg = self.F.drop('Energy')
+        F_without_nrg.index = pd.MultiIndex.from_tuples(F_without_nrg.index)
+
+        # VOCs
+        rest_of_voc = [i for i in concordance.index if 'Speciated VOC' in i and concordance.loc[i].isna().iloc[0]]
+        df = F_without_nrg.loc[[i for i in F_without_nrg.index if i[1] in rest_of_voc]]
+
+        try:
+            F_without_nrg.loc[:, 'Volatile organic compounds', 'Air'] += df.groupby(level=0).sum().values
+        except KeyError:
+            # name changed in 2018 version
+            F_without_nrg.loc(axis=0)[:, 'Volatile Organic Compounds (VOCs)', 'Air'] += df.groupby(level=0).sum().values
+
+        F_without_nrg.drop(F_without_nrg.loc(axis=0)[:, rest_of_voc].index, inplace=True)
+
+        if self.year == 2018:
+            # PMs, only take highest value flow as suggested by the NPRI team:
+            # [https://www.canada.ca/en/environment-climate-change/services/national-pollutant-release-inventory/using-interpreting-data.html]
+            for sector in F_without_nrg.columns:
+                little_pm = F_without_nrg.loc[
+                    (sector[0], 'PM2.5 - Particulate Matter <= 2.5 Micrometers', 'Air'), sector]
+                big_pm = F_without_nrg.loc[(sector[0], 'PM10 - Particulate Matter <= 10 Micrometers', 'Air'), sector]
+                unknown_size = F_without_nrg.loc[(sector[0], 'Total particulate matter', 'Air'), sector]
+                if little_pm >= big_pm:
+                    if little_pm >= unknown_size:
+                        F_without_nrg.loc[(sector[0], 'PM10 - Particulate Matter <= 10 Micrometers', 'Air'), sector] = 0
+                        F_without_nrg.loc[(sector[0], 'Total particulate matter', 'Air'), sector] = 0
+                    else:
+                        F_without_nrg.loc[(sector[0], 'PM10 - Particulate Matter <= 10 Micrometers', 'Air'), sector] = 0
+                        F_without_nrg.loc[
+                            (sector[0], 'PM2.5 - Particulate Matter <= 2.5 Micrometers', 'Air'), sector] = 0
+                else:
+                    if big_pm > unknown_size:
+                        F_without_nrg.loc[
+                            (sector[0], 'PM2.5 - Particulate Matter <= 2.5 Micrometers', 'Air'), sector] = 0
+                        F_without_nrg.loc[(sector[0], 'Total particulate matter', 'Air'), sector] = 0
+                    else:
+                        F_without_nrg.loc[(sector[0], 'PM10 - Particulate Matter <= 10 Micrometers', 'Air'), sector] = 0
+                        F_without_nrg.loc[
+                            (sector[0], 'PM2.5 - Particulate Matter <= 2.5 Micrometers', 'Air'), sector] = 0
+        else:
+            # PMs, only take highest value flow as suggested by the NPRI team:
+            # [https://www.canada.ca/en/environment-climate-change/services/national-pollutant-release-inventory/using-interpreting-data.html]
+            for sector in F_without_nrg.columns:
+                little_pm = F_without_nrg.loc[(sector[0], 'PM2.5', 'Air'), sector]
+                big_pm = F_without_nrg.loc[(sector[0], 'PM10', 'Air'), sector]
+                unknown_size = F_without_nrg.loc[(sector[0], 'Total particulate matter', 'Air'), sector]
+                if little_pm >= big_pm:
+                    if little_pm >= unknown_size:
+                        F_without_nrg.loc[(sector[0], 'PM10', 'Air'), sector] = 0
+                        F_without_nrg.loc[(sector[0], 'Total particulate matter', 'Air'), sector] = 0
+                    else:
+                        F_without_nrg.loc[(sector[0], 'PM10', 'Air'), sector] = 0
+                        F_without_nrg.loc[(sector[0], 'PM2.5', 'Air'), sector] = 0
+                else:
+                    if big_pm > unknown_size:
+                        F_without_nrg.loc[(sector[0], 'PM2.5', 'Air'), sector] = 0
+                        F_without_nrg.loc[(sector[0], 'Total particulate matter', 'Air'), sector] = 0
+                    else:
+                        F_without_nrg.loc[(sector[0], 'PM10', 'Air'), sector] = 0
+                        F_without_nrg.loc[(sector[0], 'PM2.5', 'Air'), sector] = 0
+
+        # plug back the Energy flow
+        self.F = pd.concat([F_without_nrg, pd.DataFrame(self.F.loc['Energy']).T])
+
+        # we modified flows names in self.F, modify self.C accordingly
+        self.C = self.C.loc[:, self.F.index].fillna(0)
+
     def split_private_public_sectors(self, NAICS_code, IOIC_code):
         """
         Support method to split equally emissions from private and public sectors
@@ -2018,7 +2016,7 @@ class IOTables:
             print('Format requested not implemented yet.')
 
 # ------------------------------------------------ DEPRECATED ---------------------------------------------------------
-    def old_province_import_export(self, province_trade_file):
+    def deprecated_province_import_export(self, province_trade_file):
         """
         Method extracting and formatting inter province imports/exports
         :return: modified self.U, self.V, self.W, self.Y
@@ -2112,7 +2110,7 @@ class IOTables:
                     [i for i in self.matching_dict if i != importing_province], importing_province].groupby(
                     level=1).sum())
 
-    def old_match_ghg_accounts_to_iots(self):
+    def deprecated_match_ghg_accounts_to_iots(self):
         """
         Method was for aggregated GHG accounts. New method works with disaggregated accounts.
 
@@ -2212,7 +2210,7 @@ class IOTables:
         self.emission_metadata.loc['GHGs', 'CAS Number'] = 'N/A'
         self.emission_metadata.loc['GHGs', 'Unit'] = 'kgCO2eq'
 
-    def old_international_import_export(self):
+    def deprecated_international_import_export(self):
         """
         Method executes two things:
         1. It removes international imports from the use table
@@ -2294,7 +2292,7 @@ class IOTables:
         del io.A
         del io.satellite.S
 
-    def old_balance_model(self):
+    def deprecated_balance_model(self):
         """
         Balance the system so that the financial balance is kept. Also concatenate openIO with Exiobase.
         :return:
@@ -2317,7 +2315,7 @@ class IOTables:
         # provinces from openIO-Canada are not allowed to trade with the Canada region from exiobase
         self.Y.loc['CA'] = 0
 
-    def load_merchandise_international_trade_database_industry(self):
+    def deprecated_load_merchandise_international_trade_database_industry(self):
         """
         Loading and treating the international trade merchandise database of Statistics Canada.
         Original source: https://open.canada.ca/data/en/dataset/cf26a8f3-bf96-4fd3-8fa9-e0b4089b5866
@@ -2349,7 +2347,7 @@ class IOTables:
         # drop Canada as we consider there cannot be international imports from Canada by Canada (?!?)
         self.imports_industry_classification = imports_industry_classification.drop('CA', axis=0, level=0)
 
-    def link_merchandise_database_to_openio_industry(self):
+    def deprecated_link_merchandise_database_to_openio_industry(self):
         """
         Linking the international trade merchandise database of Statistics Canada to openIO-Canada.
         :return:
@@ -2397,7 +2395,7 @@ class IOTables:
                           self.who_uses_int_imports.loc(axis=0)[:,
                           self.merchandise_international_imports.index.levels[1]].sum().sum())
 
-    def link_international_trade_data_to_exiobase_industry(self):
+    def deprecated_link_international_trade_data_to_exiobase_industry(self):
         """
         Linking the data from the international merchandise trade database, which was previously linked to openIO-Canada,
         to exiobase.

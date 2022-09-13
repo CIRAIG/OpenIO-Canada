@@ -9,12 +9,12 @@ OpenIO-Canada covers 492 commodities, 310 pollutants including 3 greenhouse gase
 
 OpenIO-Canada is connected to the Exiobase global MRIO database to model value chains happening outside Canada.
 
-###Getting started
+### Getting started
 
 Clone the repository (or download it) and install the different libraries required to run this Python class (requirements.txt).
 Go to the doc folder and take a look at the demo.ipynb file to see how to generate the IO tables.
 
-###Data used
+### Data used
 - economic data: https://www150.statcan.gc.ca/n1/en/catalogue/15-602-X
 - international merchandise trade data: https://open.canada.ca/data/en/dataset/b1126a07-fd85-4d56-8395-143aba1747a4
 - ghg emissions: https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=3810009701
@@ -25,7 +25,7 @@ Go to the doc folder and take a look at the demo.ipynb file to see how to genera
 - The IMPACT World+ impact assessment methodology is used
 
 
-###Miscellaneous information
+### Miscellaneous information
 This project was in part funded by Shared Services Canada (SSC) but they are not responsible for any data/results 
 obtained from open IO Canada.
 
