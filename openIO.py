@@ -177,11 +177,11 @@ class IOTables:
         print("Refining the GHG emissions for the agriculture sector...")
         self.better_distribution_for_agriculture_ghgs()
 
-        print("Normalizing emissions...")
-        self.normalize_flows()
-
         print("Cleaning province and country names...")
         self.differentiate_country_names_openio_exio()
+
+        print("Normalizing emissions...")
+        self.normalize_flows()
 
         print("Differentiating biogenic from fossil CO2 emissions...")
         self.differentiate_biogenic_carbon_emissions()
@@ -1692,26 +1692,6 @@ class IOTables:
                     i for i in self.F.columns if i[1] in [
                         'Animal production (except aquaculture)','Aquaculture']]] = animals.loc[[(province, ghg, 'Air')]]
 
-    def normalize_flows(self):
-        """
-        Produce normalized environmental extensions
-        :return: self.S and self.F with product classification if it's been selected
-        """
-
-        if self.classification == 'industry':
-            self.S = self.F.dot(self.inv_g)
-
-        if self.classification == 'product':
-            self.F = self.F.dot(self.V.dot(self.inv_g).T)
-            self.S = self.F.dot(self.inv_q)
-            self.S = pd.concat([self.S, self.S_exio]).fillna(0)
-            self.S = self.S.reindex(self.A.columns, axis=1)
-
-        # adding empty flows to FY to allow multiplication with self.C
-        self.FY = pd.concat([pd.DataFrame(0, self.F.index, self.Y.columns), self.FY])
-        self.FY = self.FY.groupby(self.FY.index).sum()
-        self.FY = self.FY.reindex(self.C.columns).fillna(0)
-
     def differentiate_country_names_openio_exio(self):
         """
         Some province names are identical to country names in exiobase (e.g., 'SK' and 'NL'). So we changed province
@@ -1748,8 +1728,6 @@ class IOTables:
         self.V.columns = pd.MultiIndex.from_tuples(self.V.columns)
         self.V.index = [('CA-' + i[0], i[1]) for i in self.V.index]
         self.V.index = pd.MultiIndex.from_tuples(self.V.index)
-        self.S.columns = self.A.columns
-        self.S.index = [('CA-' + i[0], i[1], i[2]) if len(i) == 3 else i for i in self.S.index]
         self.F.columns = [('CA-' + i[0], i[1]) for i in self.F.columns]
         self.F.columns = pd.MultiIndex.from_tuples(self.F.columns)
         self.F.index = [('CA-' + i[0], i[1], i[2]) if len(i) == 3 else i for i in self.F.index]
@@ -1757,6 +1735,40 @@ class IOTables:
         self.FY.columns = pd.MultiIndex.from_tuples(self.FY.columns)
         self.FY.index = [('CA-' + i[0], i[1], i[2]) if len(i) == 3 else i for i in self.FY.index]
         self.C.columns = [('CA-' + i[0], i[1], i[2]) if len(i) == 3 else i for i in self.C.columns]
+        self.g.index = [('CA-' + i[0], i[1]) for i in self.g.index]
+        self.g.columns = [('CA-' + i[0], i[1]) for i in self.g.columns]
+        self.g.index = pd.MultiIndex.from_tuples(self.g.index)
+        self.g.columns = pd.MultiIndex.from_tuples(self.g.columns)
+        self.inv_g.columns = self.g.columns
+        self.inv_g.index = self.g.columns
+        self.q.index = [('CA-' + i[0], i[1]) for i in self.q.index]
+        self.q.columns = [('CA-' + i[0], i[1]) for i in self.q.columns]
+        self.q.index = pd.MultiIndex.from_tuples(self.q.index)
+        self.q.columns = pd.MultiIndex.from_tuples(self.q.columns)
+        self.inv_q.columns = self.q.index
+        self.inv_q.index = self.q.index
+
+    def normalize_flows(self):
+        """
+        Produce normalized environmental extensions
+        :return: self.S and self.F with product classification if it's been selected
+        """
+
+        if self.classification == 'industry':
+            self.S = self.F.dot(self.inv_g)
+
+        if self.classification == 'product':
+            self.F = self.F.dot(self.V.dot(self.inv_g).T)
+            self.S = self.F.dot(self.inv_q)
+            self.S = pd.concat([self.S, self.S_exio]).fillna(0)
+            self.S = self.S.reindex(self.A.columns, axis=1)
+            # change provinces metadata for S here
+            self.S.columns = self.A.columns
+
+        # adding empty flows to FY to allow multiplication with self.C
+        self.FY = pd.concat([pd.DataFrame(0, self.F.index, self.Y.columns), self.FY])
+        self.FY = self.FY.groupby(self.FY.index).sum()
+        self.FY = self.FY.reindex(self.C.columns).fillna(0)
 
     def differentiate_biogenic_carbon_emissions(self):
         """
