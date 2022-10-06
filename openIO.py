@@ -1722,7 +1722,7 @@ class IOTables:
         bio.index = [i for i in self.S.columns if 'CA-' in i[0]]
         bio_openio = self.S.loc[[i for i in self.S.index if 'Carbon dioxide' == i[1]],
                                 [i for i in self.S.columns if 'CA-' in i[0]]].copy()
-        bio_openio = bio_openio * bio.iloc[:, 0]
+        bio_openio = np.multiply(bio_openio, bio.iloc[:, 0])
         bio_openio.index = [(i[0], 'Carbon dioxide - biogenic', i[2]) for i in bio_openio.index]
 
         # apply the distribution of fossil CO2 from Exiobase to openIO sectors
@@ -1734,7 +1734,7 @@ class IOTables:
         fossil.index = [i for i in self.S.columns if 'CA-' in i[0]]
         fossil_openio = self.S.loc[[i for i in self.S.index if 'Carbon dioxide' == i[1]],
                                    [i for i in self.S.columns if 'CA-' in i[0]]].copy()
-        fossil_openio = fossil_openio * fossil.iloc[:, 0]
+        fossil_openio = np.multiply(fossil_openio, fossil.iloc[:, 0])
         fossil_openio.index = [(i[0], 'Carbon dioxide - fossil', i[2]) for i in fossil_openio.index]
 
         # drop total CO2 emissions
@@ -1746,12 +1746,12 @@ class IOTables:
         # same story for self.F
         bio_openio_scaled = self.F.loc[[i for i in self.F.index if 'Carbon dioxide' == i[1]],
                                        [i for i in self.F.columns if 'CA-' in i[0]]].copy()
-        bio_openio_scaled = bio_openio_scaled * bio.iloc[:, 0]
+        bio_openio_scaled = np.multiply(bio_openio_scaled, bio.iloc[:, 0])
         bio_openio_scaled.index = [(i[0], 'Carbon dioxide - biogenic', i[2]) for i in bio_openio_scaled.index]
         bio_openio_scaled = bio_openio_scaled.fillna(0)
         fossil_openio_scaled = self.F.loc[[i for i in self.F.index if 'Carbon dioxide' == i[1]],
                                           [i for i in self.F.columns if 'CA-' in i[0]]].copy()
-        fossil_openio_scaled = fossil_openio_scaled * fossil.iloc[:, 0]
+        fossil_openio_scaled = np.multiply(fossil_openio_scaled, fossil.iloc[:, 0])
         fossil_openio_scaled.index = [(i[0], 'Carbon dioxide - fossil', i[2]) for i in fossil_openio_scaled.index]
         fossil_openio_scaled = fossil_openio_scaled.fillna(0)
 
