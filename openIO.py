@@ -12,11 +12,11 @@ import numpy as np
 import re
 import pkg_resources
 import os
-# from pyomo.environ import *
-from time import time
 import pymrio
 import json
 import country_converter as coco
+import logging
+import warnings
 
 
 class IOTables:
@@ -27,8 +27,23 @@ class IOTables:
         :param exiobase_folder: [string] path to exiobase folder for international imports (optional)
         """
 
-        start = time()
-        print("Reading all the Excel files...")
+        # ignoring some warnings
+        warnings.filterwarnings(action='ignore', category=FutureWarning)
+        warnings.filterwarnings(action='ignore', category=np.VisibleDeprecationWarning)
+        warnings.filterwarnings(action='ignore', category=pd.errors.PerformanceWarning)
+
+        # set up logging tool
+        logger = logging.getLogger('openIO-Canada')
+        logger.setLevel(logging.INFO)
+        logger.handlers = []
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.DEBUG)
+        ch.setFormatter(formatter)
+        logger.addHandler(ch)
+        logger.propagate = False
+
+        logger.info('Reading all the Excel files...')
 
         self.level_of_detail = [i for i in folder_path.split('/') if 'level' in i][0]
         self.classification = classification
@@ -70,9 +85,11 @@ class IOTables:
         self.link_openio_exio_final_demands = pd.DataFrame()
         self.merchandise_imports = pd.DataFrame()
         self.merchandise_imports_scaled = pd.DataFrame()
+        self.minerals = pd.DataFrame()
 
         # metadata
         self.emission_metadata = pd.DataFrame()
+        self.unit_exio = pd.DataFrame()
         self.methods_metadata = pd.DataFrame()
         self.industries = []
         self.commodities = []
@@ -106,7 +123,7 @@ class IOTables:
                                       None)
             self.NPRI_file_year = 2017
 
-        print("Formatting the Supply and Use tables...")
+        logger.info("Formatting the Supply and Use tables...")
         for province_data in files:
             su_tables = pd.read_excel(folder_path+province_data, None)
             region = province_data[:2]
@@ -120,71 +137,74 @@ class IOTables:
         self.U = self.U.fillna(0)
         self.V = self.V.fillna(0)
 
-        print("Modifying names of duplicated sectors...")
+        logger.info("Modifying names of duplicated sectors...")
         self.dealing_with_duplicated_names()
 
         if self.final_demand_aggregated:
-            print('Aggregating final demand sectors...')
+            logger.info('Aggregating final demand sectors...')
             self.aggregate_final_demand()
         else:
-            print('Organizing final demand sectors...')
+            logger.info('Organizing final demand sectors...')
             self.organize_final_demand()
 
-        print('Removing IOIC codes from index...')
+        logger.info('Removing IOIC codes from index...')
         self.remove_codes()
 
-        print("Balancing inter-provincial trade...")
+        logger.info("Balancing inter-provincial trade...")
         self.province_import_export(
             pd.read_excel(
                 folder_path+[i for i in [j for j in os.walk(folder_path)][0][2] if 'Provincial_trade_flow' in i][0],
                 'Data'))
 
         if self.exiobase_folder:
-            print('Pre-treatment of international trade data...')
+            logger.info('Pre-treatment of international trade data...')
             self.determine_sectors_importing()
             self.load_merchandise_international_trade_database()
-            print("Linking international trade data to openIO-Canada...")
+            logger.info("Linking international trade data to openIO-Canada...")
             self.link_merchandise_database_to_openio()
 
-        print("Building the symmetric tables...")
+        logger.info("Building the symmetric tables...")
         self.gimme_symmetric_iot()
 
         if self.exiobase_folder:
-            print("Linking openIO-Canada to Exiobase...")
+            logger.info("Linking openIO-Canada to Exiobase...")
             self.link_international_trade_data_to_exiobase()
             self.concatenate_matrices()
 
-        print("Extracting and formatting environmental data from the NPRI file...")
+        logger.info("Extracting and formatting environmental data from the NPRI file...")
         self.extract_environmental_data()
 
-        print("Matching emission data from NPRI to IOT sectors...")
+        logger.info("Matching emission data from NPRI to IOT sectors...")
         self.match_npri_data_to_iots()
 
-        print("Matching GHG accounts to IOT sectors...")
+        logger.info("Matching GHG accounts to IOT sectors...")
         self.match_ghg_accounts_to_iots()
 
-        print("Matching water accounts to IOT sectors...")
+        logger.info("Matching water accounts to IOT sectors...")
         self.match_water_accounts_to_iots()
 
-        print("Matching energy accounts to IOT sectors...")
+        logger.info("Matching energy accounts to IOT sectors...")
         self.match_energy_accounts_to_iots()
 
-        print("Creating the characterization matrix...")
+        logger.info("Matching mineral extraction data to IOT sectors...")
+        self.match_mineral_extraction_to_iots()
+
+        logger.info("Creating the characterization matrix...")
         self.characterization_matrix()
 
-        print("Refining the GHG emissions for the agriculture sector...")
+        logger.info("Refining the GHG emissions for the agriculture sector...")
         self.better_distribution_for_agriculture_ghgs()
 
-        print("Cleaning province and country names...")
+        logger.info("Cleaning province and country names...")
         self.differentiate_country_names_openio_exio()
 
-        print("Normalizing emissions...")
+        logger.info("Normalizing emissions...")
         self.normalize_flows()
 
-        print("Differentiating biogenic from fossil CO2 emissions...")
+        logger.info("Differentiating biogenic from fossil CO2 emissions...")
         self.differentiate_biogenic_carbon_emissions()
 
-        print('Took '+str(time()-start)+' seconds')
+        logger.info("Done extracting openIO-Canada!")
 
     def format_tables(self, su_tables, region):
         """
@@ -203,7 +223,7 @@ class IOTables:
             # starting_line_values is the line in which the first value appears
             starting_line_values = 16
 
-        elif self.year in [2018]:
+        elif self.year in [2018, 2019]:
             # starting_line is the line in which the Supply table starts (the first green row)
             starting_line = 3
             # starting_line_values is the line in which the first value appears
@@ -845,6 +865,8 @@ class IOTables:
         self.F_exio = io.satellite.F.copy()
         # millions euros to euros
         self.S_exio.iloc[9:] /= 1000000
+        self.unit_exio = io.satellite.unit.copy()
+        self.unit_exio.columns = ['Unit']
 
         # loading concordances between exiobase classification and IOIC
         ioic_exio = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/IOIC_EXIOBASE.xlsx'),
@@ -955,11 +977,18 @@ class IOTables:
 
         # check financial balance is respected before converting to euros
         assert (self.A.sum() + self.R.sum() + self.link_openio_exio_technosphere.sum())[
-                   (self.A.sum() + self.R.sum() + self.link_openio_exio_technosphere.sum()) < 0.98].sum() == 0
+                   (self.A.sum() + self.R.sum() + self.link_openio_exio_technosphere.sum()) < 0.95].sum() == 0
 
-        # convert from CAD to EURO
-        self.link_openio_exio_technosphere /= 1.5
-        self.link_openio_exio_final_demands /= 1.5
+        # convert from CAD to EURO (https://www.bankofcanada.ca/rates/exchange/annual-average-exchange-rates/)
+        if self.year == 2017:
+            self.link_openio_exio_technosphere /= 1.465
+            self.link_openio_exio_final_demands /= 1.465
+        elif self.year == 2018:
+            self.link_openio_exio_technosphere /= 1.5302
+            self.link_openio_exio_final_demands /= 1.5302
+        elif self.year == 2019:
+            self.link_openio_exio_technosphere /= 1.4856
+            self.link_openio_exio_final_demands /= 1.4856
 
     def concatenate_matrices(self):
         """
@@ -1092,15 +1121,25 @@ class IOTables:
         Method matching GHG accounts to IOIC classification selected by the user
         :return: self.F and self.FY with GHG flows included
         """
-        GHG = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/GHG_emissions_by_gas_RY2017-RY2018.xlsx'),
-                          'L61 ghg emissions by gas')
 
-        if self.year in GHG.loc[:, 'Reference Year'].values:
+        if self.year in [2017, 2018]:
+            GHG = pd.read_excel(
+                pkg_resources.resource_stream(__name__, '/Data/GHG_emissions_by_gas_RY2017-RY2018.xlsx'),
+                'L61 ghg emissions by gas')
             GHG = GHG.loc[
                 [i for i in GHG.index if GHG.loc[i, 'Reference Year'] == self.year and GHG.Geography[i] != 'Canada']]
+        elif self.year == 2019:
+            GHG = pd.read_excel(
+                pkg_resources.resource_stream(__name__, '/Data/GHG_emissions_by_gas_RY2019.xlsx'),
+                'L61 ghg emissions by gas')
+            GHG = GHG.loc[[i for i in GHG.index if GHG.Geography[i] != 'Canada']]
         else:
+            GHG = pd.read_excel(
+                pkg_resources.resource_stream(__name__, '/Data/GHG_emissions_by_gas_RY2017-RY2018.xlsx'),
+                'L61 ghg emissions by gas')
             GHG = GHG.loc[
                 [i for i in GHG.index if GHG.loc[i, 'Reference Year'] == 2017 and GHG.Geography[i] != 'Canada']]
+
         # kilotonnes to kgs
         GHG.loc[:, ['CO2', 'CH4', 'N2O']] *= 1000000
 
@@ -1344,6 +1383,8 @@ class IOTables:
         # fillna(0) for cannabis industries
         self.F = pd.concat([self.F, water_flows]).fillna(0)
 
+        self.emission_metadata.loc['Water', 'Unit'] = 'm3'
+
     def match_energy_accounts_to_iots(self):
         """
         Method matching energy accounts to IOIC classification selected by the user
@@ -1429,6 +1470,54 @@ class IOTables:
         # cannabis stores are NaN values, we change that to zero values
         self.FY = self.FY.fillna(0)
 
+        self.emission_metadata.loc['Energy', 'Unit'] = 'TJ'
+
+    def match_mineral_extraction_to_iots(self):
+        """
+        Method matching mineral extraction data from USGS to IOIC classification selected by the user
+        :return: self.F with mineral flows included
+        """
+        xl = pd.read_excel(pkg_resources.resource_stream(
+            __name__,'/Data/Minerals_extracted_in_Canada.xlsx')).set_index('Unnamed: 0')
+        xl.index.name = None
+
+        with open(pkg_resources.resource_filename(__name__, '/Data/concordance_metals.json'), 'r') as f:
+            dict_data = json.load(f)
+
+        distrib_minerals = pd.DataFrame()
+        for mineral_sector in list(set(dict_data.values())):
+            df = self.q.sum(1).loc(axis=0)[:, mineral_sector].copy()
+            df /= df.sum()
+            distrib_minerals = pd.concat([distrib_minerals, df])
+
+        distrib_minerals.index = pd.MultiIndex.from_tuples(distrib_minerals.index)
+
+        self.minerals = pd.DataFrame(0, index=dict_data, columns=self.q.index)
+
+        if self.year in [2014, 2015, 2016, 2017, 2018]:
+            for mineral in dict_data:
+                df = xl.loc[mineral, self.year] * distrib_minerals.loc(axis=0)[:, dict_data[mineral]]
+                df.columns = [mineral]
+                df = df.T
+                self.minerals.loc[mineral, df.columns] = df.loc[mineral]
+        # no data for 2019 so use 2018 data
+        elif self.year == 2019:
+            for mineral in dict_data:
+                df = xl.loc[mineral, 2018] * distrib_minerals.loc(axis=0)[:, dict_data[mineral]]
+                df.columns = [mineral]
+                df = df.T
+                self.minerals.loc[mineral, df.columns] = df.loc[mineral]
+
+        # convert from thousand carats to metric tons
+        self.minerals.loc['Diamond'] *= 0.0002
+        # Li content per spodumene: https://www2.bgs.ac.uk/mineralsuk/download/mineralProfiles/lithium_profile.pdf
+        self.minerals.loc['Lithium'] *= 0.037
+        # from metric tons to kgs
+        self.minerals *= 1000
+
+        self.emission_metadata = pd.concat([self.emission_metadata, pd.DataFrame('kg', index=self.minerals.index,
+                                                                                 columns=['Unit'])])
+
     def characterization_matrix(self):
         """
         Produces a characterization matrix from IMPACT World+ file
@@ -1456,15 +1545,41 @@ class IOTables:
                                                            index=['Carbon dioxide', 'Methane', 'Dinitrogen monoxide'],
                                                            columns=['IMPACT World+ flows'])])
 
-        self.C = pd.DataFrame(0, pivoting.index, self.F.index)
+        # adding minerals to the list of pollutants
+        same_name = ['Antimony', 'Arsenic', 'Barite', 'Bauxite', 'Beryllium', 'Bismuth', 'Boron', 'Cadmium', 'Chromium',
+                     'Cobalt', 'Copper', 'Diatomite', 'Feldspar', 'Fluorspar', 'Gallium', 'Gold', 'Gypsum', 'Indium',
+                     'Iron', 'Lead', 'Lithium', 'Magnesium', 'Manganese', 'Mercury', 'Molybdenum', 'Nickel', 'Niobium',
+                     'Peat', 'Perlite', 'Platinum', 'Pumice', 'Rhenium', 'Selenium', 'Silver', 'Strontium', 'Talc',
+                     'Tantalum', 'Tellurium', 'Thorium', 'Tin', 'Tungsten', 'Vanadium', 'Vermiculite', 'Zinc', 'Zirconium']
+        different_name = {'Bentonite': 'Clay, bentonite', 'Graphite': 'Metamorphous rock, graphite containing',
+                          'Kaolin': 'Kaolinite', 'Phosphate rocks': 'Phosphate ore', 'Quartz': 'Sand, quartz'}
+        no_match = ['Asbestos', 'Diamond', 'Hafnium', 'Iodine', 'Iridium', 'Kyanite', 'Mica', 'Palladium', 'Potash',
+                    'Pozzolan', 'Rare earths', 'Rhodium', 'Ruthenium', 'Salt', 'Titanium', 'Wollastonite']
+        concordance = pd.concat([concordance, pd.DataFrame(None, same_name + list(different_name.keys()) + no_match,
+                                                           ['IMPACT World+ flows'])])
+        for mineral in same_name:
+            concordance.loc[mineral] = mineral
+        for mineral in different_name:
+            concordance.loc[mineral] = different_name[mineral]
+
+        self.C = pd.DataFrame(0, pivoting.index, self.F.index.tolist() + self.minerals.index.tolist())
         for flow in self.C.columns:
-            try:
-                if concordance.loc[flow[1], 'IMPACT World+ flows'] is not None:
-                    self.C.loc[:, [flow]] = pivoting.loc[:,
-                                          [(concordance.loc[flow[1], 'IMPACT World+ flows'], flow[2],
-                                            '(unspecified)')]].values
-            except KeyError:
-                pass
+            if type(flow) == tuple:
+                try:
+                    if concordance.loc[flow[1], 'IMPACT World+ flows'] is not None:
+                        self.C.loc[:, [flow]] = pivoting.loc[:,
+                                                [(concordance.loc[flow[1], 'IMPACT World+ flows'], flow[2],
+                                                  '(unspecified)')]].values
+                except KeyError:
+                    pass
+            # if type == str -> we are looking at the minerals extension -> hardcode Raw/in ground comp/subcomp
+            elif type(flow) == str:
+                try:
+                    if concordance.loc[flow, 'IMPACT World+ flows'] is not None:
+                        self.C.loc[:, [flow]] = pivoting.loc[:, [(concordance.loc[flow, 'IMPACT World+ flows'],
+                                                                  'Raw', 'in ground')]].values
+                except KeyError:
+                    pass
 
         self.C.loc[('Water use', 'm3'), [i for i in self.C.columns if i[1] == 'Water']] = 1
         self.C.loc[('Energy use', 'TJ'), [i for i in self.C.columns if i == 'Energy']] = 1
@@ -1477,7 +1592,6 @@ class IOTables:
                      'Ionizing radiation, human health',
                      'Land occupation, biodiversity',
                      'Land transformation, biodiversity',
-                     'Mineral resources use',
                      'Thermally polluted water',
                      'Water availability, freshwater ecosystem',
                      'Water availability, human health',
@@ -1497,7 +1611,6 @@ class IOTables:
                          'Ionizing radiation, human health',
                          'Land occupation, biodiversity',
                          'Land transformation, biodiversity',
-                         'Mineral resources use',
                          'Thermally polluted water',
                          'Water availability, freshwater ecosystem',
                          'Water availability, human health',
@@ -1651,11 +1764,13 @@ class IOTables:
         self.V.index = pd.MultiIndex.from_tuples(self.V.index)
         self.F.columns = [('CA-' + i[0], i[1]) for i in self.F.columns]
         self.F.columns = pd.MultiIndex.from_tuples(self.F.columns)
-        self.F.index = [('CA-' + i[0], i[1], i[2]) if len(i) == 3 else i for i in self.F.index]
+        self.F.index = [('CA-' + i[0], i[1], i[2]) if type(i) == tuple else i for i in self.F.index]
+        self.minerals.columns = [('CA-' + i[0], i[1]) for i in self.minerals.columns]
+        self.minerals.columns = pd.MultiIndex.from_tuples(self.minerals.columns)
         self.FY.columns = [('CA-' + i[0], i[1], i[2]) for i in self.FY.columns]
         self.FY.columns = pd.MultiIndex.from_tuples(self.FY.columns)
-        self.FY.index = [('CA-' + i[0], i[1], i[2]) if len(i) == 3 else i for i in self.FY.index]
-        self.C.columns = [('CA-' + i[0], i[1], i[2]) if len(i) == 3 else i for i in self.C.columns]
+        self.FY.index = [('CA-' + i[0], i[1], i[2]) if type(i) == tuple else i for i in self.FY.index]
+        self.C.columns = [('CA-' + i[0], i[1], i[2]) if type(i) == tuple else i for i in self.C.columns]
         self.g.index = [('CA-' + i[0], i[1]) for i in self.g.index]
         self.g.columns = [('CA-' + i[0], i[1]) for i in self.g.columns]
         self.g.index = pd.MultiIndex.from_tuples(self.g.index)
@@ -1680,6 +1795,7 @@ class IOTables:
 
         if self.classification == 'product':
             self.F = self.F.dot(self.V.dot(self.inv_g).T)
+            self.F = pd.concat([self.F, self.minerals])
             self.S = self.F.dot(self.inv_q)
             self.S = pd.concat([self.S, self.S_exio]).fillna(0)
             self.S = self.S.reindex(self.A.columns, axis=1)
@@ -1690,6 +1806,8 @@ class IOTables:
         self.FY = pd.concat([pd.DataFrame(0, self.F.index, self.Y.columns), self.FY])
         self.FY = self.FY.groupby(self.FY.index).sum()
         self.FY = self.FY.reindex(self.C.columns).fillna(0)
+
+        self.emission_metadata = pd.concat([self.emission_metadata, self.unit_exio])
 
     def differentiate_biogenic_carbon_emissions(self):
         """
@@ -1795,74 +1913,73 @@ class IOTables:
         :return: balanced self.F
         """
 
-        # having the Energy flow prevents us from using very handy multi-index features so we remove that flow and plug it back at the end
-        F_without_nrg = self.F.drop('Energy')
-        F_without_nrg.index = pd.MultiIndex.from_tuples(F_without_nrg.index)
+        # we want to use handy multi-index features so we remove flows without multi-index and plug them back at the end
+        F_multiindex = self.F.loc[[i for i in self.F.index if type(i) == tuple]].copy()
+        F_multiindex.index = pd.MultiIndex.from_tuples(F_multiindex.index)
 
         # VOCs
         rest_of_voc = [i for i in concordance.index if 'Speciated VOC' in i and concordance.loc[i].isna().iloc[0]]
-        df = F_without_nrg.loc[[i for i in F_without_nrg.index if i[1] in rest_of_voc]]
+        df = F_multiindex.loc[[i for i in F_multiindex.index if i[1] in rest_of_voc]]
 
         try:
-            F_without_nrg.loc[:, 'Volatile organic compounds', 'Air'] += df.groupby(level=0).sum().values
+            F_multiindex.loc[:, 'Volatile organic compounds', 'Air'] += df.groupby(level=0).sum().values
         except KeyError:
             # name changed in 2018 version
-            F_without_nrg.loc(axis=0)[:, 'Volatile Organic Compounds (VOCs)', 'Air'] += df.groupby(level=0).sum().values
+            F_multiindex.loc(axis=0)[:, 'Volatile Organic Compounds (VOCs)', 'Air'] += df.groupby(level=0).sum().values
 
-        F_without_nrg.drop(F_without_nrg.loc(axis=0)[:, rest_of_voc].index, inplace=True)
+        F_multiindex.drop(F_multiindex.loc(axis=0)[:, rest_of_voc].index, inplace=True)
+        # adjust characterization matrix too
+        self.C = self.C.drop([i for i in self.C.columns if i[1] in rest_of_voc], axis=1)
 
         if self.year == 2018:
             # PMs, only take highest value flow as suggested by the NPRI team:
             # [https://www.canada.ca/en/environment-climate-change/services/national-pollutant-release-inventory/using-interpreting-data.html]
-            for sector in F_without_nrg.columns:
-                little_pm = F_without_nrg.loc[
+            for sector in F_multiindex.columns:
+                little_pm = F_multiindex.loc[
                     (sector[0], 'PM2.5 - Particulate Matter <= 2.5 Micrometers', 'Air'), sector]
-                big_pm = F_without_nrg.loc[(sector[0], 'PM10 - Particulate Matter <= 10 Micrometers', 'Air'), sector]
-                unknown_size = F_without_nrg.loc[(sector[0], 'Total particulate matter', 'Air'), sector]
+                big_pm = F_multiindex.loc[(sector[0], 'PM10 - Particulate Matter <= 10 Micrometers', 'Air'), sector]
+                unknown_size = F_multiindex.loc[(sector[0], 'Total particulate matter', 'Air'), sector]
                 if little_pm >= big_pm:
                     if little_pm >= unknown_size:
-                        F_without_nrg.loc[(sector[0], 'PM10 - Particulate Matter <= 10 Micrometers', 'Air'), sector] = 0
-                        F_without_nrg.loc[(sector[0], 'Total particulate matter', 'Air'), sector] = 0
+                        F_multiindex.loc[(sector[0], 'PM10 - Particulate Matter <= 10 Micrometers', 'Air'), sector] = 0
+                        F_multiindex.loc[(sector[0], 'Total particulate matter', 'Air'), sector] = 0
                     else:
-                        F_without_nrg.loc[(sector[0], 'PM10 - Particulate Matter <= 10 Micrometers', 'Air'), sector] = 0
-                        F_without_nrg.loc[
+                        F_multiindex.loc[(sector[0], 'PM10 - Particulate Matter <= 10 Micrometers', 'Air'), sector] = 0
+                        F_multiindex.loc[
                             (sector[0], 'PM2.5 - Particulate Matter <= 2.5 Micrometers', 'Air'), sector] = 0
                 else:
                     if big_pm > unknown_size:
-                        F_without_nrg.loc[
+                        F_multiindex.loc[
                             (sector[0], 'PM2.5 - Particulate Matter <= 2.5 Micrometers', 'Air'), sector] = 0
-                        F_without_nrg.loc[(sector[0], 'Total particulate matter', 'Air'), sector] = 0
+                        F_multiindex.loc[(sector[0], 'Total particulate matter', 'Air'), sector] = 0
                     else:
-                        F_without_nrg.loc[(sector[0], 'PM10 - Particulate Matter <= 10 Micrometers', 'Air'), sector] = 0
-                        F_without_nrg.loc[
+                        F_multiindex.loc[(sector[0], 'PM10 - Particulate Matter <= 10 Micrometers', 'Air'), sector] = 0
+                        F_multiindex.loc[
                             (sector[0], 'PM2.5 - Particulate Matter <= 2.5 Micrometers', 'Air'), sector] = 0
         else:
             # PMs, only take highest value flow as suggested by the NPRI team:
             # [https://www.canada.ca/en/environment-climate-change/services/national-pollutant-release-inventory/using-interpreting-data.html]
-            for sector in F_without_nrg.columns:
-                little_pm = F_without_nrg.loc[(sector[0], 'PM2.5', 'Air'), sector]
-                big_pm = F_without_nrg.loc[(sector[0], 'PM10', 'Air'), sector]
-                unknown_size = F_without_nrg.loc[(sector[0], 'Total particulate matter', 'Air'), sector]
+            for sector in F_multiindex.columns:
+                little_pm = F_multiindex.loc[(sector[0], 'PM2.5', 'Air'), sector]
+                big_pm = F_multiindex.loc[(sector[0], 'PM10', 'Air'), sector]
+                unknown_size = F_multiindex.loc[(sector[0], 'Total particulate matter', 'Air'), sector]
                 if little_pm >= big_pm:
                     if little_pm >= unknown_size:
-                        F_without_nrg.loc[(sector[0], 'PM10', 'Air'), sector] = 0
-                        F_without_nrg.loc[(sector[0], 'Total particulate matter', 'Air'), sector] = 0
+                        F_multiindex.loc[(sector[0], 'PM10', 'Air'), sector] = 0
+                        F_multiindex.loc[(sector[0], 'Total particulate matter', 'Air'), sector] = 0
                     else:
-                        F_without_nrg.loc[(sector[0], 'PM10', 'Air'), sector] = 0
-                        F_without_nrg.loc[(sector[0], 'PM2.5', 'Air'), sector] = 0
+                        F_multiindex.loc[(sector[0], 'PM10', 'Air'), sector] = 0
+                        F_multiindex.loc[(sector[0], 'PM2.5', 'Air'), sector] = 0
                 else:
                     if big_pm > unknown_size:
-                        F_without_nrg.loc[(sector[0], 'PM2.5', 'Air'), sector] = 0
-                        F_without_nrg.loc[(sector[0], 'Total particulate matter', 'Air'), sector] = 0
+                        F_multiindex.loc[(sector[0], 'PM2.5', 'Air'), sector] = 0
+                        F_multiindex.loc[(sector[0], 'Total particulate matter', 'Air'), sector] = 0
                     else:
-                        F_without_nrg.loc[(sector[0], 'PM10', 'Air'), sector] = 0
-                        F_without_nrg.loc[(sector[0], 'PM2.5', 'Air'), sector] = 0
+                        F_multiindex.loc[(sector[0], 'PM10', 'Air'), sector] = 0
+                        F_multiindex.loc[(sector[0], 'PM2.5', 'Air'), sector] = 0
 
-        # plug back the Energy flow
-        self.F = pd.concat([F_without_nrg, pd.DataFrame(self.F.loc['Energy']).T])
-
-        # we modified flows names in self.F, modify self.C accordingly
-        self.C = self.C.loc[:, self.F.index].fillna(0)
+        # plug back the non multi-index flows
+        self.F = pd.concat([F_multiindex, self.F.loc[[i for i in self.F.index if type(i) != tuple]].copy()])
 
     def split_private_public_sectors(self, NAICS_code, IOIC_code):
         """
