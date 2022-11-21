@@ -1524,9 +1524,7 @@ class IOTables:
         :return: self.C, self.methods_metadata
         """
 
-        IW = pd.read_excel(
-            pkg_resources.resource_stream(
-                __name__, '/Data/IW+ 1_48 EP_1_30 MP_as DB_rules_compliance_with_manually_added_CF.xlsx'))
+        IW = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/impact_world_plus_2.0_dev.xlsx'))
 
         pivoting = pd.pivot_table(IW, values='CF value', index=('Impact category', 'CF unit'),
                                   columns=['Elem flow name', 'Compartment', 'Sub-compartment']).fillna(0)
@@ -1599,7 +1597,7 @@ class IOTables:
                      'Water scarcity'], axis=0, level=0, inplace=True)
 
         # importing characterization matrix IMPACT World+/exiobase
-        self.C_exio = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/C_exio_IW_1.30_1.48.xlsx'),
+        self.C_exio = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/impact_world_plus_2.0_exiobase.xlsx'),
                                          index_col='Unnamed: 0')
         self.C_exio.index = pd.MultiIndex.from_tuples(list(zip(
             [i.split(' (')[0] for i in self.C_exio.index],
