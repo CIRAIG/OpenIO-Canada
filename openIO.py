@@ -198,6 +198,9 @@ class IOTables:
         logger.info("Cleaning province and country names...")
         self.differentiate_country_names_openio_exio()
 
+        logger.info("Refining the GHG emissions for the meat sector...")
+        self.refine_meat_sector()
+
         logger.info("Normalizing emissions...")
         self.normalize_flows()
 
@@ -1781,6 +1784,117 @@ class IOTables:
         self.q.columns = pd.MultiIndex.from_tuples(self.q.columns)
         self.inv_q.columns = self.q.index
         self.inv_q.index = self.q.index
+
+    def refine_meat_sector(self):
+        """
+        Because the meat sector is aggregated into one sector, the economic allocation from the technology-industry
+        construct creates some issues. For instance, the Quebec products of cattle sector is composed of 85% purchases
+        of Hogs, because Quebec mainly produces Hogs and not cattle. So, we refine the definition of these meat sectors
+        by forcing the products of cattle sectors to only buy Cattle and not Hogs.
+        :return:
+        """
+
+        meat_transfo = ['Fresh and frozen beef and veal', 'Fresh and frozen pork',
+                        'Fresh and frozen poultry of all types',
+                        'Products of meat cattle', 'Products of meat pigs', 'Products of meat poultry']
+        meat_breeding = ['Cattle and calves', 'Hogs', 'Poultry', 'Pigs', 'Cattle']
+
+        for province in ['CA-AB', 'CA-BC', 'CA-MB', 'CA-NB', 'CA-NL', 'CA-NS', 'CA-NT',
+                         'CA-NU', 'CA-ON', 'CA-PE', 'CA-QC', 'CA-SK', 'CA-YT']:
+            meat_sector = 'Fresh and frozen beef and veal'
+            total_meat_breeding = self.A.loc(axis=0)[:, meat_breeding].loc(axis=1)[province, meat_sector].sum()
+            total_meat_transfo = self.A.loc(axis=0)[:, meat_transfo].loc(axis=1)[province, meat_sector].sum()
+            # rescale meat_sector
+            if self.A.loc[[i for i in self.A.index if i[1] in ['Cattle and calves', 'Cattle']],
+                          [i for i in self.A.columns if (i[0] == province and i[1] == meat_sector)]].sum().sum() != 0:
+                self.A.loc[[i for i in self.A.index if i[1] in ['Cattle and calves', 'Cattle']],
+                           [i for i in self.A.columns if (i[0] == province and i[1] == meat_sector)]] /= (
+                        self.A.loc[[i for i in self.A.index if i[1] in ['Cattle and calves', 'Cattle']],
+                                   [i for i in self.A.columns if (i[0] == province and i[1] == meat_sector)]].sum() /
+                        total_meat_breeding)
+            if self.A.loc[[i for i in self.A.index if i[1] in ['Fresh and frozen beef and veal',
+                                                               'Products of meat cattle']],
+                          [i for i in self.A.columns if (i[0] == province and i[1] == meat_sector)]].sum().sum() != 0:
+                self.A.loc[[i for i in self.A.index if i[1] in ['Fresh and frozen beef and veal',
+                                                                'Products of meat cattle']],
+                           [i for i in self.A.columns if (i[0] == province and i[1] == meat_sector)]] /= (
+                        self.A.loc[[i for i in self.A.index if i[1] in ['Fresh and frozen beef and veal',
+                                                                        'Products of meat cattle']],
+                                   [i for i in self.A.columns if (i[0] == province and i[1] == meat_sector)]].sum() /
+                        total_meat_transfo)
+            # remove other meats
+            self.A.loc[[i for i in self.A.index if i[1] in ['Pigs',
+                                                            'Hogs',
+                                                            'Poultry',
+                                                            'Fresh and frozen pork',
+                                                            'Fresh and frozen poultry of all types',
+                                                            'Products of meat pigs',
+                                                            'Products of meat poultry']],
+                       [i for i in self.A.columns if (i[0] == province and i[1] == meat_sector)]] = 0
+
+            meat_sector = 'Fresh and frozen pork'
+            total_meat_breeding = self.A.loc(axis=0)[:, meat_breeding].loc(axis=1)[province, meat_sector].sum()
+            total_meat_transfo = self.A.loc(axis=0)[:, meat_transfo].loc(axis=1)[province, meat_sector].sum()
+            # rescale meat_sector
+            if self.A.loc[[i for i in self.A.index if i[1] in ['Pigs', 'Hogs']],
+                          [i for i in self.A.columns if (i[0] == province and i[1] == meat_sector)]].sum().sum() != 0:
+                self.A.loc[[i for i in self.A.index if i[1] in ['Pigs', 'Hogs']],
+                           [i for i in self.A.columns if (i[0] == province and i[1] == meat_sector)]] /= (
+                        self.A.loc[[i for i in self.A.index if i[1] in ['Pigs', 'Hogs']],
+                                   [i for i in self.A.columns if (i[0] == province and i[1] == meat_sector)]].sum() /
+                        total_meat_breeding)
+            if self.A.loc[[i for i in self.A.index if i[1] in ['Fresh and frozen pork',
+                                                               'Products of meat pigs']],
+                          [i for i in self.A.columns if (i[0] == province and i[1] == meat_sector)]].sum().sum() != 0:
+                self.A.loc[[i for i in self.A.index if i[1] in ['Fresh and frozen pork',
+                                                                'Products of meat pigs']],
+                           [i for i in self.A.columns if (i[0] == province and i[1] == meat_sector)]] /= (
+                        self.A.loc[[i for i in self.A.index if i[1] in ['Fresh and frozen pork',
+                                                                        'Products of meat pigs']],
+                                   [i for i in self.A.columns if (i[0] == province and i[1] == meat_sector)]].sum() /
+                        total_meat_transfo)
+            # remove other meats
+            self.A.loc[[i for i in self.A.index if i[1] in ['Cattle and calves',
+                                                            'Cattle',
+                                                            'Poultry',
+                                                            'Fresh and frozen beef and veal',
+                                                            'Fresh and frozen poultry of all types',
+                                                            'Products of meat cattle',
+                                                            'Products of meat poultry']],
+                       [i for i in self.A.columns if (i[0] == province and i[1] == meat_sector)]] = 0
+
+            meat_sector = 'Fresh and frozen poultry of all types'
+            total_meat_breeding = self.A.loc(axis=0)[:, meat_breeding].loc(axis=1)[province, meat_sector].sum()
+            total_meat_transfo = self.A.loc(axis=0)[:, meat_transfo].loc(axis=1)[province, meat_sector].sum()
+            # rescale meat_sector
+            if self.A.loc[[i for i in self.A.index if i[1] in ['Poultry']],
+                          [i for i in self.A.columns if (i[0] == province and i[1] == meat_sector)]].sum().sum() != 0:
+                self.A.loc[[i for i in self.A.index if i[1] in ['Poultry']],
+                           [i for i in self.A.columns if (i[0] == province and i[1] == meat_sector)]] /= (
+                        self.A.loc[[i for i in self.A.index if i[1] in ['Poultry']],
+                                   [i for i in self.A.columns if (i[0] == province and i[1] == meat_sector)]].sum() /
+                        total_meat_breeding)
+            if self.A.loc[[i for i in self.A.index if i[1] in ['Fresh and frozen poultry of all types',
+                                                               'Products of meat poultry']],
+                          [i for i in self.A.columns if (i[0] == province and i[1] == meat_sector)]].sum().sum() != 0:
+                self.A.loc[[i for i in self.A.index if i[1] in ['Fresh and frozen poultry of all types',
+                                                                'Products of meat poultry']],
+                           [i for i in self.A.columns if (i[0] == province and i[1] == meat_sector)]] /= (
+                        self.A.loc[[i for i in self.A.index if i[1] in ['Fresh and frozen poultry of all types',
+                                                                        'Products of meat poultry']],
+                                   [i for i in self.A.columns if (i[0] == province and i[1] == meat_sector)]].sum() /
+                        total_meat_transfo)
+
+            # remove other meats
+            self.A.loc[[i for i in self.A.index if i[1] in ['Cattle and calves',
+                                                            'Cattle',
+                                                            'Pigs',
+                                                            'Hogs',
+                                                            'Fresh and frozen beef and veal',
+                                                            'Fresh and frozen pork',
+                                                            'Products of meat cattle',
+                                                            'Products of meat pigs']],
+                       [i for i in self.A.columns if (i[0] == province and i[1] == meat_sector)]] = 0
 
     def normalize_flows(self):
         """
