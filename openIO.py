@@ -114,14 +114,14 @@ class IOTables:
         self.year = int(files[0].split('SUT_C')[1].split('_')[0])
 
         try:
-            self.NPRI = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/NPRI-INRP_DataDonnées_' +
-                                                                    str(self.year) + '.xlsx'), None)
+            self.NPRI = pd.read_excel(pkg_resources.resource_stream(
+                __name__, '/Data/Environmental_data/NPRI-INRP_DataDonnées_' + str(self.year) + '.xlsx'), None)
             self.NPRI_file_year = self.year
-        # 2017 by default
+        # 2016 by default (for older years)
         except FileNotFoundError:
-            self.NPRI = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/NPRI-INRP_DataDonnées_2017.xlsx'),
-                                      None)
-            self.NPRI_file_year = 2017
+            self.NPRI = pd.read_excel(pkg_resources.resource_stream(
+                __name__, '/Data/Environmental_data/NPRI-INRP_DataDonnées_2016.xlsx'), None)
+            self.NPRI_file_year = 2016
 
         logger.info("Formatting the Supply and Use tables...")
         for province_data in files:
@@ -747,11 +747,11 @@ class IOTables:
         """
 
         # load concordance between HS classification and IOIC classification
-        conc = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/HS-IOIC.xlsx'))
+        conc = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Concordances/HS-IOIC.xlsx'))
 
         # load database
-        merchandise_database = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Imports_' + str(self.year) +
-                                                                         '_HS06_treated.xlsx'))
+        merchandise_database = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Imports_data/Imports_' +
+                                                                           str(self.year) + '_HS06_treated.xlsx'))
         merchandise_database = merchandise_database.ffill()
         merchandise_database.columns = ['Country', 'HS6', 'Value']
 
@@ -872,7 +872,7 @@ class IOTables:
         self.unit_exio.columns = ['Unit']
 
         # loading concordances between exiobase classification and IOIC
-        ioic_exio = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/IOIC_EXIOBASE.xlsx'),
+        ioic_exio = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Concordances/IOIC_EXIOBASE.xlsx'),
                                   'commodities')
         ioic_exio = ioic_exio[2:].drop('IOIC Detail level - EXIOBASE', axis=1).set_index('Unnamed: 1').fillna(0)
         ioic_exio.index.name = None
@@ -1082,7 +1082,7 @@ class IOTables:
         total_emissions_origin = self.F.sum().sum()
 
         # load and format concordances file
-        concordance = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/NPRI_concordance.xlsx'),
+        concordance = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Concordances/NPRI_concordance.xlsx'),
                                     self.level_of_detail)
         concordance.set_index('NAICS 6 Code', inplace=True)
         concordance.drop('NAICS 6 Sector Name (English)', axis=1, inplace=True)
@@ -1127,21 +1127,56 @@ class IOTables:
 
         if self.year in [2017, 2018]:
             GHG = pd.read_excel(
-                pkg_resources.resource_stream(__name__, '/Data/GHG_emissions_by_gas_RY2017-RY2018.xlsx'),
+                pkg_resources.resource_stream(__name__, '/Data/Environmental_data/GHG_emissions_by_gas_RY2017-RY2018.xlsx'),
                 'L61 ghg emissions by gas')
             GHG = GHG.loc[
                 [i for i in GHG.index if GHG.loc[i, 'Reference Year'] == self.year and GHG.Geography[i] != 'Canada']]
         elif self.year == 2019:
             GHG = pd.read_excel(
-                pkg_resources.resource_stream(__name__, '/Data/GHG_emissions_by_gas_RY2019.xlsx'),
+                pkg_resources.resource_stream(__name__, '/Data/Environmental_data/GHG_emissions_by_gas_RY2019.xlsx'),
                 'L61 ghg emissions by gas')
             GHG = GHG.loc[[i for i in GHG.index if GHG.Geography[i] != 'Canada']]
         else:
             GHG = pd.read_excel(
-                pkg_resources.resource_stream(__name__, '/Data/GHG_emissions_by_gas_RY2017-RY2018.xlsx'),
+                pkg_resources.resource_stream(__name__, '/Data/Environmental_data/GHG_emissions_by_gas_RY2017-RY2018.xlsx'),
                 'L61 ghg emissions by gas')
             GHG = GHG.loc[
                 [i for i in GHG.index if GHG.loc[i, 'Reference Year'] == 2017 and GHG.Geography[i] != 'Canada']]
+
+        # adding HFCs and PFCs emissions
+        hfcs = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Environmental_data/SF6_HFC_PFC_emissions.xlsx'),
+                             'GHG Emissions GES 2004-2021')
+
+        hfcs = hfcs.loc[:, ['Reference Year / Année de référence',
+                            "Facility Province or Territory / Province ou territoire de l'installation",
+                            "Facility NAICS Code / Code SCIAN de l'installation",
+                            'SF6 (tonnes)', 'HFC-32 (tonnes)', 'HFC-41 (tonnes)', 'HFC-43-10mee (tonnes)',
+                            'HFC-125 (tonnes)', 'HFC-134 (tonnes)', 'HFC-134a (tonnes)', 'HFC-143 (tonnes)',
+                            'HFC-143a (tonnes)',
+                            'HFC-152a (tonnes)', 'HFC-227ea (tonnes)', 'HFC-236fa (tonnes)', 'HFC-245ca (tonnes)',
+                            'CF4 (tonnes)',
+                            'C2F6 (tonnes)', 'C3F8 (tonnes)', 'C4F10 (tonnes)', 'C4F8 (tonnes)', 'C5F12 (tonnes)',
+                            'C6F14 (tonnes)']]
+
+        conc = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Concordances/NAICS-IOIC.xlsx'))
+        hfcs = hfcs.merge(conc, left_on="Facility NAICS Code / Code SCIAN de l'installation", right_on='NAICS 6 Code')
+        hfcs = hfcs.drop(["Facility NAICS Code / Code SCIAN de l'installation",
+                          'NAICS 6 Sector Name (English)', 'NAICS 6 Code'], axis=1)
+        hfcs = hfcs.set_index(['Reference Year / Année de référence',
+                               "Facility Province or Territory / Province ou territoire de l'installation",
+                               'IOIC'])
+
+        hfcs = hfcs.loc[self.year]
+        hfcs.index = pd.MultiIndex.from_tuples([({v: k for k, v in self.matching_dict.items()}[i[0]],
+                                                 dict(self.industries)[i[1]]) for i in hfcs.index])
+
+        hfcs = hfcs.groupby(hfcs.index).sum()
+        hfcs.index = pd.MultiIndex.from_tuples(hfcs.index)
+        hfcs = hfcs.fillna(0)
+        # renaming
+        hfcs.columns = ['Sulfur hexafluoride', 'HFC-32', 'HFC-41', 'HFC-4310mee', 'HFC-125', 'HFC-134', 'HFC-134a',
+                        'HFC-143', 'HFC-143a', 'HFC-152a', 'HFC-227ea', 'HFC-236fa', 'HFC-245ca', 'CFC-14', 'CFC-16',
+                        'Perfluoropropane', 'Perfluorobutane', 'Perfluorobutene', 'Perfluoropentane', 'Perfluorohexane']
 
         # kilotonnes to kgs
         GHG.loc[:, ['CO2', 'CH4', 'N2O']] *= 1000000
@@ -1199,7 +1234,7 @@ class IOTables:
                   or re.search(r'^Total', i[1])], inplace=True)
         GHG.columns = ['Carbon dioxide', 'Methane', 'Dinitrogen monoxide']
 
-        concordance = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/GHG_concordance.xlsx'),
+        concordance = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Concordances/GHG_concordance.xlsx'),
                                     self.level_of_detail)
         concordance.set_index('GHG codes', inplace=True)
 
@@ -1249,10 +1284,17 @@ class IOTables:
                                                                          columns=sectors_to_split).T
                                                             * GHG.loc(axis=0)[:, code].loc[province].values).values
                 ghgs = pd.concat([ghgs, share_sectors_to_split])
+
+            # merging with HFCs and PFCs data
+            ghgs = ghgs.join(hfcs * 1000).fillna(0)
+            ghgs.columns = [i.split(' (')[0] if i.split(' (')[0] != 'SF6' else 'Sulfur hexafluoride' for i in
+                            ghgs.columns]
+
             # spatializing GHG emissions
+            list_ghgs = ghgs.columns.tolist()
             ghgs = pd.concat([ghgs] * len(ghgs.index.levels[0]), axis=1)
             ghgs.columns = pd.MultiIndex.from_product(
-                [list(self.matching_dict.keys()), ['Carbon dioxide', 'Methane', 'Dinitrogen monoxide'], ['Air']])
+                [list(self.matching_dict.keys()), list_ghgs, ['Air']])
             for province in ghgs.columns.levels[0]:
                 ghgs.loc[[i for i in ghgs.index.levels[0] if i != province], province] = 0
 
@@ -1262,12 +1304,31 @@ class IOTables:
             # reindexing
             self.F = self.F.reindex(self.U.columns, axis=1)
 
-        self.emission_metadata.loc['Carbon dioxide', 'CAS Number'] = '000124-38-9'
-        self.emission_metadata.loc['Carbon dioxide', 'Unit'] = 'kg'
-        self.emission_metadata.loc['Methane', 'CAS Number'] = '000074-82-8'
-        self.emission_metadata.loc['Methane', 'Unit'] = 'kg'
-        self.emission_metadata.loc['Dinitrogen monoxide', 'CAS Number'] = '010024-97-2'
-        self.emission_metadata.loc['Dinitrogen monoxide', 'Unit'] = 'kg'
+        self.emission_metadata.loc['Carbon dioxide', 'CAS Number'] = '124-38-9'
+        self.emission_metadata.loc['Methane', 'CAS Number'] = '74-82-8'
+        self.emission_metadata.loc['Dinitrogen monoxide', 'CAS Number'] = '10024-97-2'
+        self.emission_metadata.loc['Sulfur hexafluoride', 'CAS Number'] = '2551-62-4'
+        self.emission_metadata.loc['HFC-32', 'CAS Number'] = '75-10-5'
+        self.emission_metadata.loc['HFC-41', 'CAS Number'] = '593-53-3'
+        self.emission_metadata.loc['HFC-4310mee', 'CAS Number'] = '138495-42-8'
+        self.emission_metadata.loc['HFC-125', 'CAS Number'] = '354-33-6'
+        self.emission_metadata.loc['HFC-134', 'CAS Number'] = '811-97-2'
+        self.emission_metadata.loc['HFC-134a', 'CAS Number'] = '811-97-2'
+        self.emission_metadata.loc['HFC-143', 'CAS Number'] = '420-46-2'
+        self.emission_metadata.loc['HFC-143a', 'CAS Number'] = '420-46-2'
+        self.emission_metadata.loc['HFC-152a', 'CAS Number'] = '75-37-6'
+        self.emission_metadata.loc['HFC-227ea', 'CAS Number'] = '431-89-0'
+        self.emission_metadata.loc['HFC-236fa', 'CAS Number'] = '690-39-1'
+        self.emission_metadata.loc['HFC-245ca', 'CAS Number'] = '679-86-7'
+        self.emission_metadata.loc['CFC-14', 'CAS Number'] = '75-73-0'
+        self.emission_metadata.loc['CFC-16', 'CAS Number'] = '76-16-4'
+        self.emission_metadata.loc['Perfluoropropane', 'CAS Number'] = '76-19-7'
+        self.emission_metadata.loc['Perfluorobutane', 'CAS Number'] = '355-25-9'
+        self.emission_metadata.loc['Perfluorobutene', 'CAS Number'] = '382-21-8'
+        self.emission_metadata.loc['Perfluoropentane', 'CAS Number'] = '678-26-2'
+        self.emission_metadata.loc['Perfluorohexane', 'CAS Number'] = '355-42-0'
+
+        self.emission_metadata.loc[list_ghgs, 'Unit'] = 'kg'
 
     def match_water_accounts_to_iots(self):
         """
@@ -1275,7 +1336,7 @@ class IOTables:
         :return: self.F and self.FY with GHG flows included
         """
         # load the water use data from STATCAN
-        water = pd.read_csv(pkg_resources.resource_stream(__name__, '/Data/water_use.csv'))
+        water = pd.read_csv(pkg_resources.resource_stream(__name__, '/Data/Environmental_data/water_use.csv'))
 
         # Only odd years from 2009 to 2017
         if self.year == 2010:
@@ -1340,7 +1401,7 @@ class IOTables:
         water.set_index('Sector', inplace=True)
 
         # load concordances matching water use data classification to the different classifications used in OpenIO
-        concordance = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/water_concordance.xlsx'),
+        concordance = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Concordances/water_concordance.xlsx'),
                                     self.level_of_detail)
         concordance.set_index('Sector', inplace=True)
         # dropping potential empty sectors (mostly Cannabis related)
@@ -1393,7 +1454,7 @@ class IOTables:
         Method matching energy accounts to IOIC classification selected by the user
         :return: self.F and self.FY with GHG flows included
         """
-        NRG = pd.read_csv(pkg_resources.resource_stream(__name__, '/Data/Energy_use.csv'))
+        NRG = pd.read_csv(pkg_resources.resource_stream(__name__, '/Data/Environmental_data/Energy_use.csv'))
         # select year of study
         NRG = NRG.loc[[i for i in NRG.index if NRG.REF_DATE[i] == self.year]]
         # keep households energy consumption in a specific dataframe
@@ -1410,7 +1471,7 @@ class IOTables:
         # ------------ Industries ----------------
 
         # load concordance file
-        concordance = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Energy_concordance.xlsx'),
+        concordance = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Concordances/Energy_concordance.xlsx'),
                                     self.level_of_detail)
         concordance.set_index('NRG codes', inplace=True)
         # dropping empty sectors (mostly Cannabis related)
@@ -1481,10 +1542,10 @@ class IOTables:
         :return: self.F with mineral flows included
         """
         xl = pd.read_excel(pkg_resources.resource_stream(
-            __name__,'/Data/Minerals_extracted_in_Canada.xlsx')).set_index('Unnamed: 0')
+            __name__, '/Data/Environmental_data/Minerals_extracted_in_Canada.xlsx')).set_index('Unnamed: 0')
         xl.index.name = None
 
-        with open(pkg_resources.resource_filename(__name__, '/Data/concordance_metals.json'), 'r') as f:
+        with open(pkg_resources.resource_filename(__name__, '/Data/Concordances/concordance_metals.json'), 'r') as f:
             dict_data = json.load(f)
 
         distrib_minerals = pd.DataFrame()
@@ -1527,42 +1588,20 @@ class IOTables:
         :return: self.C, self.methods_metadata
         """
 
-        IW = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/impact_world_plus_2.0_dev.xlsx'))
+        IW = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Characterization_factors/impact_world_plus_2.0_dev.xlsx'))
 
         pivoting = pd.pivot_table(IW, values='CF value', index=('Impact category', 'CF unit'),
                                   columns=['Elem flow name', 'Compartment', 'Sub-compartment']).fillna(0)
 
-        #TODO horrible short term fix. Gotta define NPRI/IW concordances for years 2014, 2015 and 2016
-        if self.NPRI_file_year == 2018:
-            concordance = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/NPRI_IW_concordance.xlsx'),
-                                                                      str(self.NPRI_file_year))
-        else:
-            concordance = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/NPRI_IW_concordance.xlsx'),
-                                                                      '2017')
-        concordance.set_index('NPRI flows', inplace=True)
+        try:
+            concordance = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Concordances/openIO_IW_concordance.xlsx'),
+                                        str(self.NPRI_file_year))
+        except ValueError:
+            concordance = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Concordances/openIO_IW_concordance.xlsx'),
+                                        '2016')
+        concordance.set_index('OpenIO flows', inplace=True)
 
-        # adding GHGs to the list of pollutants
-        concordance = pd.concat([concordance, pd.DataFrame(['Carbon dioxide, fossil', 'Methane, fossil', 'Dinitrogen monoxide'],
-                                                           index=['Carbon dioxide', 'Methane', 'Dinitrogen monoxide'],
-                                                           columns=['IMPACT World+ flows'])])
-
-        # adding minerals to the list of pollutants
-        same_name = ['Antimony', 'Arsenic', 'Barite', 'Bauxite', 'Beryllium', 'Bismuth', 'Boron', 'Cadmium', 'Chromium',
-                     'Cobalt', 'Copper', 'Diatomite', 'Feldspar', 'Fluorspar', 'Gallium', 'Gold', 'Gypsum', 'Indium',
-                     'Iron', 'Lead', 'Lithium', 'Magnesium', 'Manganese', 'Mercury', 'Molybdenum', 'Nickel', 'Niobium',
-                     'Peat', 'Perlite', 'Platinum', 'Pumice', 'Rhenium', 'Selenium', 'Silver', 'Strontium', 'Talc',
-                     'Tantalum', 'Tellurium', 'Thorium', 'Tin', 'Tungsten', 'Vanadium', 'Vermiculite', 'Zinc', 'Zirconium']
-        different_name = {'Bentonite': 'Clay, bentonite', 'Graphite': 'Metamorphous rock, graphite containing',
-                          'Kaolin': 'Kaolinite', 'Phosphate rocks': 'Phosphate ore', 'Quartz': 'Sand, quartz'}
-        no_match = ['Asbestos', 'Diamond', 'Hafnium', 'Iodine', 'Iridium', 'Kyanite', 'Mica', 'Palladium', 'Potash',
-                    'Pozzolan', 'Rare earths', 'Rhodium', 'Ruthenium', 'Salt', 'Titanium', 'Wollastonite']
-        concordance = pd.concat([concordance, pd.DataFrame(None, same_name + list(different_name.keys()) + no_match,
-                                                           ['IMPACT World+ flows'])])
-        for mineral in same_name:
-            concordance.loc[mineral] = mineral
-        for mineral in different_name:
-            concordance.loc[mineral] = different_name[mineral]
-
+        # applying concordance
         self.C = pd.DataFrame(0, pivoting.index, self.F.index.tolist() + self.minerals.index.tolist())
         for flow in self.C.columns:
             if type(flow) == tuple:
@@ -1600,8 +1639,8 @@ class IOTables:
                      'Water scarcity'], axis=0, level=0, inplace=True)
 
         # importing characterization matrix IMPACT World+/exiobase
-        self.C_exio = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/impact_world_plus_2.0_exiobase.xlsx'),
-                                         index_col='Unnamed: 0')
+        self.C_exio = pd.read_excel(pkg_resources.resource_stream(
+            __name__, '/Data/Characterization_factors/impact_world_plus_2.0_exiobase.xlsx'), index_col='Unnamed: 0')
         self.C_exio.index = pd.MultiIndex.from_tuples(list(zip(
             [i.split(' (')[0] for i in self.C_exio.index],
             [i.split(' (')[1].split(')')[0] for i in self.C_exio.index])))
@@ -1629,7 +1668,7 @@ class IOTables:
         # energy use in exiobase is identified through "Energy Carrier Use: Total"
         # note that STATCAN only covers energy use, thus energy supply, loss, etc. flows from exiobase are excluded
         adding_energy_use = pd.DataFrame(0, index=pd.MultiIndex.from_product([['Energy'], ['TJ']]),
-                                        columns=self.S_exio.index)
+                                         columns=self.S_exio.index)
         adding_energy_use.loc[:, [i for i in self.S_exio.index if 'Energy Carrier Use: Total' in i]] = 1
         self.C_exio = pd.concat([self.C_exio, adding_water_use, adding_energy_use])
         # forcing the match with self.C (annoying parentheses for climate change long and short term)
@@ -1935,7 +1974,7 @@ class IOTables:
         CO2 = [i for i in self.F_exio.index if 'CO2' in i]
 
         # loading concordances between exiobase classification and IOIC
-        ioic_exio = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/IOIC_EXIOBASE.xlsx'),
+        ioic_exio = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Concordances/IOIC_EXIOBASE.xlsx'),
                                   'commodities')
         ioic_exio = ioic_exio[2:].drop('IOIC Detail level - EXIOBASE', axis=1).set_index('Unnamed: 1').fillna(0)
         ioic_exio.index.name = None
@@ -2043,7 +2082,7 @@ class IOTables:
         # adjust characterization matrix too
         self.C = self.C.drop([i for i in self.C.columns if i[1] in rest_of_voc], axis=1)
 
-        if self.year == 2018:
+        if self.year >= 2018:
             # PMs, only take highest value flow as suggested by the NPRI team:
             # [https://www.canada.ca/en/environment-climate-change/services/national-pollutant-release-inventory/using-interpreting-data.html]
             for sector in F_multiindex.columns:
@@ -2369,7 +2408,7 @@ class IOTables:
         # removing the fictive sectors
         GHG.drop([i for i in GHG.index if re.search(r'^FC', i[1])], inplace=True)
 
-        concordance = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/GHG_concordance.xlsx'),
+        concordance = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Concordances/GHG_concordance.xlsx'),
                                     self.level_of_detail)
         concordance.set_index('GHG codes', inplace=True)
 
