@@ -17,14 +17,16 @@ import json
 import country_converter as coco
 import logging
 import warnings
+import gzip
+import pickle
 
 
 class IOTables:
-    def __init__(self, folder_path, classification='product', exiobase_folder=None, final_demand_aggregated=True):
+    def __init__(self, folder_path, exiobase_folder, endogenizing_capitals=False):
         """
         :param folder_path: [string] the path to the folder with the economic data (e.g. /../Detail level/)
-        :param classification: [string] the type of classification to adopt for the symmetric IOT ("product" or "industry")
         :param exiobase_folder: [string] path to exiobase folder for international imports (optional)
+        :param endogenizing_capitals: [boolean] True if you want to endogenize capitals
         """
 
         # ignoring some warnings
@@ -46,19 +48,14 @@ class IOTables:
         logger.info('Reading all the Excel files...')
 
         self.level_of_detail = [i for i in folder_path.split('/') if 'level' in i][0]
-        self.classification = classification
         self.exiobase_folder = exiobase_folder
-        self.final_demand_aggregated = final_demand_aggregated
-
-        if self.classification == "product":
-            self.assumption = 'industry technology'
-        elif self.classification == "industry":
-            self.assumption = 'fixed industry sales structure'
+        self.endogenizing = endogenizing_capitals
 
         # values
         self.V = pd.DataFrame()
         self.U = pd.DataFrame()
         self.A = pd.DataFrame()
+        self.K = pd.DataFrame()
         self.Z = pd.DataFrame()
         self.W = pd.DataFrame()
         self.R = pd.DataFrame()
@@ -78,6 +75,7 @@ class IOTables:
         self.D = pd.DataFrame()
         self.who_uses_int_imports = pd.DataFrame()
         self.A_exio = pd.DataFrame()
+        self.K_exio = pd.DataFrame()
         self.S_exio = pd.DataFrame()
         self.F_exio = pd.DataFrame()
         self.C_exio = pd.DataFrame()
@@ -140,15 +138,15 @@ class IOTables:
         logger.info("Modifying names of duplicated sectors...")
         self.dealing_with_duplicated_names()
 
-        if self.final_demand_aggregated:
-            logger.info('Aggregating final demand sectors...')
-            self.aggregate_final_demand()
-        else:
-            logger.info('Organizing final demand sectors...')
-            self.organize_final_demand()
+        logger.info('Organizing final demand sectors...')
+        self.organize_final_demand()
 
         logger.info('Removing IOIC codes from index...')
         self.remove_codes()
+
+        if self.endogenizing:
+            logger.info('Endogenizing capitals of OpenIO-Canada...')
+            self.endogenizing_capitals()
 
         logger.info("Balancing inter-provincial trade...")
         self.province_import_export(
@@ -362,103 +360,6 @@ class IOTables:
         for df in [self.V, self.U, self.g, self.W]:
             df.columns = pd.MultiIndex.from_product([self.matching_dict, self.industries]).tolist()
 
-    def aggregate_final_demand(self):
-        """
-        Aggregates all final demand sectors into 6 elements: ["Household final consumption expenditure",
-        "Non-profit institutions serving households' final consumption expenditure",
-        "Governments final consumption expenditure", "Gross fixed capital formation", "Changes in inventories",
-        "International exports"]
-        Provincial exports will be included in self.U and are thus excluded from self.Y
-        :return: self.Y with final demand sectors aggregated
-        """
-
-        # final demands are identified through their codes, hence the use of regex
-        aggregated_Y = self.Y.loc[:, [i for i in self.Y.columns if
-                                      re.search(r'^PEC\w*\d', i[1][0])]].groupby(level=0, axis=1).sum()
-        aggregated_Y.columns = pd.MultiIndex.from_product([aggregated_Y.columns,
-                                                           ["Household final consumption expenditure"]])
-
-        df = self.Y.loc[:, [i for i in self.Y.columns if
-                            re.search(r'^CEN\w*\d', i[1][0])]].groupby(level=0, axis=1).sum()
-        df.columns = pd.MultiIndex.from_product([
-            df.columns, ["Non-profit institutions serving households' final consumption expenditure"]])
-        aggregated_Y = pd.concat([aggregated_Y, df], axis=1)
-
-        df = self.Y.loc[:, [i for i in self.Y.columns if
-                            re.search(r'^CEG\w*\d', i[1][0])]].groupby(level=0, axis=1).sum()
-        df.columns = pd.MultiIndex.from_product([
-            df.columns, ["Governments final consumption expenditure"]])
-        aggregated_Y = pd.concat([aggregated_Y, df], axis=1)
-
-        df = self.Y.loc[:, [i for i in self.Y.columns if
-                            re.search(r'^CO\w*\d|^ME\w*\d|^IP\w[T]*\d', i[1][0])]].groupby(level=0, axis=1).sum()
-        df.columns = pd.MultiIndex.from_product([
-            df.columns, ["Gross fixed capital formation"]])
-        aggregated_Y = pd.concat([aggregated_Y, df], axis=1)
-
-        df = self.Y.loc[:, [i for i in self.Y.columns if
-                            re.search(r'^INV\w*\d', i[1][0])]].groupby(level=0, axis=1).sum()
-        df.columns = pd.MultiIndex.from_product([
-            df.columns, ["Changes in inventories"]])
-        aggregated_Y = pd.concat([aggregated_Y, df], axis=1)
-
-        df = self.Y.loc[:, [i for i in self.Y.columns if
-                            re.search(r'^INT\w*', i[1][0])]].groupby(level=0, axis=1).sum()
-        df.columns = pd.MultiIndex.from_product([
-            df.columns, ["International exports"]])
-        aggregated_Y = pd.concat([aggregated_Y, df], axis=1)
-
-        self.Y = aggregated_Y
-        self.Y = self.Y.T.sort_index().T
-
-        aggregated_WY = self.WY.loc[:, [i for i in self.WY.columns if
-                                      re.search(r'^PEC\w*\d', i[1][0])]].groupby(level=0, axis=1).sum()
-        aggregated_WY.columns = pd.MultiIndex.from_product([aggregated_WY.columns,
-                                                           ["Household final consumption expenditure"]])
-
-        df = self.WY.loc[:, [i for i in self.WY.columns if
-                            re.search(r'^CEN\w*\d', i[1][0])]].groupby(level=0, axis=1).sum()
-        df.columns = pd.MultiIndex.from_product([
-            df.columns, ["Non-profit institutions serving households' final consumption expenditure"]])
-        aggregated_WY = pd.concat([aggregated_WY, df], axis=1)
-
-        df = self.WY.loc[:, [i for i in self.WY.columns if
-                            re.search(r'^CEG\w*\d', i[1][0])]].groupby(level=0, axis=1).sum()
-        df.columns = pd.MultiIndex.from_product([
-            df.columns, ["Governments final consumption expenditure"]])
-        aggregated_WY = pd.concat([aggregated_WY, df], axis=1)
-
-        df = self.WY.loc[:, [i for i in self.WY.columns if
-                            re.search(r'^CO\w*\d|^ME\w*\d|^IP\w*\d', i[1][0])]].groupby(level=0, axis=1).sum()
-        df.columns = pd.MultiIndex.from_product([
-            df.columns, ["Gross fixed capital formation"]])
-        aggregated_WY = pd.concat([aggregated_WY, df], axis=1)
-
-        df = self.WY.loc[:, [i for i in self.WY.columns if
-                            re.search(r'^INV\w*\d', i[1][0])]].groupby(level=0, axis=1).sum()
-        df.columns = pd.MultiIndex.from_product([
-            df.columns, ["Changes in inventories"]])
-        aggregated_WY = pd.concat([aggregated_WY, df], axis=1)
-
-        df = self.WY.loc[:, [i for i in self.WY.columns if
-                            re.search(r'^INT\w*', i[1][0])]].groupby(level=0, axis=1).sum()
-        df.columns = pd.MultiIndex.from_product([
-            df.columns, ["International exports"]])
-        aggregated_WY = pd.concat([aggregated_WY, df], axis=1)
-
-        self.WY = aggregated_WY
-        self.WY = self.WY.T.sort_index().T
-
-        for df in [self.Y, self.WY]:
-            assert len([i for i in df.columns.levels[1] if i not in [
-                "Household final consumption expenditure",
-                "Non-profit institutions serving households' final consumption expenditure",
-                "Governments final consumption expenditure",
-                "Gross fixed capital formation",
-                "Changes in inventories",
-                "International exports"
-            ]]) == 0
-
     def organize_final_demand(self):
         """
         Extract the final demand sectors. These will be disaggregated. If you do not want the detail, use
@@ -593,6 +494,36 @@ class IOTables:
         self.V = self.V.T.reindex(reindexed_columns).T
         self.U = self.U.T.reindex(reindexed_columns).T
 
+    def endogenizing_capitals(self):
+        """
+        Endogenize gross fixed capital formation (GFCF) of openIO-Canada. Take the final demand for GFCF and distribute
+        it to the different sectors of the economy requiring the purchase of these capital goods.
+
+        Because capitals are endogenized they also need to be removed from the final demand except for residential
+        buildings which are kept as a final demand.
+        :return:
+        """
+
+        endo = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Concordances/Endogenizing.xlsx'))
+
+        for province in self.matching_dict:
+            for capital_type in ['Gross fixed capital formation, Construction',
+                                 'Gross fixed capital formation, Machinery and equipment',
+                                 'Gross fixed capital formation, Intellectual property products']:
+                df = self.Y.loc(axis=1)[province, capital_type]
+                for capital in df.columns:
+                    if self.U.loc[:, province].loc[:, endo[endo.Capitals == capital].loc[:, 'IOIC']].sum().sum() != 0:
+                        share = (self.U.loc[:, province].loc[:, endo[endo.Capitals == capital].loc[:, 'IOIC']].sum() /
+                                 self.U.loc[:, province].loc[:, endo[endo.Capitals == capital].loc[:, 'IOIC']].sum().sum())
+                        for sector in share.index:
+                            self.U.loc[:, (province, sector)] += (df.loc[:, capital] * share.loc[sector])
+
+        self.Y = self.Y.drop([i for i in self.Y.columns if (
+                i[1] in ['Gross fixed capital formation, Construction',
+                         'Gross fixed capital formation, Machinery and equipment',
+                         'Gross fixed capital formation, Intellectual property products'] and
+                i[2] != 'Residential structures')], axis=1)
+
     def province_import_export(self, province_trade_file):
         """
         Method extracting and formatting inter province imports/exports
@@ -666,32 +597,24 @@ class IOTables:
                     self.U.loc[exporting_province, importing_province] = df.loc[:,
                                                                          self.U.columns.levels[1]].reindex(
                         self.U.loc[exporting_province, importing_province].columns, axis=1).values
-                    if self.final_demand_aggregated:
-                        self.Y.loc[exporting_province, importing_province].update(df.loc[:, final_demand_imports])
-                    else:
-                        # special data treatment if final demand sectors are disaggregated
-                        dff = df.loc[:, final_demand_imports]
-                        dff.columns = pd.MultiIndex.from_tuples(dff.columns)
-                        dff = pd.concat([dff], keys=[importing_province], axis=1)
-                        dff = pd.concat([dff], keys=[exporting_province], axis=0)
-                        self.Y.update(dff)
+
+                    # special data treatment if final demand sectors are disaggregated
+                    dff = df.loc[:, final_demand_imports]
+                    dff.columns = pd.MultiIndex.from_tuples(dff.columns)
+                    dff = pd.concat([dff], keys=[importing_province], axis=1)
+                    dff = pd.concat([dff], keys=[exporting_province], axis=0)
+                    self.Y.update(dff)
 
             # remove interprovincial from intraprovincial to not double count
             self.U.loc[importing_province, importing_province].update(
                 self.U.loc[importing_province, importing_province] - self.U.loc[
                     [i for i in self.matching_dict if i != importing_province], importing_province].groupby(
                     level=1).sum())
-            if self.final_demand_aggregated:
-                self.Y.loc[importing_province, importing_province].update(
-                    self.Y.loc[importing_province, importing_province] - self.Y.loc[
-                        [i for i in self.matching_dict if i != importing_province], importing_province].groupby(
-                        level=1).sum())
-            else:
-                df = self.Y.loc[importing_province, importing_province] - self.Y.loc[
-                    [i for i in self.matching_dict if i != importing_province], importing_province].groupby(level=1).sum()
-                df = pd.concat([df], keys=[importing_province], axis=1)
-                df = pd.concat([df], keys=[importing_province], axis=0)
-                self.Y.update(df)
+            df = self.Y.loc[importing_province, importing_province] - self.Y.loc[
+                [i for i in self.matching_dict if i != importing_province], importing_province].groupby(level=1).sum()
+            df = pd.concat([df], keys=[importing_province], axis=1)
+            df = pd.concat([df], keys=[importing_province], axis=0)
+            self.Y.update(df)
 
             # if some province buys more than they use, drop the value in "changes in inventories"
             # if it occurs, it's probably linked to the immediate re-export to other provinces
@@ -835,22 +758,15 @@ class IOTables:
         self.inv_q = pd.DataFrame(np.diag((1 / self.q.sum(axis=1)).replace(np.inf, 0)), self.q.index, self.q.index)
         self.inv_g = pd.DataFrame(np.diag((1 / self.g.sum()).replace(np.inf, 0)), self.g.columns, self.g.columns)
 
-        if self.assumption == "industry technology" and self.classification == "product":
-            self.A = self.U.dot(self.inv_g.dot(self.V.T)).dot(self.inv_q)
-            self.R = self.W.dot(self.inv_g.dot(self.V.T)).dot(self.inv_q)
-            if self.exiobase_folder:
-                intermediary_demand = self.merchandise_imports_scaled.reindex(self.U.columns,axis=1).dot(
-                    self.inv_g.dot(self.V.T)).dot(self.inv_q)
-                intermediary_demand.columns = intermediary_demand.columns.tolist()
-                self.merchandise_imports_scaled = pd.concat([intermediary_demand,
-                                                             self.merchandise_imports_scaled.reindex(
-                                                                 self.Y.columns,axis=1)], axis=1)
-
-        elif self.assumption == "fixed industry sales structure" and self.classification == "industry":
-            self.A = self.V.T.dot(self.inv_q).dot(self.U).dot(self.inv_g)
-            self.R = self.W.dot(self.inv_g)
-            # TODO check the Y in industries transformation
-            self.Y = self.V.dot(self.inv_g).T.dot(self.Y)
+        self.A = self.U.dot(self.inv_g.dot(self.V.T)).dot(self.inv_q)
+        self.R = self.W.dot(self.inv_g.dot(self.V.T)).dot(self.inv_q)
+        if self.exiobase_folder:
+            intermediary_demand = self.merchandise_imports_scaled.reindex(self.U.columns,axis=1).dot(
+                self.inv_g.dot(self.V.T)).dot(self.inv_q)
+            intermediary_demand.columns = intermediary_demand.columns.tolist()
+            self.merchandise_imports_scaled = pd.concat([intermediary_demand,
+                                                         self.merchandise_imports_scaled.reindex(
+                                                             self.Y.columns,axis=1)], axis=1)
 
     def link_international_trade_data_to_exiobase(self):
         """
@@ -861,6 +777,11 @@ class IOTables:
 
         # loading Exiobase
         io = pymrio.parse_exiobase3(self.exiobase_folder)
+
+        if self.endogenizing:
+            with gzip.open(pkg_resources.resource_stream(__name__, '/Data/Capitals_endogenization_exiobase/'
+                                                                   'K_cfc_pxp_exio3.8.2_'+str(self.year)+'.gz.pickle'), 'rb') as f:
+                self.K_exio = pickle.load(f)
 
         # save the matrices from exiobase because we need them later
         self.A_exio = io.A.copy()
@@ -1004,6 +925,9 @@ class IOTables:
         # concat openIO-Canada with exiobase to get the full technology matrix
         df = pd.concat([pd.DataFrame(0, index=self.A.columns, columns=self.A_exio.columns), self.A_exio])
         self.A = pd.concat([self.A, df], axis=1)
+
+        self.K = self.K_exio.reindex(self.A.index).fillna(0)
+        self.K = self.K.T.reindex(self.A.columns).T.fillna(0)
 
         # concat interprovincial and international trade for final demands
         self.Y = pd.concat([self.Y, self.link_openio_exio_final_demands])
@@ -1181,7 +1105,7 @@ class IOTables:
         # kilotonnes to kgs
         GHG.loc[:, ['CO2', 'CH4', 'N2O']] *= 1000000
 
-        if not self.final_demand_aggregated and self.level_of_detail not in ['Summary level', 'Link-1961 level']:
+        if self.level_of_detail not in ['Summary level', 'Link-1961 level']:
             # start with the households emissions
             Household_GHG = GHG.loc[[i for i in GHG.index if 'PEH' in GHG.loc[i, 'IOIC']]]
             Household_GHG.drop(['Reference Year', 'Description', 'F_Description'], axis=1, inplace=True)
@@ -1358,7 +1282,7 @@ class IOTables:
         # convert into cubic meters
         water.VALUE *= 1000
 
-        if not self.final_demand_aggregated and self.level_of_detail not in ['Summary level','Link-1961 level']:
+        if self.level_of_detail not in ['Summary level','Link-1961 level']:
             fd_water = water.loc[[i for i in water.index if water.Sector[i] == 'Households']]
             water_provincial_use_distribution = self.Y.loc(axis=0)[:,
                                                 'Water delivered by water works and irrigation systems'].loc(axis=1)[:,
@@ -1511,23 +1435,16 @@ class IOTables:
         # rename index to IOIC FD classification
         NRG_FD.index = ['Other fuels', 'Fuels and lubricants']
 
-        if self.final_demand_aggregated:
-            # distributing national final demand energy use to provinces based on market shares
-            nrg_fd_provincial = pd.DataFrame(0, index=pd.MultiIndex.from_product(
-                [self.matching_dict, ['Household final consumption expenditure']]), columns=['Energy'])
-            share_province = self.Y.loc(axis=1)[:, 'Household final consumption expenditure'].sum() / self.Y.loc(
-                axis=1)[:,'Household final consumption expenditure'].sum().sum() * NRG_FD.sum().sum()
-            nrg_fd_provincial.loc[share_province.index] = pd.DataFrame(share_province, columns=['Energy'])
-        else:
-            # distributing national final demand energy use to provinces based on market shares
-            nrg_fd_provincial = pd.DataFrame(0, index=pd.MultiIndex.from_product(
-                [self.matching_dict, ['Household final consumption expenditure'], NRG_FD.index]), columns=['Energy'])
 
-            for fd_sector in NRG_FD.index:
-                share_province = self.Y.loc(axis=1)[:, :, fd_sector].sum() / self.Y.loc(axis=1)[:, :,
-                                                                             fd_sector].sum().sum() * NRG_FD.loc[
-                                     fd_sector, 'VALUE']
-                nrg_fd_provincial.loc[share_province.index] = pd.DataFrame(share_province, columns=['Energy'])
+        # distributing national final demand energy use to provinces based on market shares
+        nrg_fd_provincial = pd.DataFrame(0, index=pd.MultiIndex.from_product(
+            [self.matching_dict, ['Household final consumption expenditure'], NRG_FD.index]), columns=['Energy'])
+
+        for fd_sector in NRG_FD.index:
+            share_province = self.Y.loc(axis=1)[:, :, fd_sector].sum() / self.Y.loc(axis=1)[:, :,
+                                                                         fd_sector].sum().sum() * NRG_FD.loc[
+                                 fd_sector, 'VALUE']
+            nrg_fd_provincial.loc[share_province.index] = pd.DataFrame(share_province, columns=['Energy'])
 
         # adding to self.FY
         self.FY = pd.concat([self.FY, nrg_fd_provincial.reindex(self.Y.columns).fillna(0).T])
@@ -1778,6 +1695,8 @@ class IOTables:
                         self.A_exio.index.tolist())
         self.A.index = pd.MultiIndex.from_tuples(self.A.index)
         self.A.columns = self.A.index
+        self.K.index = self.A.index
+        self.K.columns = self.A.columns
         self.Y.index = self.A.index
         self.Y.columns = [('CA-' + i[0], i[1], i[2]) for i in self.Y.columns]
         self.Y.columns = pd.MultiIndex.from_tuples(self.Y.columns)
@@ -1941,17 +1860,13 @@ class IOTables:
         :return: self.S and self.F with product classification if it's been selected
         """
 
-        if self.classification == 'industry':
-            self.S = self.F.dot(self.inv_g)
-
-        if self.classification == 'product':
-            self.F = self.F.dot(self.V.dot(self.inv_g).T)
-            self.F = pd.concat([self.F, self.minerals])
-            self.S = self.F.dot(self.inv_q)
-            self.S = pd.concat([self.S, self.S_exio]).fillna(0)
-            self.S = self.S.reindex(self.A.columns, axis=1)
-            # change provinces metadata for S here
-            self.S.columns = self.A.columns
+        self.F = self.F.dot(self.V.dot(self.inv_g).T)
+        self.F = pd.concat([self.F, self.minerals])
+        self.S = self.F.dot(self.inv_q)
+        self.S = pd.concat([self.S, self.S_exio]).fillna(0)
+        self.S = self.S.reindex(self.A.columns, axis=1)
+        # change provinces metadata for S here
+        self.S.columns = self.A.columns
 
         # adding empty flows to FY to allow multiplication with self.C
         self.FY = pd.concat([pd.DataFrame(0, self.F.index, self.Y.columns), self.FY])
@@ -2052,8 +1967,14 @@ class IOTables:
         :return: self.L (total requirements), self.E (total emissions), self.D (total impacts)
         """
         I = pd.DataFrame(np.eye(len(self.A)), self.A.index, self.A.columns)
-        self.L = pd.DataFrame(np.linalg.solve(I - self.A, I), self.A.index, I.columns)
+
+        if self.endogenizing:
+            self.L = pd.DataFrame(np.linalg.solve(I - (self.A + self.K), I), self.A.index, I.columns)
+        else:
+            self.L = pd.DataFrame(np.linalg.solve(I - self.A, I), self.A.index, I.columns)
+
         self.E = self.S.dot(self.L).dot(self.Y) + self.FY
+
         self.D = self.C.dot(self.E)
 
 # -------------------------------------------------- SUPPORT ----------------------------------------------------------
