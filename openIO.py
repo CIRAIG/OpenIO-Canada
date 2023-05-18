@@ -506,23 +506,20 @@ class IOTables:
 
         endo = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Concordances/Endogenizing.xlsx'))
 
+        self.K = pd.DataFrame(0, self.U.index, self.U.columns)
+
         for province in self.matching_dict:
             for capital_type in ['Gross fixed capital formation, Construction',
                                  'Gross fixed capital formation, Machinery and equipment',
                                  'Gross fixed capital formation, Intellectual property products']:
                 df = self.Y.loc(axis=1)[province, capital_type]
                 for capital in df.columns:
-                    if self.U.loc[:, province].loc[:, endo[endo.Capitals == capital].loc[:, 'IOIC']].sum().sum() != 0:
-                        share = (self.U.loc[:, province].loc[:, endo[endo.Capitals == capital].loc[:, 'IOIC']].sum() /
-                                 self.U.loc[:, province].loc[:, endo[endo.Capitals == capital].loc[:, 'IOIC']].sum().sum())
+                    if self.V.loc[:, province].loc[:, endo[endo.Capitals == capital].loc[:, 'IOIC']].sum().sum() != 0:
+                        share = (self.V.loc[:, province].loc[:, endo[endo.Capitals == capital].loc[:, 'IOIC']].sum() /
+                                 self.V.loc[:, province].loc[:,
+                                 endo[endo.Capitals == capital].loc[:, 'IOIC']].sum().sum())
                         for sector in share.index:
-                            self.U.loc[:, (province, sector)] += (df.loc[:, capital] * share.loc[sector])
-
-        self.Y = self.Y.drop([i for i in self.Y.columns if (
-                i[1] in ['Gross fixed capital formation, Construction',
-                         'Gross fixed capital formation, Machinery and equipment',
-                         'Gross fixed capital formation, Intellectual property products'] and
-                i[2] != 'Residential structures')], axis=1)
+                            self.K.loc[:, (province, sector)] += (df.loc[:, capital] * share.loc[sector])
 
     def province_import_export(self, province_trade_file):
         """
@@ -759,6 +756,7 @@ class IOTables:
         self.inv_g = pd.DataFrame(np.diag((1 / self.g.sum()).replace(np.inf, 0)), self.g.columns, self.g.columns)
 
         self.A = self.U.dot(self.inv_g.dot(self.V.T)).dot(self.inv_q)
+        self.K = self.K.dot(self.inv_g.dot(self.V.T)).dot(self.inv_q)
         self.R = self.W.dot(self.inv_g.dot(self.V.T)).dot(self.inv_q)
         if self.exiobase_folder:
             intermediary_demand = self.merchandise_imports_scaled.reindex(self.U.columns,axis=1).dot(
@@ -767,6 +765,14 @@ class IOTables:
             self.merchandise_imports_scaled = pd.concat([intermediary_demand,
                                                          self.merchandise_imports_scaled.reindex(
                                                              self.Y.columns,axis=1)], axis=1)
+
+        if self.endogenizing:
+            # remove capital goods from final demands if they were endogenized
+            self.Y = self.Y.drop([i for i in self.Y.columns if (
+                    i[1] in ['Gross fixed capital formation, Construction',
+                             'Gross fixed capital formation, Machinery and equipment',
+                             'Gross fixed capital formation, Intellectual property products'] and
+                    i[2] != 'Residential structures')], axis=1)
 
     def link_international_trade_data_to_exiobase(self):
         """
@@ -926,8 +932,9 @@ class IOTables:
         df = pd.concat([pd.DataFrame(0, index=self.A.columns, columns=self.A_exio.columns), self.A_exio])
         self.A = pd.concat([self.A, df], axis=1)
 
-        self.K = self.K_exio.reindex(self.A.index).fillna(0)
-        self.K = self.K.T.reindex(self.A.columns).T.fillna(0)
+        self.K = pd.concat([self.K, pd.DataFrame(0, index=self.K_exio.columns, columns=self.K.columns)])
+        df = pd.concat([pd.DataFrame(0, index=self.K.columns, columns=self.K_exio.columns), self.K_exio])
+        self.K = pd.concat([self.K, df], axis=1)
 
         # concat interprovincial and international trade for final demands
         self.Y = pd.concat([self.Y, self.link_openio_exio_final_demands])
