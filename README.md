@@ -11,7 +11,8 @@ OpenIO-Canada is connected to the Exiobase global MRIO database to model value c
 
 ### Getting started
 
-Clone the repository (or download it) and install the different libraries required to run this Python class (requirements.txt).
+Clone the repository (or download it) and install the different libraries required to run this Python class (requirements.txt).<br>
+Note that we recommend working with version **3.9.7** of Python as we can ensure it works for that specific version.<br>
 Go to the doc folder and take a look at the demo.ipynb file to see how to generate the IO tables.
 
 ### Data used
