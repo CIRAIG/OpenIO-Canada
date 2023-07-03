@@ -1143,41 +1143,6 @@ class IOTables:
             GHG = GHG.loc[
                 [i for i in GHG.index if GHG.loc[i, 'Reference Year'] == 2017 and GHG.Geography[i] != 'Canada']]
 
-        # adding HFCs and PFCs emissions
-        hfcs = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Environmental_data/SF6_HFC_PFC_emissions.xlsx'),
-                             'GHG Emissions GES 2004-2021')
-
-        hfcs = hfcs.loc[:, ['Reference Year / Année de référence',
-                            "Facility Province or Territory / Province ou territoire de l'installation",
-                            "Facility NAICS Code / Code SCIAN de l'installation",
-                            'SF6 (tonnes)', 'HFC-32 (tonnes)', 'HFC-41 (tonnes)', 'HFC-43-10mee (tonnes)',
-                            'HFC-125 (tonnes)', 'HFC-134 (tonnes)', 'HFC-134a (tonnes)', 'HFC-143 (tonnes)',
-                            'HFC-143a (tonnes)',
-                            'HFC-152a (tonnes)', 'HFC-227ea (tonnes)', 'HFC-236fa (tonnes)', 'HFC-245ca (tonnes)',
-                            'CF4 (tonnes)',
-                            'C2F6 (tonnes)', 'C3F8 (tonnes)', 'C4F10 (tonnes)', 'C4F8 (tonnes)', 'C5F12 (tonnes)',
-                            'C6F14 (tonnes)']]
-
-        conc = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Concordances/NAICS-IOIC.xlsx'))
-        hfcs = hfcs.merge(conc, left_on="Facility NAICS Code / Code SCIAN de l'installation", right_on='NAICS 6 Code')
-        hfcs = hfcs.drop(["Facility NAICS Code / Code SCIAN de l'installation",
-                          'NAICS 6 Sector Name (English)', 'NAICS 6 Code'], axis=1)
-        hfcs = hfcs.set_index(['Reference Year / Année de référence',
-                               "Facility Province or Territory / Province ou territoire de l'installation",
-                               'IOIC'])
-
-        hfcs = hfcs.loc[self.year]
-        hfcs.index = pd.MultiIndex.from_tuples([({v: k for k, v in self.matching_dict.items()}[i[0]],
-                                                 dict(self.industries)[i[1]]) for i in hfcs.index])
-
-        hfcs = hfcs.groupby(hfcs.index).sum()
-        hfcs.index = pd.MultiIndex.from_tuples(hfcs.index)
-        hfcs = hfcs.fillna(0)
-        # renaming
-        hfcs.columns = ['Sulfur hexafluoride', 'HFC-32', 'HFC-41', 'HFC-4310mee', 'HFC-125', 'HFC-134', 'HFC-134a',
-                        'HFC-143', 'HFC-143a', 'HFC-152a', 'HFC-227ea', 'HFC-236fa', 'HFC-245ca', 'CFC-14', 'CFC-16',
-                        'Perfluoropropane', 'Perfluorobutane', 'Perfluorobutene', 'Perfluoropentane', 'Perfluorohexane']
-
         # kilotonnes to kgs
         GHG.loc[:, ['CO2', 'CH4', 'N2O']] *= 1000000
 
@@ -1285,11 +1250,6 @@ class IOTables:
                                                             * GHG.loc(axis=0)[:, code].loc[province].values).values
                 ghgs = pd.concat([ghgs, share_sectors_to_split])
 
-            # merging with HFCs and PFCs data
-            ghgs = ghgs.join(hfcs * 1000).fillna(0)
-            ghgs.columns = [i.split(' (')[0] if i.split(' (')[0] != 'SF6' else 'Sulfur hexafluoride' for i in
-                            ghgs.columns]
-
             # spatializing GHG emissions
             list_ghgs = ghgs.columns.tolist()
             ghgs = pd.concat([ghgs] * len(ghgs.index.levels[0]), axis=1)
@@ -1307,27 +1267,6 @@ class IOTables:
         self.emission_metadata.loc['Carbon dioxide', 'CAS Number'] = '124-38-9'
         self.emission_metadata.loc['Methane', 'CAS Number'] = '74-82-8'
         self.emission_metadata.loc['Dinitrogen monoxide', 'CAS Number'] = '10024-97-2'
-        self.emission_metadata.loc['Sulfur hexafluoride', 'CAS Number'] = '2551-62-4'
-        self.emission_metadata.loc['HFC-32', 'CAS Number'] = '75-10-5'
-        self.emission_metadata.loc['HFC-41', 'CAS Number'] = '593-53-3'
-        self.emission_metadata.loc['HFC-4310mee', 'CAS Number'] = '138495-42-8'
-        self.emission_metadata.loc['HFC-125', 'CAS Number'] = '354-33-6'
-        self.emission_metadata.loc['HFC-134', 'CAS Number'] = '811-97-2'
-        self.emission_metadata.loc['HFC-134a', 'CAS Number'] = '811-97-2'
-        self.emission_metadata.loc['HFC-143', 'CAS Number'] = '420-46-2'
-        self.emission_metadata.loc['HFC-143a', 'CAS Number'] = '420-46-2'
-        self.emission_metadata.loc['HFC-152a', 'CAS Number'] = '75-37-6'
-        self.emission_metadata.loc['HFC-227ea', 'CAS Number'] = '431-89-0'
-        self.emission_metadata.loc['HFC-236fa', 'CAS Number'] = '690-39-1'
-        self.emission_metadata.loc['HFC-245ca', 'CAS Number'] = '679-86-7'
-        self.emission_metadata.loc['CFC-14', 'CAS Number'] = '75-73-0'
-        self.emission_metadata.loc['CFC-16', 'CAS Number'] = '76-16-4'
-        self.emission_metadata.loc['Perfluoropropane', 'CAS Number'] = '76-19-7'
-        self.emission_metadata.loc['Perfluorobutane', 'CAS Number'] = '355-25-9'
-        self.emission_metadata.loc['Perfluorobutene', 'CAS Number'] = '382-21-8'
-        self.emission_metadata.loc['Perfluoropentane', 'CAS Number'] = '678-26-2'
-        self.emission_metadata.loc['Perfluorohexane', 'CAS Number'] = '355-42-0'
-
         self.emission_metadata.loc[list_ghgs, 'Unit'] = 'kg'
 
     def match_water_accounts_to_iots(self):
@@ -1602,7 +1541,15 @@ class IOTables:
         concordance.set_index('OpenIO flows', inplace=True)
 
         # applying concordance
-        self.C = pd.DataFrame(0, pivoting.index, self.F.index.tolist() + self.minerals.index.tolist())
+        hfcs = ['CF4', 'C2F6', 'SF6', 'NF3', 'c-C4F8', 'C3F8', 'HFC-125', 'HFC-134a', 'HFC-143', 'HFC-143a', 'HFC-152a', 'HFC-227ea', 'HFC-23', 'HFC-32', 'HFC-41', 'HFC-134', 'HFC-245fa', 'HFC-43-10mee', 'HFC-365mfc', 'HFC-236fa']
+        if self.year in [2016, 2017]:
+            hfcs.append('C5F12')
+            self.emission_metadata.loc['C5F12', 'CAS Number'] = '678-26-2'
+
+        hfcs_idx = pd.MultiIndex.from_product(
+            [hfcs, [i for i in self.matching_dict.keys()], ['Air']]).swaplevel(0, 1)
+
+        self.C = pd.DataFrame(0, pivoting.index, self.F.index.tolist() + self.minerals.index.tolist() + hfcs_idx.tolist())
         for flow in self.C.columns:
             if type(flow) == tuple:
                 try:
@@ -1624,6 +1571,29 @@ class IOTables:
         self.C.loc[('Water use', 'm3'), [i for i in self.C.columns if i[1] == 'Water']] = 1
         self.C.loc[('Energy use', 'TJ'), [i for i in self.C.columns if i == 'Energy']] = 1
         self.C = self.C.fillna(0)
+
+        self.emission_metadata.loc['CF4', 'CAS Number'] = '75-73-0'
+        self.emission_metadata.loc['C2F6', 'CAS Number'] = '76-16-4'
+        self.emission_metadata.loc['C3F8', 'CAS Number'] = '76-19-7'
+        self.emission_metadata.loc['HFC-125', 'CAS Number'] = '354-33-6'
+        self.emission_metadata.loc['HFC-134', 'CAS Number'] = '359-35-3'
+        self.emission_metadata.loc['HFC-134a', 'CAS Number'] = '811-97-2'
+        self.emission_metadata.loc['HFC-143', 'CAS Number'] = '430-66-0'
+        self.emission_metadata.loc['HFC-143a', 'CAS Number'] = '420-46-2'
+        self.emission_metadata.loc['HFC-152a', 'CAS Number'] = '75-37-6'
+        self.emission_metadata.loc['HFC-227ea', 'CAS Number'] = '431-89-0'
+        self.emission_metadata.loc['HFC-23', 'CAS Number'] = '75-46-7'
+        self.emission_metadata.loc['HFC-236fa', 'CAS Number'] = '690-39-1'
+        self.emission_metadata.loc['HFC-245fa', 'CAS Number'] = '460-73-1'
+        self.emission_metadata.loc['HFC-32', 'CAS Number'] = '75-10-5'
+        self.emission_metadata.loc['HFC-365mfc', 'CAS Number'] = '406-58-6'
+        self.emission_metadata.loc['HFC-41', 'CAS Number'] = '593-53-3'
+        self.emission_metadata.loc['HFC-4310mee', 'CAS Number'] = '138495-42-8'
+        self.emission_metadata.loc['NF3', 'CAS Number'] = '7783-54-2'
+        self.emission_metadata.loc['SF6', 'CAS Number'] = '2551-62-4'
+        self.emission_metadata.loc['c-C4F8', 'CAS Number'] = '115-25-3'
+
+        self.emission_metadata.loc[hfcs, 'Unit'] = 'kg'
 
         # some methods of IMPACT World+ do not make sense in our context, remove them
         self.C.drop(['Fossil and nuclear energy use',
@@ -1947,6 +1917,7 @@ class IOTables:
         if self.classification == 'product':
             self.F = self.F.dot(self.V.dot(self.inv_g).T)
             self.F = pd.concat([self.F, self.minerals])
+            self.add_HFCs_emissions()
             self.S = self.F.dot(self.inv_q)
             self.S = pd.concat([self.S, self.S_exio]).fillna(0)
             self.S = self.S.reindex(self.A.columns, axis=1)
@@ -1959,6 +1930,80 @@ class IOTables:
         self.FY = self.FY.reindex(self.C.columns).fillna(0)
 
         self.emission_metadata = pd.concat([self.emission_metadata, self.unit_exio])
+
+    def add_HFCs_emissions(self):
+        """
+        Method matching HFCs accounts to IOIC product classification
+        :return: self.F with HFCs flows included
+        """
+
+        industry_mapping = {"2.C.3 Aluminium Production": ['Basic and semi-finished products of aluminum and alloys', 'Unwrought aluminum including alloys'],
+        "2.C.4 Magnesium Production": ['Basic and semi-finished products of non-ferrous metals and alloys (except aluminum)', 'Other unwrought non-ferrous metals including alloys'],
+        "2.E.1 Integrated Circuit or Semiconductor": ['Printed and integrated circuits, semiconductors and printed circuit assemblies'],
+        "2.E.5 Other": ['Other electronic components'],
+        "2.F.1.a Commercial Refrigeration": ['Heating and cooling equipment (except household refrigerators and freezers)'],
+        "2.F.1.b Domestic Refrigeration": ['Major appliances'],
+        "2.F.1.c Industrial Refrigeration": ['Heating and cooling equipment (except household refrigerators and freezers)'],
+        "2.F.1.d Transport Refrigeration": ['Heating and cooling equipment (except household refrigerators and freezers)'],
+        "2.F.1.e Mobile Air-conditioning": ['Heating and cooling equipment (except household refrigerators and freezers)'],
+        "2.F.1.f Stationary Air-conditioning": ['Heating and cooling equipment (except household refrigerators and freezers)'],
+        "2.F.2 Foam Blowing Agents": ['Foam products (except for construction)', 'Plastic and foam building and construction materials'],
+        "2.F.3 Fire Protection": ['Other miscellaneous manufactured products'],
+        "2.F.4 Aerosols": ['Soaps and cleaning compounds', 'Perfumes and toiletries', 'Lubricants and other petroleum refinery products', 'Medical, dental and personal safety supplies, instruments and equipment'],
+        "2.F.5 Solvents": ['Chemical products, n.e.c.'],
+        "2.F.6 Other Applications":  ['Chemical products, n.e.c.'],
+        "2.G.1 Electrical Equipment": ['Batteries and battery chargers', 'Communication and electric wire and cable', 'Wiring devices', 'Other electrical equipment and components'],
+        "2.G.4 Other": ['Other miscellaneous manufactured products']} # TODO look for more precision
+
+        ### environmental values
+        all_GES = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Environmental_data/SF6_HFC_PFC_emissions.xlsx'),'Canada_UNFCCC_emissions', index_col=0)
+        all_GES = all_GES.dropna(axis=0, subset=['numberValue'])
+
+        # keep hfcs only
+        hfcs_list = ['C10F18', 'C2F6', 'C3F8', 'C4F10', 'C5F12', 'C6F14', 'c-C3F6', 'c-C4F8', 'CF4', 'CO', 'HFC-125', 'HFC-134', 'HFC-134a', 'HFC-143', 'HFC-143a', 'HFC-152', 'HFC-152a', 'HFC-161', 'HFC-227ea', 'HFC-23',
+                'HFC-236cb', 'HFC-236ea', 'HFC-236fa', 'HFC-245ca', 'HFC-245fa', 'HFC-32', 'HFC-365mfc', 'HFC-41', 'HFC-43-10mee', 'NF3', 'SF6']
+        hfcs = all_GES.loc[all_GES['gas'].isin(hfcs_list)].copy()
+        hfcs['category'] = hfcs['category'].replace("\s+", " ", regex=True).str.strip()
+        hfcs = hfcs.loc[hfcs['category'].isin([k for k in industry_mapping.keys()])].reset_index(drop=True)
+
+        # convert to kg
+        mass_conversion_factors = { "kg": 1, "t": 1000, "kt": 1000000 }
+        hfcs['numberValue'] = hfcs['unit'].map(mass_conversion_factors).mul(hfcs['numberValue'])
+
+        hfcs = hfcs.loc[(hfcs['measure'] == 'Net emissions/removals') & (hfcs['year'] == self.year), ['category', 'gas', 'numberValue']]
+
+        hfcs = hfcs.set_index(['gas', 'category'])
+        hfcs.rename_axis(['gas', 'category'])
+
+        ### economic values
+        V = self.V.groupby(axis='columns',level=0).sum()
+
+        R = pd.DataFrame(columns=V.index)
+
+        for k, io_sectors in industry_mapping.items():
+            temp = V.iloc[V.index.get_level_values(1).isin([i for i in io_sectors])]
+            # economic allocation
+            temp = temp.div(temp.values.sum())
+
+            temp = temp.reindex(V.index).fillna(0)
+            temp = temp.T
+            temp = temp.assign(category=k).set_index('category', append=True)
+            R = pd.concat([R, temp])
+
+        idx = pd.MultiIndex.from_tuples(R.index, names=['province', 'category'])
+        R = R.reset_index(drop=True).set_index(idx)
+
+        ### combine economic and environmental values (left outer join)
+        W = hfcs.join(R)
+        W.loc[:, W.columns != 'numberValue'] = W.loc[:, W.columns != 'numberValue'].mul(W['numberValue'], 0)
+        W = W.drop(columns='numberValue').groupby(level=['gas', 'province']).sum()
+        columns = pd.MultiIndex.from_tuples(W.columns)
+        W = W.reindex(columns, axis='columns')
+        W = W.assign(compartiment='Air').set_index('compartiment', append=True).reorder_levels(['province', 'gas', 'compartiment'])
+        W.index.names = len(W.index.names)*[None]
+
+        if W.columns.equals(self.F.columns):
+            self.F = pd.concat([self.F, W])
 
     def differentiate_biogenic_carbon_emissions(self):
         """
