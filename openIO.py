@@ -1588,7 +1588,7 @@ class IOTables:
         self.emission_metadata.loc['HFC-32', 'CAS Number'] = '75-10-5'
         self.emission_metadata.loc['HFC-365mfc', 'CAS Number'] = '406-58-6'
         self.emission_metadata.loc['HFC-41', 'CAS Number'] = '593-53-3'
-        self.emission_metadata.loc['HFC-4310mee', 'CAS Number'] = '138495-42-8'
+        self.emission_metadata.loc['HFC-43-10mee', 'CAS Number'] = '138495-42-8'
         self.emission_metadata.loc['NF3', 'CAS Number'] = '7783-54-2'
         self.emission_metadata.loc['SF6', 'CAS Number'] = '2551-62-4'
         self.emission_metadata.loc['c-C4F8', 'CAS Number'] = '115-25-3'
@@ -1949,11 +1949,13 @@ class IOTables:
         "2.F.1.f Stationary Air-conditioning": ['Heating and cooling equipment (except household refrigerators and freezers)'],
         "2.F.2 Foam Blowing Agents": ['Foam products (except for construction)', 'Plastic and foam building and construction materials'],
         "2.F.3 Fire Protection": ['Other miscellaneous manufactured products'],
-        "2.F.4 Aerosols": ['Soaps and cleaning compounds', 'Perfumes and toiletries', 'Lubricants and other petroleum refinery products', 'Medical, dental and personal safety supplies, instruments and equipment'],
+        "2.F.4.a Metered Dose Inhalers": ['Medical devices'],
+        "2.F.4.b Other": ['Soaps and cleaning compounds', 'Perfumes and toiletries', 'Lubricants and other petroleum refinery products',
+                          'Chemical products, n.e.c.', 'Pesticides and other agricultural chemicals', 'Paints, coatings and adhesive products'],
         "2.F.5 Solvents": ['Chemical products, n.e.c.'],
         "2.F.6 Other Applications":  ['Chemical products, n.e.c.'],
         "2.G.1 Electrical Equipment": ['Batteries and battery chargers', 'Communication and electric wire and cable', 'Wiring devices', 'Other electrical equipment and components'],
-        "2.G.4 Other": ['Other miscellaneous manufactured products']} # TODO look for more precision
+        "2.G.4 Other": ['Other miscellaneous manufactured products']}
 
         ### environmental values
         all_GES = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Environmental_data/SF6_HFC_PFC_emissions.xlsx'),'Canada_UNFCCC_emissions', index_col=0)
