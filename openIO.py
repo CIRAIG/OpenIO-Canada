@@ -1937,25 +1937,8 @@ class IOTables:
         :return: self.F with HFCs flows included
         """
 
-        industry_mapping = {"2.C.3 Aluminium Production": ['Basic and semi-finished products of aluminum and alloys', 'Unwrought aluminum including alloys'],
-        "2.C.4 Magnesium Production": ['Basic and semi-finished products of non-ferrous metals and alloys (except aluminum)', 'Other unwrought non-ferrous metals including alloys'],
-        "2.E.1 Integrated Circuit or Semiconductor": ['Printed and integrated circuits, semiconductors and printed circuit assemblies'],
-        "2.E.5 Other": ['Other electronic components'],
-        "2.F.1.a Commercial Refrigeration": ['Heating and cooling equipment (except household refrigerators and freezers)'],
-        "2.F.1.b Domestic Refrigeration": ['Major appliances'],
-        "2.F.1.c Industrial Refrigeration": ['Heating and cooling equipment (except household refrigerators and freezers)'],
-        "2.F.1.d Transport Refrigeration": ['Heating and cooling equipment (except household refrigerators and freezers)'],
-        "2.F.1.e Mobile Air-conditioning": ['Heating and cooling equipment (except household refrigerators and freezers)'],
-        "2.F.1.f Stationary Air-conditioning": ['Heating and cooling equipment (except household refrigerators and freezers)'],
-        "2.F.2 Foam Blowing Agents": ['Foam products (except for construction)', 'Plastic and foam building and construction materials'],
-        "2.F.3 Fire Protection": ['Other miscellaneous manufactured products'],
-        "2.F.4.a Metered Dose Inhalers": ['Medical devices'],
-        "2.F.4.b Other": ['Soaps and cleaning compounds', 'Perfumes and toiletries', 'Lubricants and other petroleum refinery products',
-                          'Chemical products, n.e.c.', 'Pesticides and other agricultural chemicals', 'Paints, coatings and adhesive products'],
-        "2.F.5 Solvents": ['Chemical products, n.e.c.'],
-        "2.F.6 Other Applications":  ['Chemical products, n.e.c.'],
-        "2.G.1 Electrical Equipment": ['Batteries and battery chargers', 'Communication and electric wire and cable', 'Wiring devices', 'Other electrical equipment and components'],
-        "2.G.4 Other": ['Other miscellaneous manufactured products']}
+        with open(pkg_resources.resource_filename(__name__, '/Data/Concordances/concordance_HFCs.json'),'r') as f:
+            industry_mapping = json.load(f)
 
         ### environmental values
         all_GES = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Environmental_data/SF6_HFC_PFC_emissions.xlsx'),'Canada_UNFCCC_emissions', index_col=0)
