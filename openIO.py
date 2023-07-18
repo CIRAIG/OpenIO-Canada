@@ -2115,7 +2115,8 @@ class IOTables:
 
     def add_HFCs_emissions(self):
         """
-        Method matching HFCs accounts to IOIC product classification
+        Method matching HFCs accounts to IOIC product classification.
+        Source of the data: https://doi.org/10.5281/zenodo.7432088
         :return: self.F with HFCs flows included
         """
 
