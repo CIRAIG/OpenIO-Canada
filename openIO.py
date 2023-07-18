@@ -710,8 +710,8 @@ class IOTables:
                         scaled_imports_Y = ((import_distribution_Y.T * import_markets.fillna(0).loc[
                             importing_province, exporting_province]).T).reindex(import_distribution_Y.index).fillna(0)
 
-                        self.assert_order(exporting_province, importing_province, scaled_imports_U, scaled_imports_K,
-                                          scaled_imports_Y)
+                        self.assert_order(exporting_province, importing_province, scaled_imports_U, scaled_imports_Y,
+                                          scaled_imports_K)
 
                         # assign new values into self.U
                         self.U.loc[exporting_province, importing_province] = (
@@ -2434,7 +2434,7 @@ class IOTables:
                    scaled_imports_U.loc[:, self.U.columns.levels[1]].reindex(
                        self.U.loc[exporting_province, importing_province].columns, axis=1).columns)
 
-        if scaled_imports_K != None:
+        if isinstance(scaled_imports_K, pd.DataFrame):
             assert all(self.K.loc[exporting_province, importing_province].index ==
                        scaled_imports_K.loc[:, self.K.columns.levels[1]].reindex(
                            self.K.loc[exporting_province, importing_province].columns, axis=1).index)
