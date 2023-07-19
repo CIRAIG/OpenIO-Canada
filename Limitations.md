@@ -1,4 +1,4 @@
-The following paragraphs present the limitations of openIO-Canada v2.6.
+The following paragraphs present the limitations of openIO-Canada v2.7.
 
 - The sectors within a province importing international goods is not known. In other words, we know Quebec is importing X$
 amount of steel from the US, but we do not know if it's the construction or the manufacturing sector which needs the X$ 
@@ -19,3 +19,4 @@ currently be underestimated. The same is true of SF6, HFCs and PFCs emissions.
 - NPRI emissions from the Education services sector were (arbitrarily) split 50/50 between the public and private sector
 - There is a non-negligible amount of emissions from the NPRI that could not be matched to the IMPACT World+ impact 
 assessment methodology, hence having a null impact.
+- For the Canadian part of openIO-Canada, the capital formation (and not the consumption of capital) was endogenized.

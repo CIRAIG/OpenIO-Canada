@@ -2096,8 +2096,12 @@ class IOTables:
         :return: self.S and self.F with product classification if it's been selected
         """
 
-
-        self.F = self.F.dot(self.V.dot(self.inv_g).T)
+        if self.endogenizing:
+            # use old g (w/o endogenization) because we didnt scale down the value added in g
+            inv_g = pd.DataFrame(np.diag((1 / self.g.sum()).replace(np.inf, 0)), self.g.columns, self.g.columns)
+            self.F = self.F.dot(self.V.dot(inv_g).T)
+        else:
+            self.F = self.F.dot(self.V.dot(self.inv_g).T)
         self.F = pd.concat([self.F, self.minerals])
         self.add_HFCs_emissions()
         self.S = self.F.dot(self.inv_q)
