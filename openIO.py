@@ -577,6 +577,16 @@ class IOTables:
         assert np.isclose((self.U.sum(1) + self.K.sum(1) + self.Y.sum(1) - self.INT_imports.sum(1)).sum(),
                           self.q.sum(1).sum())
 
+        # correct added value to account for the fact that capitals were endogenized
+        capital_added_value_removal = pd.concat([-self.K.sum()] * len(self.matching_dict), axis=1).T
+        capital_added_value_removal.index = pd.MultiIndex.from_product(
+            [self.matching_dict.keys(), ['Capital endogenization removal']])
+        for province in self.matching_dict.keys():
+            capital_added_value_removal.loc[[i for i in self.matching_dict.keys() if i != province], province] = 0
+        self.W = pd.concat([self.W, capital_added_value_removal])
+
+        assert np.isclose((self.U.sum() + self.K.sum() + self.W.sum()).sum(), self.g.sum().sum())
+
     def province_import_export(self, province_trade_file):
         """
         Method extracting and formatting inter province imports/exports
@@ -914,35 +924,31 @@ class IOTables:
         :return: self.A, self.R and self.Y
         """
 
+        # recalculate g because we introduced K
         if self.endogenizing:
-            # recalculate g because we introduced K
             g = (self.U.sum() + self.W.sum() + self.who_uses_int_imports_U.sum() + self.K.sum() +
                  self.who_uses_int_imports_K.sum())
+            g = pd.concat([g] * len(self.matching_dict), axis=1).T
+            g.index = self.g.index
+            g.columns = pd.MultiIndex.from_tuples(g.columns)
+            for province in self.matching_dict.keys():
+                g.loc[[i for i in g.index.levels[0] if i != province], province] = 0
+            self.g = g.copy('deep')
 
-            self.inv_q = pd.DataFrame(np.diag((1 / self.q.sum(1)).replace(np.inf, 0)), self.q.index, self.q.index)
-            self.inv_g = pd.DataFrame(np.diag((1 / g).replace(np.inf, 0)), self.g.columns, self.g.columns)
+        self.inv_q = pd.DataFrame(np.diag((1 / self.q.sum(axis=1)).replace(np.inf, 0)), self.q.index, self.q.index)
+        self.inv_g = pd.DataFrame(np.diag((1 / self.g.sum()).replace(np.inf, 0)), self.g.columns, self.g.columns)
 
-            self.A = self.U.dot(self.inv_g.dot(self.V.T)).dot(self.inv_q)
+        self.A = self.U.dot(self.inv_g.dot(self.V.T)).dot(self.inv_q)
+        self.R = self.W.dot(self.inv_g.dot(self.V.T)).dot(self.inv_q)
+
+        if self.exiobase_folder:
+            self.merchandise_imports_scaled_U = self.merchandise_imports_scaled_U.reindex(
+                self.U.columns, axis=1).dot(self.inv_g.dot(self.V.T)).dot(self.inv_q)
+            self.merchandise_imports_scaled_K = self.merchandise_imports_scaled_K.reindex(
+                self.U.columns, axis=1).dot(self.inv_g.dot(self.V.T)).dot(self.inv_q)
+
+        if self.endogenizing:
             self.K = self.K.dot(self.inv_g.dot(self.V.T)).dot(self.inv_q)
-            self.R = self.W.dot(self.inv_g.dot(self.V.T)).dot(self.inv_q)
-
-            if self.exiobase_folder:
-                self.merchandise_imports_scaled_U = self.merchandise_imports_scaled_U.reindex(
-                    self.U.columns, axis=1).dot(self.inv_g.dot(self.V.T)).dot(self.inv_q)
-                self.merchandise_imports_scaled_K = self.merchandise_imports_scaled_K.reindex(
-                    self.U.columns, axis=1).dot(self.inv_g.dot(self.V.T)).dot(self.inv_q)
-
-        else:
-            self.inv_q = pd.DataFrame(np.diag((1 / self.q.sum(axis=1)).replace(np.inf, 0)), self.q.index, self.q.index)
-            self.inv_g = pd.DataFrame(np.diag((1 / self.g.sum()).replace(np.inf, 0)), self.g.columns, self.g.columns)
-
-            self.A = self.U.dot(self.inv_g.dot(self.V.T)).dot(self.inv_q)
-            self.R = self.W.dot(self.inv_g.dot(self.V.T)).dot(self.inv_q)
-            if self.exiobase_folder:
-                self.merchandise_imports_scaled_U = self.merchandise_imports_scaled_U.reindex(
-                    self.U.columns, axis=1).dot(self.inv_g.dot(self.V.T)).dot(self.inv_q)
-                self.merchandise_imports_scaled_K = self.merchandise_imports_scaled_K.reindex(
-                    self.U.columns, axis=1).dot(self.inv_g.dot(self.V.T)).dot(self.inv_q)
 
     def link_international_trade_data_to_exiobase(self):
         """
@@ -2096,12 +2102,7 @@ class IOTables:
         :return: self.S and self.F with product classification if it's been selected
         """
 
-        if self.endogenizing:
-            # use old g (w/o endogenization) because we didnt scale down the value added in g
-            inv_g = pd.DataFrame(np.diag((1 / self.g.sum()).replace(np.inf, 0)), self.g.columns, self.g.columns)
-            self.F = self.F.dot(self.V.dot(inv_g).T)
-        else:
-            self.F = self.F.dot(self.V.dot(self.inv_g).T)
+        self.F = self.F.dot(self.V.dot(self.inv_g).T)
         self.F = pd.concat([self.F, self.minerals])
         self.add_HFCs_emissions()
         self.S = self.F.dot(self.inv_q)
