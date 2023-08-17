@@ -115,6 +115,7 @@ class IOTables:
 
         files = [i for i in os.walk(folder_path)]
         files = [i for i in files[0][2] if i[:2] in self.matching_dict.keys() and 'SUT' in i]
+        files.sort()
         self.year = int(files[0].split('SUT_C')[1].split('_')[0])
 
         try:
