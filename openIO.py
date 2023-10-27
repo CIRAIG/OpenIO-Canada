@@ -541,8 +541,8 @@ class IOTables:
                         if len(endo[endo.Capitals == capital].loc[:, 'IOIC']) == 1:
                             self.K.loc[:, (province, endo[endo.Capitals == capital].loc[:, 'IOIC'].iloc[0])] += df.loc[:,capital]
                         else:
-                            print('There is an issue while allocating capital formation of openIO-Canada for '
-                                  'the capital: ' + capital + ' and for the province: ' + province)
+                            warnings.warn('There is more capital ' + capital + ' for the province: ' + province +
+                                          ' purchased than total purchases of the corresponding sector in that year.')
 
         # add a final demand category for households for building residential structures
         df = self.Y.loc(axis=1)[:, 'Gross fixed capital formation, Construction', 'Residential structures'].copy('deep')
@@ -807,8 +807,11 @@ class IOTables:
         assert np.isclose(self.Y.sum().sum() + self.who_uses_int_imports_Y.sum().sum(), before_distribution_Y)
 
         # check that nothing fuzzy is happening with negative values that are not due to artefacts
-        assert len(self.U[self.U < -1].dropna(how='all', axis=1).dropna(how='all', axis=0)) == 0
-        assert len(self.K[self.K < -1].dropna(how='all', axis=1).dropna(how='all', axis=0)) == 0
+        if not len(self.U[self.U < -1].dropna(how='all', axis=1).dropna(how='all', axis=0)) == 0:
+            warnings.warn("Warning! The import data for the following sectors is inconsistent with the supply and use "
+                          "data and stipulates that these sectors import more than what they are using "+
+                          str([i for i in self.U[self.U < -1].dropna(how='all', axis=1).dropna(how='all', axis=0).index])+
+                          ". The resulting negative values will be forced to zero.")
         # remove negative artefacts (like 1e-10$)
         self.U = self.U[self.U > 0].fillna(0)
         assert not self.U[self.U < 0].any().any()
