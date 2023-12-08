@@ -1,461 +1,553 @@
-﻿REF_DATE,GEO,DGUID,Sector,UOM,UOM_ID,SCALAR_FACTOR,SCALAR_ID,VECTOR,COORDINATE,VALUE,STATUS,SYMBOL,TERMINATED,DECIMALS
-2009,Canada,2016A000011124,"Total, industries and households",Cubic metres,72,thousands,3,v86719702,1.1,39243345,,,,0
-2009,Canada,2016A000011124,"Total, industries",Cubic metres,72,thousands,3,v86719703,1.2,35654691,,,,0
-2009,Canada,2016A000011124,Crop production [BS111],Cubic metres,72,thousands,3,v86719704,1.3,1524319,,,,0
-2009,Canada,2016A000011124,Animal production [BS112],Cubic metres,72,thousands,3,v86719705,1.4,1299882,,,,0
-2009,Canada,2016A000011124,Forestry and logging [BS11300],Cubic metres,72,thousands,3,v86719706,1.5,346,,,,0
-2009,Canada,2016A000011124,"Fishing, hunting and trapping [BS11400]",Cubic metres,72,thousands,3,v86719707,1.6,,..,,,0
-2009,Canada,2016A000011124,Support activities for agriculture and forestry [BS11500],Cubic metres,72,thousands,3,v86719708,1.7,,..,,,0
-2009,Canada,2016A000011124,Oil and gas extraction [BS21100],Cubic metres,72,thousands,3,v86719709,1.8,289149,,,,0
-2009,Canada,2016A000011124,Coal mining [BS21210],Cubic metres,72,thousands,3,v86719710,1.9,20966,,,,0
-2009,Canada,2016A000011124,Metal ore mining [BS21220],Cubic metres,72,thousands,3,v86719711,1.1,319054,,,,0
-2009,Canada,2016A000011124,Non-metallic mineral mining and quarrying [BS21230],Cubic metres,72,thousands,3,v86719712,1.11,103073,,,,0
-2009,Canada,2016A000011124,Support activities for mining and oil and gas extraction [BS21300],Cubic metres,72,thousands,3,v86719713,1.12,9,,,,0
-2009,Canada,2016A000011124,"Electric power generation, transmission and distribution [BS22110]",Cubic metres,72,thousands,3,v86719714,1.13,26213561,,,,0
-2009,Canada,2016A000011124,"Natural gas distribution, water, sewage and other systems [BS221A0]",Cubic metres,72,thousands,3,v86719715,1.14,968870,,,,0
-2009,Canada,2016A000011124,Residential building construction [BS23A00],Cubic metres,72,thousands,3,v86719716,1.15,4929,,,,0
-2009,Canada,2016A000011124,Non-residential building construction [BS23B00],Cubic metres,72,thousands,3,v86719717,1.16,2092,,,,0
-2009,Canada,2016A000011124,Transportation engineering construction [BS23C10],Cubic metres,72,thousands,3,v86719718,1.17,87,,,,0
-2009,Canada,2016A000011124,Oil and gas engineering construction [BS23C20],Cubic metres,72,thousands,3,v86719719,1.18,11,,,,0
-2009,Canada,2016A000011124,Electric power engineering construction [BS23C30],Cubic metres,72,thousands,3,v86719720,1.19,32,,,,0
-2009,Canada,2016A000011124,Communication engineering construction [BS23C40],Cubic metres,72,thousands,3,v86719721,1.2,5,,,,0
-2009,Canada,2016A000011124,Other engineering construction [BS23C50],Cubic metres,72,thousands,3,v86719722,1.21,16,,,,0
-2009,Canada,2016A000011124,Repair construction [BS23D00],Cubic metres,72,thousands,3,v86719723,1.22,144,,,,0
-2009,Canada,2016A000011124,Other activities of the construction industry [BS23E00],Cubic metres,72,thousands,3,v86719724,1.23,32,,,,0
-2009,Canada,2016A000011124,Food manufacturing [BS311],Cubic metres,72,thousands,3,v86719725,1.24,332330,,,,0
-2009,Canada,2016A000011124,Beverage and tobacco product manufacturing [BS312],Cubic metres,72,thousands,3,v86719726,1.25,46939,,,,0
-2009,Canada,2016A000011124,Textile and textile product mills [BS31A],Cubic metres,72,thousands,3,v86719727,1.26,4070,,,,0
-2009,Canada,2016A000011124,Clothing and leather and allied product manufacturing [BS31B],Cubic metres,72,thousands,3,v86719728,1.27,887,,,,0
-2009,Canada,2016A000011124,Wood product manufacturing [BS321],Cubic metres,72,thousands,3,v86719729,1.28,24565,,,,0
-2009,Canada,2016A000011124,Paper manufacturing [BS322],Cubic metres,72,thousands,3,v86719730,1.29,1678136,,,,0
-2009,Canada,2016A000011124,Printing and related support activities [BS323],Cubic metres,72,thousands,3,v86719731,1.3,1202,,,,0
-2009,Canada,2016A000011124,Petroleum and coal product manufacturing [BS324],Cubic metres,72,thousands,3,v86719732,1.31,316151,,,,0
-2009,Canada,2016A000011124,Chemical manufacturing [BS325],Cubic metres,72,thousands,3,v86719733,1.32,352201,,,,0
-2009,Canada,2016A000011124,Plastic and rubber products manufacturing [BS326],Cubic metres,72,thousands,3,v86719734,1.33,27570,,,,0
-2009,Canada,2016A000011124,Non-metallic mineral product manufacturing [BS327],Cubic metres,72,thousands,3,v86719735,1.34,39042,,,,0
-2009,Canada,2016A000011124,Primary metal manufacturing [BS331],Cubic metres,72,thousands,3,v86719736,1.35,1057979,,,,0
-2009,Canada,2016A000011124,Fabricated metal product manufacturing [BS332],Cubic metres,72,thousands,3,v86719737,1.36,13879,,,,0
-2009,Canada,2016A000011124,Machinery manufacturing [BS333],Cubic metres,72,thousands,3,v86719738,1.37,2663,,,,0
-2009,Canada,2016A000011124,Computer and electronic product manufacturing [BS334],Cubic metres,72,thousands,3,v86719739,1.38,2581,,,,0
-2009,Canada,2016A000011124,Electrical equipment and component manufacturing [BS335],Cubic metres,72,thousands,3,v86719740,1.39,1528,,,,0
-2009,Canada,2016A000011124,Transportation equipment manufacturing [BS336],Cubic metres,72,thousands,3,v86719741,1.4,21390,,,,0
-2009,Canada,2016A000011124,Furniture and related product manufacturing [BS337],Cubic metres,72,thousands,3,v86719742,1.41,1522,,,,0
-2009,Canada,2016A000011124,Miscellaneous manufacturing [BS339],Cubic metres,72,thousands,3,v86719743,1.42,2796,,,,0
-2009,Canada,2016A000011124,Wholesale trade [BS41000],Cubic metres,72,thousands,3,v86719744,1.43,52648,,,,0
-2009,Canada,2016A000011124,Retail trade [BS4A000],Cubic metres,72,thousands,3,v86719745,1.44,42876,,,,0
-2009,Canada,2016A000011124,Air transportation [BS48100],Cubic metres,72,thousands,3,v86719746,1.45,1972,,,,0
-2009,Canada,2016A000011124,Rail transportation [BS48200],Cubic metres,72,thousands,3,v86719747,1.46,3245,,,,0
-2009,Canada,2016A000011124,Water transportation [BS48300],Cubic metres,72,thousands,3,v86719748,1.47,1592,,,,0
-2009,Canada,2016A000011124,Truck transportation [BS48400],Cubic metres,72,thousands,3,v86719749,1.48,6452,,,,0
-2009,Canada,2016A000011124,"Transit, ground passenger and scenic and sightseeing transportation, taxi and limousine service and support activities for transportation [BS48B00]",Cubic metres,72,thousands,3,v86719750,1.49,16956,,,,0
-2009,Canada,2016A000011124,Pipeline transportation [BS48600],Cubic metres,72,thousands,3,v86719751,1.5,3286,,,,0
-2009,Canada,2016A000011124,Postal service and couriers and messengers [BS49A00],Cubic metres,72,thousands,3,v86719752,1.51,465,,,,0
-2009,Canada,2016A000011124,Warehousing and storage [BS49300],Cubic metres,72,thousands,3,v86719753,1.52,3463,,,,0
-2009,Canada,2016A000011124,Motion picture and sound recording industries [BS51200],Cubic metres,72,thousands,3,v86719754,1.53,3785,,,,0
-2009,Canada,2016A000011124,Radio and television broadcasting [BS51510],Cubic metres,72,thousands,3,v86719755,1.54,19,,,,0
-2009,Canada,2016A000011124,"Publishing, pay and specialty services, telecommunications and other information services [BS51B00]",Cubic metres,72,thousands,3,v86719756,1.55,5289,,,,0
-2009,Canada,2016A000011124,Depository credit intermediation and monetary authorities [BS52B00],Cubic metres,72,thousands,3,v86719757,1.56,15951,,,,0
-2009,Canada,2016A000011124,Insurance carriers [BS52410],Cubic metres,72,thousands,3,v86719758,1.57,317,,,,0
-2009,Canada,2016A000011124,Lessors of real estate [BS53110],Cubic metres,72,thousands,3,v86719759,1.58,162584,,,,0
-2009,Canada,2016A000011124,Owner-occupied dwellings [BS5311A],Cubic metres,72,thousands,3,v86719760,1.59,0,,,,0
-2009,Canada,2016A000011124,Rental and leasing services and lessors of non-financial intangible assets (except copyrighted works) [BS53B00],Cubic metres,72,thousands,3,v86719761,1.6,3836,,,,0
-2009,Canada,2016A000011124,"Other finance, insurance and real estate services and management of companies and enterprises [BS5A000]",Cubic metres,72,thousands,3,v86719762,1.61,72726,,,,0
-2009,Canada,2016A000011124,"Legal, accounting and architectural, engineering and related services [BS541C0]",Cubic metres,72,thousands,3,v86719763,1.62,9325,,,,0
-2009,Canada,2016A000011124,"Computer systems design and other professional, scientific and technical services [BS541D0]",Cubic metres,72,thousands,3,v86719764,1.63,3565,,,,0
-2009,Canada,2016A000011124,"Advertising, public relations and related services [BS54180]",Cubic metres,72,thousands,3,v86719765,1.64,365,,,,0
-2009,Canada,2016A000011124,Administrative and support services [BS56100],Cubic metres,72,thousands,3,v86719766,1.65,2952,,,,0
-2009,Canada,2016A000011124,Waste management and remediation services [BS56200],Cubic metres,72,thousands,3,v86719767,1.66,9475,,,,0
-2009,Canada,2016A000011124,Educational services [BS61000],Cubic metres,72,thousands,3,v86719768,1.67,10008,,,,0
-2009,Canada,2016A000011124,Health care and social assistance [BS62000],Cubic metres,72,thousands,3,v86719769,1.68,62672,,,,0
-2009,Canada,2016A000011124,"Arts, entertainment and recreation [BS71000]",Cubic metres,72,thousands,3,v86719770,1.69,4958,,,,0
-2009,Canada,2016A000011124,Accommodation and food services [BS72000],Cubic metres,72,thousands,3,v86719771,1.7,55034,,,,0
-2009,Canada,2016A000011124,Repair and maintenance [BS81100],Cubic metres,72,thousands,3,v86719772,1.71,10995,,,,0
-2009,Canada,2016A000011124,Personal services and private households [BS81A00],Cubic metres,72,thousands,3,v86719773,1.72,7871,,,,0
-2009,Canada,2016A000011124,Professional and similar organisations [BS81300],Cubic metres,72,thousands,3,v86719774,1.73,3270,,,,0
-2009,Canada,2016A000011124,Repair and maintenance [FC11000],Cubic metres,72,thousands,3,v86719775,1.74,0,,,,0
-2009,Canada,2016A000011124,Operating supplies [FC12000],Cubic metres,72,thousands,3,v86719776,1.75,0,,,,0
-2009,Canada,2016A000011124,Office supplies [FC13000],Cubic metres,72,thousands,3,v86719777,1.76,0,,,,0
-2009,Canada,2016A000011124,"Advertising, promotion, meals, entertainment, and travel [FC20000]",Cubic metres,72,thousands,3,v86719778,1.77,0,,,,0
-2009,Canada,2016A000011124,Transportation margins [FC30000],Cubic metres,72,thousands,3,v86719779,1.78,0,,,,0
-2009,Canada,2016A000011124,Non-profit education services [NP61000],Cubic metres,72,thousands,3,v86719780,1.79,14016,,,,0
-2009,Canada,2016A000011124,Non-profit social assistance [NP62400],Cubic metres,72,thousands,3,v86719781,1.8,19447,,,,0
-2009,Canada,2016A000011124,"Non-profit arts, entertainment and recreation [NP71000]",Cubic metres,72,thousands,3,v86719782,1.81,11336,,,,0
-2009,Canada,2016A000011124,Religious organizations [NP81310],Cubic metres,72,thousands,3,v86719783,1.82,51266,,,,0
-2009,Canada,2016A000011124,Miscellaneous non-profit institutions serving households [NPA0000],Cubic metres,72,thousands,3,v86719784,1.83,101658,,,,0
-2009,Canada,2016A000011124,Educational services (except universities) [GS611B0],Cubic metres,72,thousands,3,v86719785,1.84,12434,,,,0
-2009,Canada,2016A000011124,Universities [GS61130],Cubic metres,72,thousands,3,v86719786,1.85,16022,,,,0
-2009,Canada,2016A000011124,Hospitals [GS62200],Cubic metres,72,thousands,3,v86719787,1.86,45536,,,,0
-2009,Canada,2016A000011124,Nursing and residential care facilities [GS62300],Cubic metres,72,thousands,3,v86719788,1.87,1723,,,,0
-2009,Canada,2016A000011124,Other federal government services [GS91100],Cubic metres,72,thousands,3,v86719789,1.88,8427,,,,0
-2009,Canada,2016A000011124,Other provincial and territorial government services [GS91200],Cubic metres,72,thousands,3,v86719790,1.89,35015,,,,0
-2009,Canada,2016A000011124,Other municipal government services [GS91300],Cubic metres,72,thousands,3,v86719791,1.9,68916,,,,0
-2009,Canada,2016A000011124,Other aboriginal government services [GS91400],Cubic metres,72,thousands,3,v86719792,1.91,16934,,,,0
-2009,Canada,2016A000011124,Households,Cubic metres,72,thousands,3,v86719793,1.92,3588654,,,,0
-2011,Canada,2016A000011124,"Total, industries and households",Cubic metres,72,thousands,3,v86719702,1.1,35531959,,,,0
-2011,Canada,2016A000011124,"Total, industries",Cubic metres,72,thousands,3,v86719703,1.2,32025726,,,,0
-2011,Canada,2016A000011124,Crop production [BS111],Cubic metres,72,thousands,3,v86719704,1.3,1017946,,,,0
-2011,Canada,2016A000011124,Animal production [BS112],Cubic metres,72,thousands,3,v86719705,1.4,810264,,,,0
-2011,Canada,2016A000011124,Forestry and logging [BS11300],Cubic metres,72,thousands,3,v86719706,1.5,585,,,,0
-2011,Canada,2016A000011124,"Fishing, hunting and trapping [BS11400]",Cubic metres,72,thousands,3,v86719707,1.6,,..,,,0
-2011,Canada,2016A000011124,Support activities for agriculture and forestry [BS11500],Cubic metres,72,thousands,3,v86719708,1.7,,..,,,0
-2011,Canada,2016A000011124,Oil and gas extraction [BS21100],Cubic metres,72,thousands,3,v86719709,1.8,342961,,,,0
-2011,Canada,2016A000011124,Coal mining [BS21210],Cubic metres,72,thousands,3,v86719710,1.9,33632,,,,0
-2011,Canada,2016A000011124,Metal ore mining [BS21220],Cubic metres,72,thousands,3,v86719711,1.1,260066,,,,0
-2011,Canada,2016A000011124,Non-metallic mineral mining and quarrying [BS21230],Cubic metres,72,thousands,3,v86719712,1.11,123732,,,,0
-2011,Canada,2016A000011124,Support activities for mining and oil and gas extraction [BS21300],Cubic metres,72,thousands,3,v86719713,1.12,26,,,,0
-2011,Canada,2016A000011124,"Electric power generation, transmission and distribution [BS22110]",Cubic metres,72,thousands,3,v86719714,1.13,23715875,,,,0
-2011,Canada,2016A000011124,"Natural gas distribution, water, sewage and other systems [BS221A0]",Cubic metres,72,thousands,3,v86719715,1.14,925044,,,,0
-2011,Canada,2016A000011124,Residential building construction [BS23A00],Cubic metres,72,thousands,3,v86719716,1.15,5296,,,,0
-2011,Canada,2016A000011124,Non-residential building construction [BS23B00],Cubic metres,72,thousands,3,v86719717,1.16,2300,,,,0
-2011,Canada,2016A000011124,Transportation engineering construction [BS23C10],Cubic metres,72,thousands,3,v86719718,1.17,130,,,,0
-2011,Canada,2016A000011124,Oil and gas engineering construction [BS23C20],Cubic metres,72,thousands,3,v86719719,1.18,18,,,,0
-2011,Canada,2016A000011124,Electric power engineering construction [BS23C30],Cubic metres,72,thousands,3,v86719720,1.19,51,,,,0
-2011,Canada,2016A000011124,Communication engineering construction [BS23C40],Cubic metres,72,thousands,3,v86719721,1.2,17,,,,0
-2011,Canada,2016A000011124,Other engineering construction [BS23C50],Cubic metres,72,thousands,3,v86719722,1.21,42,,,,0
-2011,Canada,2016A000011124,Repair construction [BS23D00],Cubic metres,72,thousands,3,v86719723,1.22,102,,,,0
-2011,Canada,2016A000011124,Other activities of the construction industry [BS23E00],Cubic metres,72,thousands,3,v86719724,1.23,51,,,,0
-2011,Canada,2016A000011124,Food manufacturing [BS311],Cubic metres,72,thousands,3,v86719725,1.24,346390,,,,0
-2011,Canada,2016A000011124,Beverage and tobacco product manufacturing [BS312],Cubic metres,72,thousands,3,v86719726,1.25,39401,,,,0
-2011,Canada,2016A000011124,Textile and textile product mills [BS31A],Cubic metres,72,thousands,3,v86719727,1.26,3045,,,,0
-2011,Canada,2016A000011124,Clothing and leather and allied product manufacturing [BS31B],Cubic metres,72,thousands,3,v86719728,1.27,883,,,,0
-2011,Canada,2016A000011124,Wood product manufacturing [BS321],Cubic metres,72,thousands,3,v86719729,1.28,23713,,,,0
-2011,Canada,2016A000011124,Paper manufacturing [BS322],Cubic metres,72,thousands,3,v86719730,1.29,1448139,,,,0
-2011,Canada,2016A000011124,Printing and related support activities [BS323],Cubic metres,72,thousands,3,v86719731,1.3,1149,,,,0
-2011,Canada,2016A000011124,Petroleum and coal product manufacturing [BS324],Cubic metres,72,thousands,3,v86719732,1.31,288781,,,,0
-2011,Canada,2016A000011124,Chemical manufacturing [BS325],Cubic metres,72,thousands,3,v86719733,1.32,450962,,,,0
-2011,Canada,2016A000011124,Plastic and rubber products manufacturing [BS326],Cubic metres,72,thousands,3,v86719734,1.33,26699,,,,0
-2011,Canada,2016A000011124,Non-metallic mineral product manufacturing [BS327],Cubic metres,72,thousands,3,v86719735,1.34,44282,,,,0
-2011,Canada,2016A000011124,Primary metal manufacturing [BS331],Cubic metres,72,thousands,3,v86719736,1.35,1076117,,,,0
-2011,Canada,2016A000011124,Fabricated metal product manufacturing [BS332],Cubic metres,72,thousands,3,v86719737,1.36,5997,,,,0
-2011,Canada,2016A000011124,Machinery manufacturing [BS333],Cubic metres,72,thousands,3,v86719738,1.37,3573,,,,0
-2011,Canada,2016A000011124,Computer and electronic product manufacturing [BS334],Cubic metres,72,thousands,3,v86719739,1.38,3458,,,,0
-2011,Canada,2016A000011124,Electrical equipment and component manufacturing [BS335],Cubic metres,72,thousands,3,v86719740,1.39,1099,,,,0
-2011,Canada,2016A000011124,Transportation equipment manufacturing [BS336],Cubic metres,72,thousands,3,v86719741,1.4,24070,,,,0
-2011,Canada,2016A000011124,Furniture and related product manufacturing [BS337],Cubic metres,72,thousands,3,v86719742,1.41,1364,,,,0
-2011,Canada,2016A000011124,Miscellaneous manufacturing [BS339],Cubic metres,72,thousands,3,v86719743,1.42,881,,,,0
-2011,Canada,2016A000011124,Wholesale trade [BS41000],Cubic metres,72,thousands,3,v86719744,1.43,57259,,,,0
-2011,Canada,2016A000011124,Retail trade [BS4A000],Cubic metres,72,thousands,3,v86719745,1.44,45269,,,,0
-2011,Canada,2016A000011124,Air transportation [BS48100],Cubic metres,72,thousands,3,v86719746,1.45,1416,,,,0
-2011,Canada,2016A000011124,Rail transportation [BS48200],Cubic metres,72,thousands,3,v86719747,1.46,7201,,,,0
-2011,Canada,2016A000011124,Water transportation [BS48300],Cubic metres,72,thousands,3,v86719748,1.47,2322,,,,0
-2011,Canada,2016A000011124,Truck transportation [BS48400],Cubic metres,72,thousands,3,v86719749,1.48,7614,,,,0
-2011,Canada,2016A000011124,"Transit, ground passenger and scenic and sightseeing transportation, taxi and limousine service and support activities for transportation [BS48B00]",Cubic metres,72,thousands,3,v86719750,1.49,23038,,,,0
-2011,Canada,2016A000011124,Pipeline transportation [BS48600],Cubic metres,72,thousands,3,v86719751,1.5,4235,,,,0
-2011,Canada,2016A000011124,Postal service and couriers and messengers [BS49A00],Cubic metres,72,thousands,3,v86719752,1.51,412,,,,0
-2011,Canada,2016A000011124,Warehousing and storage [BS49300],Cubic metres,72,thousands,3,v86719753,1.52,3736,,,,0
-2011,Canada,2016A000011124,Motion picture and sound recording industries [BS51200],Cubic metres,72,thousands,3,v86719754,1.53,2780,,,,0
-2011,Canada,2016A000011124,Radio and television broadcasting [BS51510],Cubic metres,72,thousands,3,v86719755,1.54,6,,,,0
-2011,Canada,2016A000011124,"Publishing, pay and specialty services, telecommunications and other information services [BS51B00]",Cubic metres,72,thousands,3,v86719756,1.55,3851,,,,0
-2011,Canada,2016A000011124,Depository credit intermediation and monetary authorities [BS52B00],Cubic metres,72,thousands,3,v86719757,1.56,21718,,,,0
-2011,Canada,2016A000011124,Insurance carriers [BS52410],Cubic metres,72,thousands,3,v86719758,1.57,310,,,,0
-2011,Canada,2016A000011124,Lessors of real estate [BS53110],Cubic metres,72,thousands,3,v86719759,1.58,158778,,,,0
-2011,Canada,2016A000011124,Owner-occupied dwellings [BS5311A],Cubic metres,72,thousands,3,v86719760,1.59,0,,,,0
-2011,Canada,2016A000011124,Rental and leasing services and lessors of non-financial intangible assets (except copyrighted works) [BS53B00],Cubic metres,72,thousands,3,v86719761,1.6,4891,,,,0
-2011,Canada,2016A000011124,"Other finance, insurance and real estate services and management of companies and enterprises [BS5A000]",Cubic metres,72,thousands,3,v86719762,1.61,72307,,,,0
-2011,Canada,2016A000011124,"Legal, accounting and architectural, engineering and related services [BS541C0]",Cubic metres,72,thousands,3,v86719763,1.62,8855,,,,0
-2011,Canada,2016A000011124,"Computer systems design and other professional, scientific and technical services [BS541D0]",Cubic metres,72,thousands,3,v86719764,1.63,4221,,,,0
-2011,Canada,2016A000011124,"Advertising, public relations and related services [BS54180]",Cubic metres,72,thousands,3,v86719765,1.64,124,,,,0
-2011,Canada,2016A000011124,Administrative and support services [BS56100],Cubic metres,72,thousands,3,v86719766,1.65,2903,,,,0
-2011,Canada,2016A000011124,Waste management and remediation services [BS56200],Cubic metres,72,thousands,3,v86719767,1.66,10053,,,,0
-2011,Canada,2016A000011124,Educational services [BS61000],Cubic metres,72,thousands,3,v86719768,1.67,15365,,,,0
-2011,Canada,2016A000011124,Health care and social assistance [BS62000],Cubic metres,72,thousands,3,v86719769,1.68,70793,,,,0
-2011,Canada,2016A000011124,"Arts, entertainment and recreation [BS71000]",Cubic metres,72,thousands,3,v86719770,1.69,4981,,,,0
-2011,Canada,2016A000011124,Accommodation and food services [BS72000],Cubic metres,72,thousands,3,v86719771,1.7,49606,,,,0
-2011,Canada,2016A000011124,Repair and maintenance [BS81100],Cubic metres,72,thousands,3,v86719772,1.71,11911,,,,0
-2011,Canada,2016A000011124,Personal services and private households [BS81A00],Cubic metres,72,thousands,3,v86719773,1.72,8367,,,,0
-2011,Canada,2016A000011124,Professional and similar organisations [BS81300],Cubic metres,72,thousands,3,v86719774,1.73,1754,,,,0
-2011,Canada,2016A000011124,Repair and maintenance [FC11000],Cubic metres,72,thousands,3,v86719775,1.74,0,,,,0
-2011,Canada,2016A000011124,Operating supplies [FC12000],Cubic metres,72,thousands,3,v86719776,1.75,0,,,,0
-2011,Canada,2016A000011124,Office supplies [FC13000],Cubic metres,72,thousands,3,v86719777,1.76,0,,,,0
-2011,Canada,2016A000011124,"Advertising, promotion, meals, entertainment, and travel [FC20000]",Cubic metres,72,thousands,3,v86719778,1.77,0,,,,0
-2011,Canada,2016A000011124,Transportation margins [FC30000],Cubic metres,72,thousands,3,v86719779,1.78,0,,,,0
-2011,Canada,2016A000011124,Non-profit education services [NP61000],Cubic metres,72,thousands,3,v86719780,1.79,14319,,,,0
-2011,Canada,2016A000011124,Non-profit social assistance [NP62400],Cubic metres,72,thousands,3,v86719781,1.8,17044,,,,0
-2011,Canada,2016A000011124,"Non-profit arts, entertainment and recreation [NP71000]",Cubic metres,72,thousands,3,v86719782,1.81,8687,,,,0
-2011,Canada,2016A000011124,Religious organizations [NP81310],Cubic metres,72,thousands,3,v86719783,1.82,51901,,,,0
-2011,Canada,2016A000011124,Miscellaneous non-profit institutions serving households [NPA0000],Cubic metres,72,thousands,3,v86719784,1.83,107994,,,,0
-2011,Canada,2016A000011124,Educational services (except universities) [GS611B0],Cubic metres,72,thousands,3,v86719785,1.84,8783,,,,0
-2011,Canada,2016A000011124,Universities [GS61130],Cubic metres,72,thousands,3,v86719786,1.85,12637,,,,0
-2011,Canada,2016A000011124,Hospitals [GS62200],Cubic metres,72,thousands,3,v86719787,1.86,41103,,,,0
-2011,Canada,2016A000011124,Nursing and residential care facilities [GS62300],Cubic metres,72,thousands,3,v86719788,1.87,1604,,,,0
-2011,Canada,2016A000011124,Other federal government services [GS91100],Cubic metres,72,thousands,3,v86719789,1.88,10446,,,,0
-2011,Canada,2016A000011124,Other provincial and territorial government services [GS91200],Cubic metres,72,thousands,3,v86719790,1.89,40924,,,,0
-2011,Canada,2016A000011124,Other municipal government services [GS91300],Cubic metres,72,thousands,3,v86719791,1.9,58535,,,,0
-2011,Canada,2016A000011124,Other aboriginal government services [GS91400],Cubic metres,72,thousands,3,v86719792,1.91,17534,,,,0
-2011,Canada,2016A000011124,Households,Cubic metres,72,thousands,3,v86719793,1.92,3506234,,,,0
-2013,Canada,2016A000011124,"Total, industries and households",Cubic metres,72,thousands,3,v86719702,1.1,37457754,,,,0
-2013,Canada,2016A000011124,"Total, industries",Cubic metres,72,thousands,3,v86719703,1.2,34328855,,,,0
-2013,Canada,2016A000011124,Crop production [BS111],Cubic metres,72,thousands,3,v86719704,1.3,1197935,,,,0
-2013,Canada,2016A000011124,Animal production [BS112],Cubic metres,72,thousands,3,v86719705,1.4,1007916,,,,0
-2013,Canada,2016A000011124,Forestry and logging [BS11300],Cubic metres,72,thousands,3,v86719706,1.5,426,,,,0
-2013,Canada,2016A000011124,"Fishing, hunting and trapping [BS11400]",Cubic metres,72,thousands,3,v86719707,1.6,,..,,,0
-2013,Canada,2016A000011124,Support activities for agriculture and forestry [BS11500],Cubic metres,72,thousands,3,v86719708,1.7,,..,,,0
-2013,Canada,2016A000011124,Oil and gas extraction [BS21100],Cubic metres,72,thousands,3,v86719709,1.8,360856,,,,0
-2013,Canada,2016A000011124,Coal mining [BS21210],Cubic metres,72,thousands,3,v86719710,1.9,91903,,,,0
-2013,Canada,2016A000011124,Metal ore mining [BS21220],Cubic metres,72,thousands,3,v86719711,1.1,368179,,,,0
-2013,Canada,2016A000011124,Non-metallic mineral mining and quarrying [BS21230],Cubic metres,72,thousands,3,v86719712,1.11,78241,,,,0
-2013,Canada,2016A000011124,Support activities for mining and oil and gas extraction [BS21300],Cubic metres,72,thousands,3,v86719713,1.12,30,,,,0
-2013,Canada,2016A000011124,"Electric power generation, transmission and distribution [BS22110]",Cubic metres,72,thousands,3,v86719714,1.13,25145462,,,,0
-2013,Canada,2016A000011124,"Natural gas distribution, water, sewage and other systems [BS221A0]",Cubic metres,72,thousands,3,v86719715,1.14,887747,,,,0
-2013,Canada,2016A000011124,Residential building construction [BS23A00],Cubic metres,72,thousands,3,v86719716,1.15,6503,,,,0
-2013,Canada,2016A000011124,Non-residential building construction [BS23B00],Cubic metres,72,thousands,3,v86719717,1.16,2666,,,,0
-2013,Canada,2016A000011124,Transportation engineering construction [BS23C10],Cubic metres,72,thousands,3,v86719718,1.17,185,,,,0
-2013,Canada,2016A000011124,Oil and gas engineering construction [BS23C20],Cubic metres,72,thousands,3,v86719719,1.18,33,,,,0
-2013,Canada,2016A000011124,Electric power engineering construction [BS23C30],Cubic metres,72,thousands,3,v86719720,1.19,83,,,,0
-2013,Canada,2016A000011124,Communication engineering construction [BS23C40],Cubic metres,72,thousands,3,v86719721,1.2,13,,,,0
-2013,Canada,2016A000011124,Other engineering construction [BS23C50],Cubic metres,72,thousands,3,v86719722,1.21,84,,,,0
-2013,Canada,2016A000011124,Repair construction [BS23D00],Cubic metres,72,thousands,3,v86719723,1.22,95,,,,0
-2013,Canada,2016A000011124,Other activities of the construction industry [BS23E00],Cubic metres,72,thousands,3,v86719724,1.23,63,,,,0
-2013,Canada,2016A000011124,Food manufacturing [BS311],Cubic metres,72,thousands,3,v86719725,1.24,367014,,,,0
-2013,Canada,2016A000011124,Beverage and tobacco product manufacturing [BS312],Cubic metres,72,thousands,3,v86719726,1.25,39080,,,,0
-2013,Canada,2016A000011124,Textile and textile product mills [BS31A],Cubic metres,72,thousands,3,v86719727,1.26,5953,,,,0
-2013,Canada,2016A000011124,Clothing and leather and allied product manufacturing [BS31B],Cubic metres,72,thousands,3,v86719728,1.27,691,,,,0
-2013,Canada,2016A000011124,Wood product manufacturing [BS321],Cubic metres,72,thousands,3,v86719729,1.28,21718,,,,0
-2013,Canada,2016A000011124,Paper manufacturing [BS322],Cubic metres,72,thousands,3,v86719730,1.29,1537380,,,,0
-2013,Canada,2016A000011124,Printing and related support activities [BS323],Cubic metres,72,thousands,3,v86719731,1.3,2098,,,,0
-2013,Canada,2016A000011124,Petroleum and coal product manufacturing [BS324],Cubic metres,72,thousands,3,v86719732,1.31,263264,,,,0
-2013,Canada,2016A000011124,Chemical manufacturing [BS325],Cubic metres,72,thousands,3,v86719733,1.32,445648,,,,0
-2013,Canada,2016A000011124,Plastic and rubber products manufacturing [BS326],Cubic metres,72,thousands,3,v86719734,1.33,27382,,,,0
-2013,Canada,2016A000011124,Non-metallic mineral product manufacturing [BS327],Cubic metres,72,thousands,3,v86719735,1.34,60348,,,,0
-2013,Canada,2016A000011124,Primary metal manufacturing [BS331],Cubic metres,72,thousands,3,v86719736,1.35,1141699,,,,0
-2013,Canada,2016A000011124,Fabricated metal product manufacturing [BS332],Cubic metres,72,thousands,3,v86719737,1.36,5253,,,,0
-2013,Canada,2016A000011124,Machinery manufacturing [BS333],Cubic metres,72,thousands,3,v86719738,1.37,4476,,,,0
-2013,Canada,2016A000011124,Computer and electronic product manufacturing [BS334],Cubic metres,72,thousands,3,v86719739,1.38,3526,,,,0
-2013,Canada,2016A000011124,Electrical equipment and component manufacturing [BS335],Cubic metres,72,thousands,3,v86719740,1.39,1251,,,,0
-2013,Canada,2016A000011124,Transportation equipment manufacturing [BS336],Cubic metres,72,thousands,3,v86719741,1.4,34745,,,,0
-2013,Canada,2016A000011124,Furniture and related product manufacturing [BS337],Cubic metres,72,thousands,3,v86719742,1.41,1725,,,,0
-2013,Canada,2016A000011124,Miscellaneous manufacturing [BS339],Cubic metres,72,thousands,3,v86719743,1.42,2788,,,,0
-2013,Canada,2016A000011124,Wholesale trade [BS41000],Cubic metres,72,thousands,3,v86719744,1.43,75450,,,,0
-2013,Canada,2016A000011124,Retail trade [BS4A000],Cubic metres,72,thousands,3,v86719745,1.44,59778,,,,0
-2013,Canada,2016A000011124,Air transportation [BS48100],Cubic metres,72,thousands,3,v86719746,1.45,1971,,,,0
-2013,Canada,2016A000011124,Rail transportation [BS48200],Cubic metres,72,thousands,3,v86719747,1.46,6629,,,,0
-2013,Canada,2016A000011124,Water transportation [BS48300],Cubic metres,72,thousands,3,v86719748,1.47,2617,,,,0
-2013,Canada,2016A000011124,Truck transportation [BS48400],Cubic metres,72,thousands,3,v86719749,1.48,9891,,,,0
-2013,Canada,2016A000011124,"Transit, ground passenger and scenic and sightseeing transportation, taxi and limousine service and support activities for transportation [BS48B00]",Cubic metres,72,thousands,3,v86719750,1.49,29746,,,,0
-2013,Canada,2016A000011124,Pipeline transportation [BS48600],Cubic metres,72,thousands,3,v86719751,1.5,5528,,,,0
-2013,Canada,2016A000011124,Postal service and couriers and messengers [BS49A00],Cubic metres,72,thousands,3,v86719752,1.51,451,,,,0
-2013,Canada,2016A000011124,Warehousing and storage [BS49300],Cubic metres,72,thousands,3,v86719753,1.52,4719,,,,0
-2013,Canada,2016A000011124,Motion picture and sound recording industries [BS51200],Cubic metres,72,thousands,3,v86719754,1.53,3345,,,,0
-2013,Canada,2016A000011124,Radio and television broadcasting [BS51510],Cubic metres,72,thousands,3,v86719755,1.54,3,,,,0
-2013,Canada,2016A000011124,"Publishing, pay and specialty services, telecommunications and other information services [BS51B00]",Cubic metres,72,thousands,3,v86719756,1.55,5753,,,,0
-2013,Canada,2016A000011124,Depository credit intermediation and monetary authorities [BS52B00],Cubic metres,72,thousands,3,v86719757,1.56,25920,,,,0
-2013,Canada,2016A000011124,Insurance carriers [BS52410],Cubic metres,72,thousands,3,v86719758,1.57,391,,,,0
-2013,Canada,2016A000011124,Lessors of real estate [BS53110],Cubic metres,72,thousands,3,v86719759,1.58,190964,,,,0
-2013,Canada,2016A000011124,Owner-occupied dwellings [BS5311A],Cubic metres,72,thousands,3,v86719760,1.59,0,,,,0
-2013,Canada,2016A000011124,Rental and leasing services and lessors of non-financial intangible assets (except copyrighted works) [BS53B00],Cubic metres,72,thousands,3,v86719761,1.6,5706,,,,0
-2013,Canada,2016A000011124,"Other finance, insurance and real estate services and management of companies and enterprises [BS5A000]",Cubic metres,72,thousands,3,v86719762,1.61,93937,,,,0
-2013,Canada,2016A000011124,"Legal, accounting and architectural, engineering and related services [BS541C0]",Cubic metres,72,thousands,3,v86719763,1.62,8912,,,,0
-2013,Canada,2016A000011124,"Computer systems design and other professional, scientific and technical services [BS541D0]",Cubic metres,72,thousands,3,v86719764,1.63,5098,,,,0
-2013,Canada,2016A000011124,"Advertising, public relations and related services [BS54180]",Cubic metres,72,thousands,3,v86719765,1.64,130,,,,0
-2013,Canada,2016A000011124,Administrative and support services [BS56100],Cubic metres,72,thousands,3,v86719766,1.65,3553,,,,0
-2013,Canada,2016A000011124,Waste management and remediation services [BS56200],Cubic metres,72,thousands,3,v86719767,1.66,14138,,,,0
-2013,Canada,2016A000011124,Educational services [BS61000],Cubic metres,72,thousands,3,v86719768,1.67,16138,,,,0
-2013,Canada,2016A000011124,Health care and social assistance [BS62000],Cubic metres,72,thousands,3,v86719769,1.68,88342,,,,0
-2013,Canada,2016A000011124,"Arts, entertainment and recreation [BS71000]",Cubic metres,72,thousands,3,v86719770,1.69,6356,,,,0
-2013,Canada,2016A000011124,Accommodation and food services [BS72000],Cubic metres,72,thousands,3,v86719771,1.7,60493,,,,0
-2013,Canada,2016A000011124,Repair and maintenance [BS81100],Cubic metres,72,thousands,3,v86719772,1.71,14145,,,,0
-2013,Canada,2016A000011124,Personal services and private households [BS81A00],Cubic metres,72,thousands,3,v86719773,1.72,9677,,,,0
-2013,Canada,2016A000011124,Professional and similar organisations [BS81300],Cubic metres,72,thousands,3,v86719774,1.73,2502,,,,0
-2013,Canada,2016A000011124,Repair and maintenance [FC11000],Cubic metres,72,thousands,3,v86719775,1.74,0,,,,0
-2013,Canada,2016A000011124,Operating supplies [FC12000],Cubic metres,72,thousands,3,v86719776,1.75,0,,,,0
-2013,Canada,2016A000011124,Office supplies [FC13000],Cubic metres,72,thousands,3,v86719777,1.76,0,,,,0
-2013,Canada,2016A000011124,"Advertising, promotion, meals, entertainment, and travel [FC20000]",Cubic metres,72,thousands,3,v86719778,1.77,0,,,,0
-2013,Canada,2016A000011124,Transportation margins [FC30000],Cubic metres,72,thousands,3,v86719779,1.78,0,,,,0
-2013,Canada,2016A000011124,Non-profit education services [NP61000],Cubic metres,72,thousands,3,v86719780,1.79,15792,,,,0
-2013,Canada,2016A000011124,Non-profit social assistance [NP62400],Cubic metres,72,thousands,3,v86719781,1.8,26367,,,,0
-2013,Canada,2016A000011124,"Non-profit arts, entertainment and recreation [NP71000]",Cubic metres,72,thousands,3,v86719782,1.81,11463,,,,0
-2013,Canada,2016A000011124,Religious organizations [NP81310],Cubic metres,72,thousands,3,v86719783,1.82,66175,,,,0
-2013,Canada,2016A000011124,Miscellaneous non-profit institutions serving households [NPA0000],Cubic metres,72,thousands,3,v86719784,1.83,124723,,,,0
-2013,Canada,2016A000011124,Educational services (except universities) [GS611B0],Cubic metres,72,thousands,3,v86719785,1.84,13326,,,,0
-2013,Canada,2016A000011124,Universities [GS61130],Cubic metres,72,thousands,3,v86719786,1.85,17785,,,,0
-2013,Canada,2016A000011124,Hospitals [GS62200],Cubic metres,72,thousands,3,v86719787,1.86,61258,,,,0
-2013,Canada,2016A000011124,Nursing and residential care facilities [GS62300],Cubic metres,72,thousands,3,v86719788,1.87,2285,,,,0
-2013,Canada,2016A000011124,Other federal government services [GS91100],Cubic metres,72,thousands,3,v86719789,1.88,9095,,,,0
-2013,Canada,2016A000011124,Other provincial and territorial government services [GS91200],Cubic metres,72,thousands,3,v86719790,1.89,28060,,,,0
-2013,Canada,2016A000011124,Other municipal government services [GS91300],Cubic metres,72,thousands,3,v86719791,1.9,68298,,,,0
-2013,Canada,2016A000011124,Other aboriginal government services [GS91400],Cubic metres,72,thousands,3,v86719792,1.91,17487,,,,0
-2013,Canada,2016A000011124,Households,Cubic metres,72,thousands,3,v86719793,1.92,3128899,,,,0
-2015,Canada,2016A000011124,"Total, industries and households",Cubic metres,72,thousands,3,v86719702,1.1,36451889,,,,0
-2015,Canada,2016A000011124,"Total, industries",Cubic metres,72,thousands,3,v86719703,1.2,33291291,,,,0
-2015,Canada,2016A000011124,Crop production [BS111],Cubic metres,72,thousands,3,v86719704,1.3,1794775,,,,0
-2015,Canada,2016A000011124,Animal production [BS112],Cubic metres,72,thousands,3,v86719705,1.4,1573015,,,,0
-2015,Canada,2016A000011124,Forestry and logging [BS11300],Cubic metres,72,thousands,3,v86719706,1.5,172,,,,0
-2015,Canada,2016A000011124,"Fishing, hunting and trapping [BS11400]",Cubic metres,72,thousands,3,v86719707,1.6,,..,,,0
-2015,Canada,2016A000011124,Support activities for agriculture and forestry [BS11500],Cubic metres,72,thousands,3,v86719708,1.7,,..,,,0
-2015,Canada,2016A000011124,Oil and gas extraction [BS21100],Cubic metres,72,thousands,3,v86719709,1.8,371843,,,,0
-2015,Canada,2016A000011124,Coal mining [BS21210],Cubic metres,72,thousands,3,v86719710,1.9,62815,,,,0
-2015,Canada,2016A000011124,Metal ore mining [BS21220],Cubic metres,72,thousands,3,v86719711,1.1,370020,,,,0
-2015,Canada,2016A000011124,Non-metallic mineral mining and quarrying [BS21230],Cubic metres,72,thousands,3,v86719712,1.11,97532,,,,0
-2015,Canada,2016A000011124,Support activities for mining and oil and gas extraction [BS21300],Cubic metres,72,thousands,3,v86719713,1.12,29,,,,0
-2015,Canada,2016A000011124,"Electric power generation, transmission and distribution [BS22110]",Cubic metres,72,thousands,3,v86719714,1.13,23318293,,,,0
-2015,Canada,2016A000011124,"Natural gas distribution, water, sewage and other systems [BS221A0]",Cubic metres,72,thousands,3,v86719715,1.14,1000739,,,,0
-2015,Canada,2016A000011124,Residential building construction [BS23A00],Cubic metres,72,thousands,3,v86719716,1.15,5644,,,,0
-2015,Canada,2016A000011124,Non-residential building construction [BS23B00],Cubic metres,72,thousands,3,v86719717,1.16,2476,,,,0
-2015,Canada,2016A000011124,Transportation engineering construction [BS23C10],Cubic metres,72,thousands,3,v86719718,1.17,220,,,,0
-2015,Canada,2016A000011124,Oil and gas engineering construction [BS23C20],Cubic metres,72,thousands,3,v86719719,1.18,28,,,,0
-2015,Canada,2016A000011124,Electric power engineering construction [BS23C30],Cubic metres,72,thousands,3,v86719720,1.19,99,,,,0
-2015,Canada,2016A000011124,Communication engineering construction [BS23C40],Cubic metres,72,thousands,3,v86719721,1.2,33,,,,0
-2015,Canada,2016A000011124,Other engineering construction [BS23C50],Cubic metres,72,thousands,3,v86719722,1.21,91,,,,0
-2015,Canada,2016A000011124,Repair construction [BS23D00],Cubic metres,72,thousands,3,v86719723,1.22,80,,,,0
-2015,Canada,2016A000011124,Other activities of the construction industry [BS23E00],Cubic metres,72,thousands,3,v86719724,1.23,50,,,,0
-2015,Canada,2016A000011124,Food manufacturing [BS311],Cubic metres,72,thousands,3,v86719725,1.24,306587,,,,0
-2015,Canada,2016A000011124,Beverage and tobacco product manufacturing [BS312],Cubic metres,72,thousands,3,v86719726,1.25,38285,,,,0
-2015,Canada,2016A000011124,Textile and textile product mills [BS31A],Cubic metres,72,thousands,3,v86719727,1.26,4534,,,,0
-2015,Canada,2016A000011124,Clothing and leather and allied product manufacturing [BS31B],Cubic metres,72,thousands,3,v86719728,1.27,305,,,,0
-2015,Canada,2016A000011124,Wood product manufacturing [BS321],Cubic metres,72,thousands,3,v86719729,1.28,30426,,,,0
-2015,Canada,2016A000011124,Paper manufacturing [BS322],Cubic metres,72,thousands,3,v86719730,1.29,1512719,,,,0
-2015,Canada,2016A000011124,Printing and related support activities [BS323],Cubic metres,72,thousands,3,v86719731,1.3,1156,,,,0
-2015,Canada,2016A000011124,Petroleum and coal product manufacturing [BS324],Cubic metres,72,thousands,3,v86719732,1.31,220576,,,,0
-2015,Canada,2016A000011124,Chemical manufacturing [BS325],Cubic metres,72,thousands,3,v86719733,1.32,525340,,,,0
-2015,Canada,2016A000011124,Plastic and rubber products manufacturing [BS326],Cubic metres,72,thousands,3,v86719734,1.33,21895,,,,0
-2015,Canada,2016A000011124,Non-metallic mineral product manufacturing [BS327],Cubic metres,72,thousands,3,v86719735,1.34,40929,,,,0
-2015,Canada,2016A000011124,Primary metal manufacturing [BS331],Cubic metres,72,thousands,3,v86719736,1.35,905604,,,,0
-2015,Canada,2016A000011124,Fabricated metal product manufacturing [BS332],Cubic metres,72,thousands,3,v86719737,1.36,9659,,,,0
-2015,Canada,2016A000011124,Machinery manufacturing [BS333],Cubic metres,72,thousands,3,v86719738,1.37,3923,,,,0
-2015,Canada,2016A000011124,Computer and electronic product manufacturing [BS334],Cubic metres,72,thousands,3,v86719739,1.38,3036,,,,0
-2015,Canada,2016A000011124,Electrical equipment and component manufacturing [BS335],Cubic metres,72,thousands,3,v86719740,1.39,1072,,,,0
-2015,Canada,2016A000011124,Transportation equipment manufacturing [BS336],Cubic metres,72,thousands,3,v86719741,1.4,30375,,,,0
-2015,Canada,2016A000011124,Furniture and related product manufacturing [BS337],Cubic metres,72,thousands,3,v86719742,1.41,1215,,,,0
-2015,Canada,2016A000011124,Miscellaneous manufacturing [BS339],Cubic metres,72,thousands,3,v86719743,1.42,2782,,,,0
-2015,Canada,2016A000011124,Wholesale trade [BS41000],Cubic metres,72,thousands,3,v86719744,1.43,62334,,,,0
-2015,Canada,2016A000011124,Retail trade [BS4A000],Cubic metres,72,thousands,3,v86719745,1.44,51960,,,,0
-2015,Canada,2016A000011124,Air transportation [BS48100],Cubic metres,72,thousands,3,v86719746,1.45,2290,,,,0
-2015,Canada,2016A000011124,Rail transportation [BS48200],Cubic metres,72,thousands,3,v86719747,1.46,4749,,,,0
-2015,Canada,2016A000011124,Water transportation [BS48300],Cubic metres,72,thousands,3,v86719748,1.47,2630,,,,0
-2015,Canada,2016A000011124,Truck transportation [BS48400],Cubic metres,72,thousands,3,v86719749,1.48,11462,,,,0
-2015,Canada,2016A000011124,"Transit, ground passenger and scenic and sightseeing transportation, taxi and limousine service and support activities for transportation [BS48B00]",Cubic metres,72,thousands,3,v86719750,1.49,29778,,,,0
-2015,Canada,2016A000011124,Pipeline transportation [BS48600],Cubic metres,72,thousands,3,v86719751,1.5,5226,,,,0
-2015,Canada,2016A000011124,Postal service and couriers and messengers [BS49A00],Cubic metres,72,thousands,3,v86719752,1.51,447,,,,0
-2015,Canada,2016A000011124,Warehousing and storage [BS49300],Cubic metres,72,thousands,3,v86719753,1.52,4031,,,,0
-2015,Canada,2016A000011124,Motion picture and sound recording industries [BS51200],Cubic metres,72,thousands,3,v86719754,1.53,2468,,,,0
-2015,Canada,2016A000011124,Radio and television broadcasting [BS51510],Cubic metres,72,thousands,3,v86719755,1.54,0,,,,0
-2015,Canada,2016A000011124,"Publishing, pay and specialty services, telecommunications and other information services [BS51B00]",Cubic metres,72,thousands,3,v86719756,1.55,4164,,,,0
-2015,Canada,2016A000011124,Depository credit intermediation and monetary authorities [BS52B00],Cubic metres,72,thousands,3,v86719757,1.56,20626,,,,0
-2015,Canada,2016A000011124,Insurance carriers [BS52410],Cubic metres,72,thousands,3,v86719758,1.57,319,,,,0
-2015,Canada,2016A000011124,Lessors of real estate [BS53110],Cubic metres,72,thousands,3,v86719759,1.58,162378,,,,0
-2015,Canada,2016A000011124,Owner-occupied dwellings [BS5311A],Cubic metres,72,thousands,3,v86719760,1.59,0,,,,0
-2015,Canada,2016A000011124,Rental and leasing services and lessors of non-financial intangible assets (except copyrighted works) [BS53B00],Cubic metres,72,thousands,3,v86719761,1.6,5470,,,,0
-2015,Canada,2016A000011124,"Other finance, insurance and real estate services and management of companies and enterprises [BS5A000]",Cubic metres,72,thousands,3,v86719762,1.61,84408,,,,0
-2015,Canada,2016A000011124,"Legal, accounting and architectural, engineering and related services [BS541C0]",Cubic metres,72,thousands,3,v86719763,1.62,6998,,,,0
-2015,Canada,2016A000011124,"Computer systems design and other professional, scientific and technical services [BS541D0]",Cubic metres,72,thousands,3,v86719764,1.63,4185,,,,0
-2015,Canada,2016A000011124,"Advertising, public relations and related services [BS54180]",Cubic metres,72,thousands,3,v86719765,1.64,96,,,,0
-2015,Canada,2016A000011124,Administrative and support services [BS56100],Cubic metres,72,thousands,3,v86719766,1.65,3131,,,,0
-2015,Canada,2016A000011124,Waste management and remediation services [BS56200],Cubic metres,72,thousands,3,v86719767,1.66,25935,,,,0
-2015,Canada,2016A000011124,Educational services [BS61000],Cubic metres,72,thousands,3,v86719768,1.67,13969,,,,0
-2015,Canada,2016A000011124,Health care and social assistance [BS62000],Cubic metres,72,thousands,3,v86719769,1.68,72815,,,,0
-2015,Canada,2016A000011124,"Arts, entertainment and recreation [BS71000]",Cubic metres,72,thousands,3,v86719770,1.69,5597,,,,0
-2015,Canada,2016A000011124,Accommodation and food services [BS72000],Cubic metres,72,thousands,3,v86719771,1.7,57948,,,,0
-2015,Canada,2016A000011124,Repair and maintenance [BS81100],Cubic metres,72,thousands,3,v86719772,1.71,13432,,,,0
-2015,Canada,2016A000011124,Personal services and private households [BS81A00],Cubic metres,72,thousands,3,v86719773,1.72,7165,,,,0
-2015,Canada,2016A000011124,Professional and similar organisations [BS81300],Cubic metres,72,thousands,3,v86719774,1.73,1628,,,,0
-2015,Canada,2016A000011124,Repair and maintenance [FC11000],Cubic metres,72,thousands,3,v86719775,1.74,0,,,,0
-2015,Canada,2016A000011124,Operating supplies [FC12000],Cubic metres,72,thousands,3,v86719776,1.75,0,,,,0
-2015,Canada,2016A000011124,Office supplies [FC13000],Cubic metres,72,thousands,3,v86719777,1.76,0,,,,0
-2015,Canada,2016A000011124,"Advertising, promotion, meals, entertainment, and travel [FC20000]",Cubic metres,72,thousands,3,v86719778,1.77,0,,,,0
-2015,Canada,2016A000011124,Transportation margins [FC30000],Cubic metres,72,thousands,3,v86719779,1.78,0,,,,0
-2015,Canada,2016A000011124,Non-profit education services [NP61000],Cubic metres,72,thousands,3,v86719780,1.79,13282,,,,0
-2015,Canada,2016A000011124,Non-profit social assistance [NP62400],Cubic metres,72,thousands,3,v86719781,1.8,20625,,,,0
-2015,Canada,2016A000011124,"Non-profit arts, entertainment and recreation [NP71000]",Cubic metres,72,thousands,3,v86719782,1.81,8811,,,,0
-2015,Canada,2016A000011124,Religious organizations [NP81310],Cubic metres,72,thousands,3,v86719783,1.82,46601,,,,0
-2015,Canada,2016A000011124,Miscellaneous non-profit institutions serving households [NPA0000],Cubic metres,72,thousands,3,v86719784,1.83,101694,,,,0
-2015,Canada,2016A000011124,Educational services (except universities) [GS611B0],Cubic metres,72,thousands,3,v86719785,1.84,11672,,,,0
-2015,Canada,2016A000011124,Universities [GS61130],Cubic metres,72,thousands,3,v86719786,1.85,15317,,,,0
-2015,Canada,2016A000011124,Hospitals [GS62200],Cubic metres,72,thousands,3,v86719787,1.86,51284,,,,0
-2015,Canada,2016A000011124,Nursing and residential care facilities [GS62300],Cubic metres,72,thousands,3,v86719788,1.87,2036,,,,0
-2015,Canada,2016A000011124,Other federal government services [GS91100],Cubic metres,72,thousands,3,v86719789,1.88,7048,,,,0
-2015,Canada,2016A000011124,Other provincial and territorial government services [GS91200],Cubic metres,72,thousands,3,v86719790,1.89,15491,,,,0
-2015,Canada,2016A000011124,Other municipal government services [GS91300],Cubic metres,72,thousands,3,v86719791,1.9,55267,,,,0
-2015,Canada,2016A000011124,Other aboriginal government services [GS91400],Cubic metres,72,thousands,3,v86719792,1.91,16151,,,,0
-2015,Canada,2016A000011124,Households,Cubic metres,72,thousands,3,v86719793,1.92,3160598,,,,0
-2017,Canada,2016A000011124,"Total, industries and households",Cubic metres,72,thousands,3,v86719702,1.1,36812891,,,,0
-2017,Canada,2016A000011124,"Total, industries",Cubic metres,72,thousands,3,v86719703,1.2,33844839,,,,0
-2017,Canada,2016A000011124,Crop production [BS111],Cubic metres,72,thousands,3,v86719704,1.3,2198281,,,,0
-2017,Canada,2016A000011124,Animal production [BS112],Cubic metres,72,thousands,3,v86719705,1.4,1661308,,,,0
-2017,Canada,2016A000011124,Forestry and logging [BS11300],Cubic metres,72,thousands,3,v86719706,1.5,332,,,,0
-2017,Canada,2016A000011124,"Fishing, hunting and trapping [BS11400]",Cubic metres,72,thousands,3,v86719707,1.6,,..,,,0
-2017,Canada,2016A000011124,Support activities for agriculture and forestry [BS11500],Cubic metres,72,thousands,3,v86719708,1.7,,..,,,0
-2017,Canada,2016A000011124,Oil and gas extraction [BS21100],Cubic metres,72,thousands,3,v86719709,1.8,408859,,,,0
-2017,Canada,2016A000011124,Coal mining [BS21210],Cubic metres,72,thousands,3,v86719710,1.9,60729,,,,0
-2017,Canada,2016A000011124,Metal ore mining [BS21220],Cubic metres,72,thousands,3,v86719711,1.1,427089,,,,0
-2017,Canada,2016A000011124,Non-metallic mineral mining and quarrying [BS21230],Cubic metres,72,thousands,3,v86719712,1.11,100153,,,,0
-2017,Canada,2016A000011124,Support activities for mining and oil and gas extraction [BS21300],Cubic metres,72,thousands,3,v86719713,1.12,20,,,,0
-2017,Canada,2016A000011124,"Electric power generation, transmission and distribution [BS22110]",Cubic metres,72,thousands,3,v86719714,1.13,23267423,,,,0
-2017,Canada,2016A000011124,"Natural gas distribution, water, sewage and other systems [BS221A0]",Cubic metres,72,thousands,3,v86719715,1.14,1058034,,,,0
-2017,Canada,2016A000011124,Residential building construction [BS23A00],Cubic metres,72,thousands,3,v86719716,1.15,5265,,,,0
-2017,Canada,2016A000011124,Non-residential building construction [BS23B00],Cubic metres,72,thousands,3,v86719717,1.16,1841,,,,0
-2017,Canada,2016A000011124,Transportation engineering construction [BS23C10],Cubic metres,72,thousands,3,v86719718,1.17,195,,,,0
-2017,Canada,2016A000011124,Oil and gas engineering construction [BS23C20],Cubic metres,72,thousands,3,v86719719,1.18,21,,,,0
-2017,Canada,2016A000011124,Electric power engineering construction [BS23C30],Cubic metres,72,thousands,3,v86719720,1.19,92,,,,0
-2017,Canada,2016A000011124,Communication engineering construction [BS23C40],Cubic metres,72,thousands,3,v86719721,1.2,40,,,,0
-2017,Canada,2016A000011124,Other engineering construction [BS23C50],Cubic metres,72,thousands,3,v86719722,1.21,68,,,,0
-2017,Canada,2016A000011124,Repair construction [BS23D00],Cubic metres,72,thousands,3,v86719723,1.22,68,,,,0
-2017,Canada,2016A000011124,Other activities of the construction industry [BS23E00],Cubic metres,72,thousands,3,v86719724,1.23,40,,,,0
-2017,Canada,2016A000011124,Food manufacturing [BS311],Cubic metres,72,thousands,3,v86719725,1.24,254807,,,,0
-2017,Canada,2016A000011124,Beverage and tobacco product manufacturing [BS312],Cubic metres,72,thousands,3,v86719726,1.25,47025,,,,0
-2017,Canada,2016A000011124,Textile and textile product mills [BS31A],Cubic metres,72,thousands,3,v86719727,1.26,1694,,,,0
-2017,Canada,2016A000011124,Clothing and leather and allied product manufacturing [BS31B],Cubic metres,72,thousands,3,v86719728,1.27,554,,,,0
-2017,Canada,2016A000011124,Wood product manufacturing [BS321],Cubic metres,72,thousands,3,v86719729,1.28,36967,,,,0
-2017,Canada,2016A000011124,Paper manufacturing [BS322],Cubic metres,72,thousands,3,v86719730,1.29,1482778,,,,0
-2017,Canada,2016A000011124,Printing and related support activities [BS323],Cubic metres,72,thousands,3,v86719731,1.3,826,,,,0
-2017,Canada,2016A000011124,Petroleum and coal product manufacturing [BS324],Cubic metres,72,thousands,3,v86719732,1.31,245788,,,,0
-2017,Canada,2016A000011124,Chemical manufacturing [BS325],Cubic metres,72,thousands,3,v86719733,1.32,580820,,,,0
-2017,Canada,2016A000011124,Plastic and rubber products manufacturing [BS326],Cubic metres,72,thousands,3,v86719734,1.33,21468,,,,0
-2017,Canada,2016A000011124,Non-metallic mineral product manufacturing [BS327],Cubic metres,72,thousands,3,v86719735,1.34,46953,,,,0
-2017,Canada,2016A000011124,Primary metal manufacturing [BS331],Cubic metres,72,thousands,3,v86719736,1.35,953450,,,,0
-2017,Canada,2016A000011124,Fabricated metal product manufacturing [BS332],Cubic metres,72,thousands,3,v86719737,1.36,18345,,,,0
-2017,Canada,2016A000011124,Machinery manufacturing [BS333],Cubic metres,72,thousands,3,v86719738,1.37,1633,,,,0
-2017,Canada,2016A000011124,Computer and electronic product manufacturing [BS334],Cubic metres,72,thousands,3,v86719739,1.38,1696,,,,0
-2017,Canada,2016A000011124,Electrical equipment and component manufacturing [BS335],Cubic metres,72,thousands,3,v86719740,1.39,1955,,,,0
-2017,Canada,2016A000011124,Transportation equipment manufacturing [BS336],Cubic metres,72,thousands,3,v86719741,1.4,27902,,,,0
-2017,Canada,2016A000011124,Furniture and related product manufacturing [BS337],Cubic metres,72,thousands,3,v86719742,1.41,612,,,,0
-2017,Canada,2016A000011124,Miscellaneous manufacturing [BS339],Cubic metres,72,thousands,3,v86719743,1.42,2951,,,,0
-2017,Canada,2016A000011124,Wholesale trade [BS41000],Cubic metres,72,thousands,3,v86719744,1.43,53308,,,,0
-2017,Canada,2016A000011124,Retail trade [BS4A000],Cubic metres,72,thousands,3,v86719745,1.44,44412,,,,0
-2017,Canada,2016A000011124,Air transportation [BS48100],Cubic metres,72,thousands,3,v86719746,1.45,2331,,,,0
-2017,Canada,2016A000011124,Rail transportation [BS48200],Cubic metres,72,thousands,3,v86719747,1.46,3720,,,,0
-2017,Canada,2016A000011124,Water transportation [BS48300],Cubic metres,72,thousands,3,v86719748,1.47,2180,,,,0
-2017,Canada,2016A000011124,Truck transportation [BS48400],Cubic metres,72,thousands,3,v86719749,1.48,10410,,,,0
-2017,Canada,2016A000011124,"Transit, ground passenger and scenic and sightseeing transportation, taxi and limousine service and support activities for transportation [BS48B00]",Cubic metres,72,thousands,3,v86719750,1.49,28138,,,,0
-2017,Canada,2016A000011124,Pipeline transportation [BS48600],Cubic metres,72,thousands,3,v86719751,1.5,4829,,,,0
-2017,Canada,2016A000011124,Postal service and couriers and messengers [BS49A00],Cubic metres,72,thousands,3,v86719752,1.51,391,,,,0
-2017,Canada,2016A000011124,Warehousing and storage [BS49300],Cubic metres,72,thousands,3,v86719753,1.52,3524,,,,0
-2017,Canada,2016A000011124,Motion picture and sound recording industries [BS51200],Cubic metres,72,thousands,3,v86719754,1.53,2406,,,,0
-2017,Canada,2016A000011124,Radio and television broadcasting [BS51510],Cubic metres,72,thousands,3,v86719755,1.54,0,,,,0
-2017,Canada,2016A000011124,"Publishing, pay and specialty services, telecommunications and other information services [BS51B00]",Cubic metres,72,thousands,3,v86719756,1.55,10616,,,,0
-2017,Canada,2016A000011124,Depository credit intermediation and monetary authorities [BS52B00],Cubic metres,72,thousands,3,v86719757,1.56,18906,,,,0
-2017,Canada,2016A000011124,Insurance carriers [BS52410],Cubic metres,72,thousands,3,v86719758,1.57,290,,,,0
-2017,Canada,2016A000011124,Lessors of real estate [BS53110],Cubic metres,72,thousands,3,v86719759,1.58,140844,,,,0
-2017,Canada,2016A000011124,Owner-occupied dwellings [BS5311A],Cubic metres,72,thousands,3,v86719760,1.59,0,,,,0
-2017,Canada,2016A000011124,Rental and leasing services and lessors of non-financial intangible assets (except copyrighted works) [BS53B00],Cubic metres,72,thousands,3,v86719761,1.6,5405,,,,0
-2017,Canada,2016A000011124,"Other finance, insurance and real estate services and management of companies and enterprises [BS5A000]",Cubic metres,72,thousands,3,v86719762,1.61,73976,,,,0
-2017,Canada,2016A000011124,"Legal, accounting and architectural, engineering and related services [BS541C0]",Cubic metres,72,thousands,3,v86719763,1.62,5853,,,,0
-2017,Canada,2016A000011124,"Computer systems design and other professional, scientific and technical services [BS541D0]",Cubic metres,72,thousands,3,v86719764,1.63,3623,,,,0
-2017,Canada,2016A000011124,"Advertising, public relations and related services [BS54180]",Cubic metres,72,thousands,3,v86719765,1.64,76,,,,0
-2017,Canada,2016A000011124,Administrative and support services [BS56100],Cubic metres,72,thousands,3,v86719766,1.65,2801,,,,0
-2017,Canada,2016A000011124,Waste management and remediation services [BS56200],Cubic metres,72,thousands,3,v86719767,1.66,26905,,,,0
-2017,Canada,2016A000011124,Educational services [BS61000],Cubic metres,72,thousands,3,v86719768,1.67,14001,,,,0
-2017,Canada,2016A000011124,Health care and social assistance [BS62000],Cubic metres,72,thousands,3,v86719769,1.68,61832,,,,0
-2017,Canada,2016A000011124,"Arts, entertainment and recreation [BS71000]",Cubic metres,72,thousands,3,v86719770,1.69,4980,,,,0
-2017,Canada,2016A000011124,Accommodation and food services [BS72000],Cubic metres,72,thousands,3,v86719771,1.7,53987,,,,0
-2017,Canada,2016A000011124,Repair and maintenance [BS81100],Cubic metres,72,thousands,3,v86719772,1.71,12380,,,,0
-2017,Canada,2016A000011124,Personal services and private households [BS81A00],Cubic metres,72,thousands,3,v86719773,1.72,5971,,,,0
-2017,Canada,2016A000011124,Professional and similar organisations [BS81300],Cubic metres,72,thousands,3,v86719774,1.73,1463,,,,0
-2017,Canada,2016A000011124,Repair and maintenance [FC11000],Cubic metres,72,thousands,3,v86719775,1.74,0,,,,0
-2017,Canada,2016A000011124,Operating supplies [FC12000],Cubic metres,72,thousands,3,v86719776,1.75,0,,,,0
-2017,Canada,2016A000011124,Office supplies [FC13000],Cubic metres,72,thousands,3,v86719777,1.76,0,,,,0
-2017,Canada,2016A000011124,"Advertising, promotion, meals, entertainment, and travel [FC20000]",Cubic metres,72,thousands,3,v86719778,1.77,0,,,,0
-2017,Canada,2016A000011124,Transportation margins [FC30000],Cubic metres,72,thousands,3,v86719779,1.78,0,,,,0
-2017,Canada,2016A000011124,Non-profit education services [NP61000],Cubic metres,72,thousands,3,v86719780,1.79,12959,,,,0
-2017,Canada,2016A000011124,Non-profit social assistance [NP62400],Cubic metres,72,thousands,3,v86719781,1.8,18138,,,,0
-2017,Canada,2016A000011124,"Non-profit arts, entertainment and recreation [NP71000]",Cubic metres,72,thousands,3,v86719782,1.81,6503,,,,0
-2017,Canada,2016A000011124,Religious organizations [NP81310],Cubic metres,72,thousands,3,v86719783,1.82,43548,,,,0
-2017,Canada,2016A000011124,Miscellaneous non-profit institutions serving households [NPA0000],Cubic metres,72,thousands,3,v86719784,1.83,94601,,,,0
-2017,Canada,2016A000011124,Educational services (except universities) [GS611B0],Cubic metres,72,thousands,3,v86719785,1.84,10201,,,,0
-2017,Canada,2016A000011124,Universities [GS61130],Cubic metres,72,thousands,3,v86719786,1.85,13469,,,,0
-2017,Canada,2016A000011124,Hospitals [GS62200],Cubic metres,72,thousands,3,v86719787,1.86,44546,,,,0
-2017,Canada,2016A000011124,Nursing and residential care facilities [GS62300],Cubic metres,72,thousands,3,v86719788,1.87,1807,,,,0
-2017,Canada,2016A000011124,Other federal government services [GS91100],Cubic metres,72,thousands,3,v86719789,1.88,5675,,,,0
-2017,Canada,2016A000011124,Other provincial and territorial government services [GS91200],Cubic metres,72,thousands,3,v86719790,1.89,13891,,,,0
-2017,Canada,2016A000011124,Other municipal government services [GS91300],Cubic metres,72,thousands,3,v86719791,1.9,48218,,,,0
-2017,Canada,2016A000011124,Other aboriginal government services [GS91400],Cubic metres,72,thousands,3,v86719792,1.91,13644,,,,0
-2017,Canada,2016A000011124,Households,Cubic metres,72,thousands,3,v86719793,1.92,2968052,,,,0
+﻿"REF_DATE","GEO","DGUID","Sector","UOM","UOM_ID","SCALAR_FACTOR","SCALAR_ID","VECTOR","COORDINATE","VALUE","STATUS","SYMBOL","TERMINATED","DECIMALS"
+"2009","Canada","2016A000011124","Total, industries and households","Cubic metres","72","thousands","3","v86719702","1.1","39047242","","","","0"
+"2009","Canada","2016A000011124","Total, industries","Cubic metres","72","thousands","3","v86719703","1.2","35458587","","","","0"
+"2009","Canada","2016A000011124","Crop production [BS111]","Cubic metres","72","thousands","3","v86719704","1.3","1458956","","","","0"
+"2009","Canada","2016A000011124","Animal production [BS112]","Cubic metres","72","thousands","3","v86719705","1.4","1169141","","","","0"
+"2009","Canada","2016A000011124","Forestry and logging [BS11300]","Cubic metres","72","thousands","3","v86719706","1.5","346","","","","0"
+"2009","Canada","2016A000011124","Fishing, hunting and trapping [BS11400]","Cubic metres","72","thousands","3","v86719707","1.6","","..","","","0"
+"2009","Canada","2016A000011124","Support activities for agriculture and forestry [BS11500]","Cubic metres","72","thousands","3","v86719708","1.7","","..","","","0"
+"2009","Canada","2016A000011124","Oil and gas extraction [BS21100]","Cubic metres","72","thousands","3","v86719709","1.8","289149","","","","0"
+"2009","Canada","2016A000011124","Coal mining [BS21210]","Cubic metres","72","thousands","3","v86719710","1.9","20966","","","","0"
+"2009","Canada","2016A000011124","Metal ore mining [BS21220]","Cubic metres","72","thousands","3","v86719711","1.10","319054","","","","0"
+"2009","Canada","2016A000011124","Non-metallic mineral mining and quarrying [BS21230]","Cubic metres","72","thousands","3","v86719712","1.11","103073","","","","0"
+"2009","Canada","2016A000011124","Support activities for mining and oil and gas extraction [BS21300]","Cubic metres","72","thousands","3","v86719713","1.12","9","","","","0"
+"2009","Canada","2016A000011124","Electric power generation, transmission and distribution [BS22110]","Cubic metres","72","thousands","3","v86719714","1.13","26213561","","","","0"
+"2009","Canada","2016A000011124","Natural gas distribution, water, sewage and other systems [BS221A0]","Cubic metres","72","thousands","3","v86719715","1.14","968870","","","","0"
+"2009","Canada","2016A000011124","Residential building construction [BS23A00]","Cubic metres","72","thousands","3","v86719716","1.15","4929","","","","0"
+"2009","Canada","2016A000011124","Non-residential building construction [BS23B00]","Cubic metres","72","thousands","3","v86719717","1.16","2092","","","","0"
+"2009","Canada","2016A000011124","Transportation engineering construction [BS23C10]","Cubic metres","72","thousands","3","v86719718","1.17","87","","","","0"
+"2009","Canada","2016A000011124","Oil and gas engineering construction [BS23C20]","Cubic metres","72","thousands","3","v86719719","1.18","11","","","","0"
+"2009","Canada","2016A000011124","Electric power engineering construction [BS23C30]","Cubic metres","72","thousands","3","v86719720","1.19","32","","","","0"
+"2009","Canada","2016A000011124","Communication engineering construction [BS23C40]","Cubic metres","72","thousands","3","v86719721","1.20","5","","","","0"
+"2009","Canada","2016A000011124","Other engineering construction [BS23C50]","Cubic metres","72","thousands","3","v86719722","1.21","16","","","","0"
+"2009","Canada","2016A000011124","Repair construction [BS23D00]","Cubic metres","72","thousands","3","v86719723","1.22","144","","","","0"
+"2009","Canada","2016A000011124","Other activities of the construction industry [BS23E00]","Cubic metres","72","thousands","3","v86719724","1.23","32","","","","0"
+"2009","Canada","2016A000011124","Food manufacturing [BS311]","Cubic metres","72","thousands","3","v86719725","1.24","332330","","","","0"
+"2009","Canada","2016A000011124","Beverage and tobacco product manufacturing [BS312]","Cubic metres","72","thousands","3","v86719726","1.25","46939","","","","0"
+"2009","Canada","2016A000011124","Textile and textile product mills [BS31A]","Cubic metres","72","thousands","3","v86719727","1.26","4070","","","","0"
+"2009","Canada","2016A000011124","Clothing and leather and allied product manufacturing [BS31B]","Cubic metres","72","thousands","3","v86719728","1.27","887","","","","0"
+"2009","Canada","2016A000011124","Wood product manufacturing [BS321]","Cubic metres","72","thousands","3","v86719729","1.28","24565","","","","0"
+"2009","Canada","2016A000011124","Paper manufacturing [BS322]","Cubic metres","72","thousands","3","v86719730","1.29","1678136","","","","0"
+"2009","Canada","2016A000011124","Printing and related support activities [BS323]","Cubic metres","72","thousands","3","v86719731","1.30","1202","","","","0"
+"2009","Canada","2016A000011124","Petroleum and coal product manufacturing [BS324]","Cubic metres","72","thousands","3","v86719732","1.31","316151","","","","0"
+"2009","Canada","2016A000011124","Chemical manufacturing [BS325]","Cubic metres","72","thousands","3","v86719733","1.32","352201","","","","0"
+"2009","Canada","2016A000011124","Plastic and rubber products manufacturing [BS326]","Cubic metres","72","thousands","3","v86719734","1.33","27570","","","","0"
+"2009","Canada","2016A000011124","Non-metallic mineral product manufacturing [BS327]","Cubic metres","72","thousands","3","v86719735","1.34","39042","","","","0"
+"2009","Canada","2016A000011124","Primary metal manufacturing [BS331]","Cubic metres","72","thousands","3","v86719736","1.35","1057979","","","","0"
+"2009","Canada","2016A000011124","Fabricated metal product manufacturing [BS332]","Cubic metres","72","thousands","3","v86719737","1.36","13879","","","","0"
+"2009","Canada","2016A000011124","Machinery manufacturing [BS333]","Cubic metres","72","thousands","3","v86719738","1.37","2663","","","","0"
+"2009","Canada","2016A000011124","Computer and electronic product manufacturing [BS334]","Cubic metres","72","thousands","3","v86719739","1.38","2581","","","","0"
+"2009","Canada","2016A000011124","Electrical equipment and component manufacturing [BS335]","Cubic metres","72","thousands","3","v86719740","1.39","1528","","","","0"
+"2009","Canada","2016A000011124","Transportation equipment manufacturing [BS336]","Cubic metres","72","thousands","3","v86719741","1.40","21390","","","","0"
+"2009","Canada","2016A000011124","Furniture and related product manufacturing [BS337]","Cubic metres","72","thousands","3","v86719742","1.41","1522","","","","0"
+"2009","Canada","2016A000011124","Miscellaneous manufacturing [BS339]","Cubic metres","72","thousands","3","v86719743","1.42","2796","","","","0"
+"2009","Canada","2016A000011124","Wholesale trade [BS41000]","Cubic metres","72","thousands","3","v86719744","1.43","52648","","","","0"
+"2009","Canada","2016A000011124","Retail trade [BS4A000]","Cubic metres","72","thousands","3","v86719745","1.44","42876","","","","0"
+"2009","Canada","2016A000011124","Air transportation [BS48100]","Cubic metres","72","thousands","3","v86719746","1.45","1972","","","","0"
+"2009","Canada","2016A000011124","Rail transportation [BS48200]","Cubic metres","72","thousands","3","v86719747","1.46","3245","","","","0"
+"2009","Canada","2016A000011124","Water transportation [BS48300]","Cubic metres","72","thousands","3","v86719748","1.47","1592","","","","0"
+"2009","Canada","2016A000011124","Truck transportation [BS48400]","Cubic metres","72","thousands","3","v86719749","1.48","6452","","","","0"
+"2009","Canada","2016A000011124","Transit, ground passenger and scenic and sightseeing transportation, taxi and limousine service and support activities for transportation [BS48B00]","Cubic metres","72","thousands","3","v86719750","1.49","16956","","","","0"
+"2009","Canada","2016A000011124","Pipeline transportation [BS48600]","Cubic metres","72","thousands","3","v86719751","1.50","3286","","","","0"
+"2009","Canada","2016A000011124","Postal service and couriers and messengers [BS49A00]","Cubic metres","72","thousands","3","v86719752","1.51","465","","","","0"
+"2009","Canada","2016A000011124","Warehousing and storage [BS49300]","Cubic metres","72","thousands","3","v86719753","1.52","3463","","","","0"
+"2009","Canada","2016A000011124","Motion picture and sound recording industries [BS51200]","Cubic metres","72","thousands","3","v86719754","1.53","3785","","","","0"
+"2009","Canada","2016A000011124","Radio and television broadcasting [BS51510]","Cubic metres","72","thousands","3","v86719755","1.54","19","","","","0"
+"2009","Canada","2016A000011124","Publishing, pay and specialty services, telecommunications and other information services [BS51B00]","Cubic metres","72","thousands","3","v86719756","1.55","5289","","","","0"
+"2009","Canada","2016A000011124","Depository credit intermediation and monetary authorities [BS52B00]","Cubic metres","72","thousands","3","v86719757","1.56","15951","","","","0"
+"2009","Canada","2016A000011124","Insurance carriers [BS52410]","Cubic metres","72","thousands","3","v86719758","1.57","317","","","","0"
+"2009","Canada","2016A000011124","Lessors of real estate [BS53110]","Cubic metres","72","thousands","3","v86719759","1.58","162584","","","","0"
+"2009","Canada","2016A000011124","Owner-occupied dwellings [BS5311A]","Cubic metres","72","thousands","3","v86719760","1.59","0","","","","0"
+"2009","Canada","2016A000011124","Rental and leasing services and lessors of non-financial intangible assets (except copyrighted works) [BS53B00]","Cubic metres","72","thousands","3","v86719761","1.60","3836","","","","0"
+"2009","Canada","2016A000011124","Other finance, insurance and real estate services and management of companies and enterprises [BS5A000]","Cubic metres","72","thousands","3","v86719762","1.61","72726","","","","0"
+"2009","Canada","2016A000011124","Legal, accounting and architectural, engineering and related services [BS541C0]","Cubic metres","72","thousands","3","v86719763","1.62","9325","","","","0"
+"2009","Canada","2016A000011124","Computer systems design and other professional, scientific and technical services [BS541D0]","Cubic metres","72","thousands","3","v86719764","1.63","3565","","","","0"
+"2009","Canada","2016A000011124","Advertising, public relations and related services [BS54180]","Cubic metres","72","thousands","3","v86719765","1.64","365","","","","0"
+"2009","Canada","2016A000011124","Administrative and support services [BS56100]","Cubic metres","72","thousands","3","v86719766","1.65","2952","","","","0"
+"2009","Canada","2016A000011124","Waste management and remediation services [BS56200]","Cubic metres","72","thousands","3","v86719767","1.66","9475","","","","0"
+"2009","Canada","2016A000011124","Educational services [BS61000]","Cubic metres","72","thousands","3","v86719768","1.67","10008","","","","0"
+"2009","Canada","2016A000011124","Health care and social assistance [BS62000]","Cubic metres","72","thousands","3","v86719769","1.68","62672","","","","0"
+"2009","Canada","2016A000011124","Arts, entertainment and recreation [BS71000]","Cubic metres","72","thousands","3","v86719770","1.69","4958","","","","0"
+"2009","Canada","2016A000011124","Accommodation and food services [BS72000]","Cubic metres","72","thousands","3","v86719771","1.70","55034","","","","0"
+"2009","Canada","2016A000011124","Repair and maintenance [BS81100]","Cubic metres","72","thousands","3","v86719772","1.71","10995","","","","0"
+"2009","Canada","2016A000011124","Personal services and private households [BS81A00]","Cubic metres","72","thousands","3","v86719773","1.72","7871","","","","0"
+"2009","Canada","2016A000011124","Professional and similar organisations [BS81300]","Cubic metres","72","thousands","3","v86719774","1.73","3270","","","","0"
+"2009","Canada","2016A000011124","Repair and maintenance [FC11000]","Cubic metres","72","thousands","3","v86719775","1.74","0","","","","0"
+"2009","Canada","2016A000011124","Operating supplies [FC12000]","Cubic metres","72","thousands","3","v86719776","1.75","0","","","","0"
+"2009","Canada","2016A000011124","Office supplies [FC13000]","Cubic metres","72","thousands","3","v86719777","1.76","0","","","","0"
+"2009","Canada","2016A000011124","Advertising, promotion, meals, entertainment, and travel [FC20000]","Cubic metres","72","thousands","3","v86719778","1.77","0","","","","0"
+"2009","Canada","2016A000011124","Transportation margins [FC30000]","Cubic metres","72","thousands","3","v86719779","1.78","0","","","","0"
+"2009","Canada","2016A000011124","Non-profit education services [NP61000]","Cubic metres","72","thousands","3","v86719780","1.79","14016","","","","0"
+"2009","Canada","2016A000011124","Non-profit social assistance [NP62400]","Cubic metres","72","thousands","3","v86719781","1.80","19447","","","","0"
+"2009","Canada","2016A000011124","Non-profit arts, entertainment and recreation [NP71000]","Cubic metres","72","thousands","3","v86719782","1.81","11336","","","","0"
+"2009","Canada","2016A000011124","Religious organizations [NP81310]","Cubic metres","72","thousands","3","v86719783","1.82","51266","","","","0"
+"2009","Canada","2016A000011124","Miscellaneous non-profit institutions serving households [NPA0000]","Cubic metres","72","thousands","3","v86719784","1.83","101658","","","","0"
+"2009","Canada","2016A000011124","Educational services (except universities) [GS611B0]","Cubic metres","72","thousands","3","v86719785","1.84","12434","","","","0"
+"2009","Canada","2016A000011124","Universities [GS61130]","Cubic metres","72","thousands","3","v86719786","1.85","16022","","","","0"
+"2009","Canada","2016A000011124","Hospitals [GS62200]","Cubic metres","72","thousands","3","v86719787","1.86","45536","","","","0"
+"2009","Canada","2016A000011124","Nursing and residential care facilities [GS62300]","Cubic metres","72","thousands","3","v86719788","1.87","1723","","","","0"
+"2009","Canada","2016A000011124","Other federal government services [GS91100]","Cubic metres","72","thousands","3","v86719789","1.88","8427","","","","0"
+"2009","Canada","2016A000011124","Other provincial and territorial government services [GS91200]","Cubic metres","72","thousands","3","v86719790","1.89","35015","","","","0"
+"2009","Canada","2016A000011124","Other municipal government services [GS91300]","Cubic metres","72","thousands","3","v86719791","1.90","68916","","","","0"
+"2009","Canada","2016A000011124","Other aboriginal government services [GS91400]","Cubic metres","72","thousands","3","v86719792","1.91","16934","","","","0"
+"2009","Canada","2016A000011124","Households","Cubic metres","72","thousands","3","v86719793","1.92","3588654","","","","0"
+"2011","Canada","2016A000011124","Total, industries and households","Cubic metres","72","thousands","3","v86719702","1.1","35695436","","","","0"
+"2011","Canada","2016A000011124","Total, industries","Cubic metres","72","thousands","3","v86719703","1.2","32189555","","","","0"
+"2011","Canada","2016A000011124","Crop production [BS111]","Cubic metres","72","thousands","3","v86719704","1.3","1078447","","","","0"
+"2011","Canada","2016A000011124","Animal production [BS112]","Cubic metres","72","thousands","3","v86719705","1.4","913593","","","","0"
+"2011","Canada","2016A000011124","Forestry and logging [BS11300]","Cubic metres","72","thousands","3","v86719706","1.5","585","","","","0"
+"2011","Canada","2016A000011124","Fishing, hunting and trapping [BS11400]","Cubic metres","72","thousands","3","v86719707","1.6","","..","","","0"
+"2011","Canada","2016A000011124","Support activities for agriculture and forestry [BS11500]","Cubic metres","72","thousands","3","v86719708","1.7","","..","","","0"
+"2011","Canada","2016A000011124","Oil and gas extraction [BS21100]","Cubic metres","72","thousands","3","v86719709","1.8","342961","","","","0"
+"2011","Canada","2016A000011124","Coal mining [BS21210]","Cubic metres","72","thousands","3","v86719710","1.9","33632","","","","0"
+"2011","Canada","2016A000011124","Metal ore mining [BS21220]","Cubic metres","72","thousands","3","v86719711","1.10","260066","","","","0"
+"2011","Canada","2016A000011124","Non-metallic mineral mining and quarrying [BS21230]","Cubic metres","72","thousands","3","v86719712","1.11","123732","","","","0"
+"2011","Canada","2016A000011124","Support activities for mining and oil and gas extraction [BS21300]","Cubic metres","72","thousands","3","v86719713","1.12","26","","","","0"
+"2011","Canada","2016A000011124","Electric power generation, transmission and distribution [BS22110]","Cubic metres","72","thousands","3","v86719714","1.13","23715875","","","","0"
+"2011","Canada","2016A000011124","Natural gas distribution, water, sewage and other systems [BS221A0]","Cubic metres","72","thousands","3","v86719715","1.14","925044","","","","0"
+"2011","Canada","2016A000011124","Residential building construction [BS23A00]","Cubic metres","72","thousands","3","v86719716","1.15","5296","","","","0"
+"2011","Canada","2016A000011124","Non-residential building construction [BS23B00]","Cubic metres","72","thousands","3","v86719717","1.16","2300","","","","0"
+"2011","Canada","2016A000011124","Transportation engineering construction [BS23C10]","Cubic metres","72","thousands","3","v86719718","1.17","130","","","","0"
+"2011","Canada","2016A000011124","Oil and gas engineering construction [BS23C20]","Cubic metres","72","thousands","3","v86719719","1.18","18","","","","0"
+"2011","Canada","2016A000011124","Electric power engineering construction [BS23C30]","Cubic metres","72","thousands","3","v86719720","1.19","51","","","","0"
+"2011","Canada","2016A000011124","Communication engineering construction [BS23C40]","Cubic metres","72","thousands","3","v86719721","1.20","17","","","","0"
+"2011","Canada","2016A000011124","Other engineering construction [BS23C50]","Cubic metres","72","thousands","3","v86719722","1.21","42","","","","0"
+"2011","Canada","2016A000011124","Repair construction [BS23D00]","Cubic metres","72","thousands","3","v86719723","1.22","102","","","","0"
+"2011","Canada","2016A000011124","Other activities of the construction industry [BS23E00]","Cubic metres","72","thousands","3","v86719724","1.23","51","","","","0"
+"2011","Canada","2016A000011124","Food manufacturing [BS311]","Cubic metres","72","thousands","3","v86719725","1.24","346390","","","","0"
+"2011","Canada","2016A000011124","Beverage and tobacco product manufacturing [BS312]","Cubic metres","72","thousands","3","v86719726","1.25","39401","","","","0"
+"2011","Canada","2016A000011124","Textile and textile product mills [BS31A]","Cubic metres","72","thousands","3","v86719727","1.26","3045","","","","0"
+"2011","Canada","2016A000011124","Clothing and leather and allied product manufacturing [BS31B]","Cubic metres","72","thousands","3","v86719728","1.27","883","","","","0"
+"2011","Canada","2016A000011124","Wood product manufacturing [BS321]","Cubic metres","72","thousands","3","v86719729","1.28","23713","","","","0"
+"2011","Canada","2016A000011124","Paper manufacturing [BS322]","Cubic metres","72","thousands","3","v86719730","1.29","1448139","","","","0"
+"2011","Canada","2016A000011124","Printing and related support activities [BS323]","Cubic metres","72","thousands","3","v86719731","1.30","1149","","","","0"
+"2011","Canada","2016A000011124","Petroleum and coal product manufacturing [BS324]","Cubic metres","72","thousands","3","v86719732","1.31","288781","","","","0"
+"2011","Canada","2016A000011124","Chemical manufacturing [BS325]","Cubic metres","72","thousands","3","v86719733","1.32","450962","","","","0"
+"2011","Canada","2016A000011124","Plastic and rubber products manufacturing [BS326]","Cubic metres","72","thousands","3","v86719734","1.33","26699","","","","0"
+"2011","Canada","2016A000011124","Non-metallic mineral product manufacturing [BS327]","Cubic metres","72","thousands","3","v86719735","1.34","44282","","","","0"
+"2011","Canada","2016A000011124","Primary metal manufacturing [BS331]","Cubic metres","72","thousands","3","v86719736","1.35","1076117","","","","0"
+"2011","Canada","2016A000011124","Fabricated metal product manufacturing [BS332]","Cubic metres","72","thousands","3","v86719737","1.36","5997","","","","0"
+"2011","Canada","2016A000011124","Machinery manufacturing [BS333]","Cubic metres","72","thousands","3","v86719738","1.37","3573","","","","0"
+"2011","Canada","2016A000011124","Computer and electronic product manufacturing [BS334]","Cubic metres","72","thousands","3","v86719739","1.38","3458","","","","0"
+"2011","Canada","2016A000011124","Electrical equipment and component manufacturing [BS335]","Cubic metres","72","thousands","3","v86719740","1.39","1099","","","","0"
+"2011","Canada","2016A000011124","Transportation equipment manufacturing [BS336]","Cubic metres","72","thousands","3","v86719741","1.40","24070","","","","0"
+"2011","Canada","2016A000011124","Furniture and related product manufacturing [BS337]","Cubic metres","72","thousands","3","v86719742","1.41","1364","","","","0"
+"2011","Canada","2016A000011124","Miscellaneous manufacturing [BS339]","Cubic metres","72","thousands","3","v86719743","1.42","881","","","","0"
+"2011","Canada","2016A000011124","Wholesale trade [BS41000]","Cubic metres","72","thousands","3","v86719744","1.43","57259","","","","0"
+"2011","Canada","2016A000011124","Retail trade [BS4A000]","Cubic metres","72","thousands","3","v86719745","1.44","45269","","","","0"
+"2011","Canada","2016A000011124","Air transportation [BS48100]","Cubic metres","72","thousands","3","v86719746","1.45","1416","","","","0"
+"2011","Canada","2016A000011124","Rail transportation [BS48200]","Cubic metres","72","thousands","3","v86719747","1.46","7201","","","","0"
+"2011","Canada","2016A000011124","Water transportation [BS48300]","Cubic metres","72","thousands","3","v86719748","1.47","2322","","","","0"
+"2011","Canada","2016A000011124","Truck transportation [BS48400]","Cubic metres","72","thousands","3","v86719749","1.48","7614","","","","0"
+"2011","Canada","2016A000011124","Transit, ground passenger and scenic and sightseeing transportation, taxi and limousine service and support activities for transportation [BS48B00]","Cubic metres","72","thousands","3","v86719750","1.49","23038","","","","0"
+"2011","Canada","2016A000011124","Pipeline transportation [BS48600]","Cubic metres","72","thousands","3","v86719751","1.50","4235","","","","0"
+"2011","Canada","2016A000011124","Postal service and couriers and messengers [BS49A00]","Cubic metres","72","thousands","3","v86719752","1.51","412","","","","0"
+"2011","Canada","2016A000011124","Warehousing and storage [BS49300]","Cubic metres","72","thousands","3","v86719753","1.52","3736","","","","0"
+"2011","Canada","2016A000011124","Motion picture and sound recording industries [BS51200]","Cubic metres","72","thousands","3","v86719754","1.53","2780","","","","0"
+"2011","Canada","2016A000011124","Radio and television broadcasting [BS51510]","Cubic metres","72","thousands","3","v86719755","1.54","6","","","","0"
+"2011","Canada","2016A000011124","Publishing, pay and specialty services, telecommunications and other information services [BS51B00]","Cubic metres","72","thousands","3","v86719756","1.55","3851","","","","0"
+"2011","Canada","2016A000011124","Depository credit intermediation and monetary authorities [BS52B00]","Cubic metres","72","thousands","3","v86719757","1.56","21718","","","","0"
+"2011","Canada","2016A000011124","Insurance carriers [BS52410]","Cubic metres","72","thousands","3","v86719758","1.57","310","","","","0"
+"2011","Canada","2016A000011124","Lessors of real estate [BS53110]","Cubic metres","72","thousands","3","v86719759","1.58","158778","","","","0"
+"2011","Canada","2016A000011124","Owner-occupied dwellings [BS5311A]","Cubic metres","72","thousands","3","v86719760","1.59","0","","","","0"
+"2011","Canada","2016A000011124","Rental and leasing services and lessors of non-financial intangible assets (except copyrighted works) [BS53B00]","Cubic metres","72","thousands","3","v86719761","1.60","4891","","","","0"
+"2011","Canada","2016A000011124","Other finance, insurance and real estate services and management of companies and enterprises [BS5A000]","Cubic metres","72","thousands","3","v86719762","1.61","72307","","","","0"
+"2011","Canada","2016A000011124","Legal, accounting and architectural, engineering and related services [BS541C0]","Cubic metres","72","thousands","3","v86719763","1.62","8855","","","","0"
+"2011","Canada","2016A000011124","Computer systems design and other professional, scientific and technical services [BS541D0]","Cubic metres","72","thousands","3","v86719764","1.63","4221","","","","0"
+"2011","Canada","2016A000011124","Advertising, public relations and related services [BS54180]","Cubic metres","72","thousands","3","v86719765","1.64","124","","","","0"
+"2011","Canada","2016A000011124","Administrative and support services [BS56100]","Cubic metres","72","thousands","3","v86719766","1.65","2903","","","","0"
+"2011","Canada","2016A000011124","Waste management and remediation services [BS56200]","Cubic metres","72","thousands","3","v86719767","1.66","10053","","","","0"
+"2011","Canada","2016A000011124","Educational services [BS61000]","Cubic metres","72","thousands","3","v86719768","1.67","15365","","","","0"
+"2011","Canada","2016A000011124","Health care and social assistance [BS62000]","Cubic metres","72","thousands","3","v86719769","1.68","70793","","","","0"
+"2011","Canada","2016A000011124","Arts, entertainment and recreation [BS71000]","Cubic metres","72","thousands","3","v86719770","1.69","4981","","","","0"
+"2011","Canada","2016A000011124","Accommodation and food services [BS72000]","Cubic metres","72","thousands","3","v86719771","1.70","49606","","","","0"
+"2011","Canada","2016A000011124","Repair and maintenance [BS81100]","Cubic metres","72","thousands","3","v86719772","1.71","11911","","","","0"
+"2011","Canada","2016A000011124","Personal services and private households [BS81A00]","Cubic metres","72","thousands","3","v86719773","1.72","8367","","","","0"
+"2011","Canada","2016A000011124","Professional and similar organisations [BS81300]","Cubic metres","72","thousands","3","v86719774","1.73","1754","","","","0"
+"2011","Canada","2016A000011124","Repair and maintenance [FC11000]","Cubic metres","72","thousands","3","v86719775","1.74","0","","","","0"
+"2011","Canada","2016A000011124","Operating supplies [FC12000]","Cubic metres","72","thousands","3","v86719776","1.75","0","","","","0"
+"2011","Canada","2016A000011124","Office supplies [FC13000]","Cubic metres","72","thousands","3","v86719777","1.76","0","","","","0"
+"2011","Canada","2016A000011124","Advertising, promotion, meals, entertainment, and travel [FC20000]","Cubic metres","72","thousands","3","v86719778","1.77","0","","","","0"
+"2011","Canada","2016A000011124","Transportation margins [FC30000]","Cubic metres","72","thousands","3","v86719779","1.78","0","","","","0"
+"2011","Canada","2016A000011124","Non-profit education services [NP61000]","Cubic metres","72","thousands","3","v86719780","1.79","14319","","","","0"
+"2011","Canada","2016A000011124","Non-profit social assistance [NP62400]","Cubic metres","72","thousands","3","v86719781","1.80","17044","","","","0"
+"2011","Canada","2016A000011124","Non-profit arts, entertainment and recreation [NP71000]","Cubic metres","72","thousands","3","v86719782","1.81","8687","","","","0"
+"2011","Canada","2016A000011124","Religious organizations [NP81310]","Cubic metres","72","thousands","3","v86719783","1.82","51901","","","","0"
+"2011","Canada","2016A000011124","Miscellaneous non-profit institutions serving households [NPA0000]","Cubic metres","72","thousands","3","v86719784","1.83","107994","","","","0"
+"2011","Canada","2016A000011124","Educational services (except universities) [GS611B0]","Cubic metres","72","thousands","3","v86719785","1.84","8783","","","","0"
+"2011","Canada","2016A000011124","Universities [GS61130]","Cubic metres","72","thousands","3","v86719786","1.85","12637","","","","0"
+"2011","Canada","2016A000011124","Hospitals [GS62200]","Cubic metres","72","thousands","3","v86719787","1.86","41103","","","","0"
+"2011","Canada","2016A000011124","Nursing and residential care facilities [GS62300]","Cubic metres","72","thousands","3","v86719788","1.87","1604","","","","0"
+"2011","Canada","2016A000011124","Other federal government services [GS91100]","Cubic metres","72","thousands","3","v86719789","1.88","10446","","","","0"
+"2011","Canada","2016A000011124","Other provincial and territorial government services [GS91200]","Cubic metres","72","thousands","3","v86719790","1.89","40924","","","","0"
+"2011","Canada","2016A000011124","Other municipal government services [GS91300]","Cubic metres","72","thousands","3","v86719791","1.90","58535","","","","0"
+"2011","Canada","2016A000011124","Other aboriginal government services [GS91400]","Cubic metres","72","thousands","3","v86719792","1.91","17534","","","","0"
+"2011","Canada","2016A000011124","Households","Cubic metres","72","thousands","3","v86719793","1.92","3505881","","","","0"
+"2013","Canada","2016A000011124","Total, industries and households","Cubic metres","72","thousands","3","v86719702","1.1","37316714","","","","0"
+"2013","Canada","2016A000011124","Total, industries","Cubic metres","72","thousands","3","v86719703","1.2","34193994","","","","0"
+"2013","Canada","2016A000011124","Crop production [BS111]","Cubic metres","72","thousands","3","v86719704","1.3","1152043","","","","0"
+"2013","Canada","2016A000011124","Animal production [BS112]","Cubic metres","72","thousands","3","v86719705","1.4","914527","","","","0"
+"2013","Canada","2016A000011124","Forestry and logging [BS11300]","Cubic metres","72","thousands","3","v86719706","1.5","426","","","","0"
+"2013","Canada","2016A000011124","Fishing, hunting and trapping [BS11400]","Cubic metres","72","thousands","3","v86719707","1.6","","..","","","0"
+"2013","Canada","2016A000011124","Support activities for agriculture and forestry [BS11500]","Cubic metres","72","thousands","3","v86719708","1.7","","..","","","0"
+"2013","Canada","2016A000011124","Oil and gas extraction [BS21100]","Cubic metres","72","thousands","3","v86719709","1.8","365276","","","","0"
+"2013","Canada","2016A000011124","Coal mining [BS21210]","Cubic metres","72","thousands","3","v86719710","1.9","91903","","","","0"
+"2013","Canada","2016A000011124","Metal ore mining [BS21220]","Cubic metres","72","thousands","3","v86719711","1.10","368179","","","","0"
+"2013","Canada","2016A000011124","Non-metallic mineral mining and quarrying [BS21230]","Cubic metres","72","thousands","3","v86719712","1.11","78241","","","","0"
+"2013","Canada","2016A000011124","Support activities for mining and oil and gas extraction [BS21300]","Cubic metres","72","thousands","3","v86719713","1.12","30","","","","0"
+"2013","Canada","2016A000011124","Electric power generation, transmission and distribution [BS22110]","Cubic metres","72","thousands","3","v86719714","1.13","25145462","","","","0"
+"2013","Canada","2016A000011124","Natural gas distribution, water, sewage and other systems [BS221A0]","Cubic metres","72","thousands","3","v86719715","1.14","887747","","","","0"
+"2013","Canada","2016A000011124","Residential building construction [BS23A00]","Cubic metres","72","thousands","3","v86719716","1.15","6503","","","","0"
+"2013","Canada","2016A000011124","Non-residential building construction [BS23B00]","Cubic metres","72","thousands","3","v86719717","1.16","2666","","","","0"
+"2013","Canada","2016A000011124","Transportation engineering construction [BS23C10]","Cubic metres","72","thousands","3","v86719718","1.17","185","","","","0"
+"2013","Canada","2016A000011124","Oil and gas engineering construction [BS23C20]","Cubic metres","72","thousands","3","v86719719","1.18","33","","","","0"
+"2013","Canada","2016A000011124","Electric power engineering construction [BS23C30]","Cubic metres","72","thousands","3","v86719720","1.19","83","","","","0"
+"2013","Canada","2016A000011124","Communication engineering construction [BS23C40]","Cubic metres","72","thousands","3","v86719721","1.20","13","","","","0"
+"2013","Canada","2016A000011124","Other engineering construction [BS23C50]","Cubic metres","72","thousands","3","v86719722","1.21","84","","","","0"
+"2013","Canada","2016A000011124","Repair construction [BS23D00]","Cubic metres","72","thousands","3","v86719723","1.22","95","","","","0"
+"2013","Canada","2016A000011124","Other activities of the construction industry [BS23E00]","Cubic metres","72","thousands","3","v86719724","1.23","63","","","","0"
+"2013","Canada","2016A000011124","Food manufacturing [BS311]","Cubic metres","72","thousands","3","v86719725","1.24","367014","","","","0"
+"2013","Canada","2016A000011124","Beverage and tobacco product manufacturing [BS312]","Cubic metres","72","thousands","3","v86719726","1.25","39080","","","","0"
+"2013","Canada","2016A000011124","Textile and textile product mills [BS31A]","Cubic metres","72","thousands","3","v86719727","1.26","5953","","","","0"
+"2013","Canada","2016A000011124","Clothing and leather and allied product manufacturing [BS31B]","Cubic metres","72","thousands","3","v86719728","1.27","691","","","","0"
+"2013","Canada","2016A000011124","Wood product manufacturing [BS321]","Cubic metres","72","thousands","3","v86719729","1.28","21718","","","","0"
+"2013","Canada","2016A000011124","Paper manufacturing [BS322]","Cubic metres","72","thousands","3","v86719730","1.29","1537380","","","","0"
+"2013","Canada","2016A000011124","Printing and related support activities [BS323]","Cubic metres","72","thousands","3","v86719731","1.30","2098","","","","0"
+"2013","Canada","2016A000011124","Petroleum and coal product manufacturing [BS324]","Cubic metres","72","thousands","3","v86719732","1.31","263264","","","","0"
+"2013","Canada","2016A000011124","Chemical manufacturing [BS325]","Cubic metres","72","thousands","3","v86719733","1.32","445648","","","","0"
+"2013","Canada","2016A000011124","Plastic and rubber products manufacturing [BS326]","Cubic metres","72","thousands","3","v86719734","1.33","27382","","","","0"
+"2013","Canada","2016A000011124","Non-metallic mineral product manufacturing [BS327]","Cubic metres","72","thousands","3","v86719735","1.34","60348","","","","0"
+"2013","Canada","2016A000011124","Primary metal manufacturing [BS331]","Cubic metres","72","thousands","3","v86719736","1.35","1141699","","","","0"
+"2013","Canada","2016A000011124","Fabricated metal product manufacturing [BS332]","Cubic metres","72","thousands","3","v86719737","1.36","5253","","","","0"
+"2013","Canada","2016A000011124","Machinery manufacturing [BS333]","Cubic metres","72","thousands","3","v86719738","1.37","4476","","","","0"
+"2013","Canada","2016A000011124","Computer and electronic product manufacturing [BS334]","Cubic metres","72","thousands","3","v86719739","1.38","3526","","","","0"
+"2013","Canada","2016A000011124","Electrical equipment and component manufacturing [BS335]","Cubic metres","72","thousands","3","v86719740","1.39","1251","","","","0"
+"2013","Canada","2016A000011124","Transportation equipment manufacturing [BS336]","Cubic metres","72","thousands","3","v86719741","1.40","34745","","","","0"
+"2013","Canada","2016A000011124","Furniture and related product manufacturing [BS337]","Cubic metres","72","thousands","3","v86719742","1.41","1725","","","","0"
+"2013","Canada","2016A000011124","Miscellaneous manufacturing [BS339]","Cubic metres","72","thousands","3","v86719743","1.42","2788","","","","0"
+"2013","Canada","2016A000011124","Wholesale trade [BS41000]","Cubic metres","72","thousands","3","v86719744","1.43","75450","","","","0"
+"2013","Canada","2016A000011124","Retail trade [BS4A000]","Cubic metres","72","thousands","3","v86719745","1.44","59778","","","","0"
+"2013","Canada","2016A000011124","Air transportation [BS48100]","Cubic metres","72","thousands","3","v86719746","1.45","1971","","","","0"
+"2013","Canada","2016A000011124","Rail transportation [BS48200]","Cubic metres","72","thousands","3","v86719747","1.46","6629","","","","0"
+"2013","Canada","2016A000011124","Water transportation [BS48300]","Cubic metres","72","thousands","3","v86719748","1.47","2617","","","","0"
+"2013","Canada","2016A000011124","Truck transportation [BS48400]","Cubic metres","72","thousands","3","v86719749","1.48","9891","","","","0"
+"2013","Canada","2016A000011124","Transit, ground passenger and scenic and sightseeing transportation, taxi and limousine service and support activities for transportation [BS48B00]","Cubic metres","72","thousands","3","v86719750","1.49","29746","","","","0"
+"2013","Canada","2016A000011124","Pipeline transportation [BS48600]","Cubic metres","72","thousands","3","v86719751","1.50","5528","","","","0"
+"2013","Canada","2016A000011124","Postal service and couriers and messengers [BS49A00]","Cubic metres","72","thousands","3","v86719752","1.51","451","","","","0"
+"2013","Canada","2016A000011124","Warehousing and storage [BS49300]","Cubic metres","72","thousands","3","v86719753","1.52","4719","","","","0"
+"2013","Canada","2016A000011124","Motion picture and sound recording industries [BS51200]","Cubic metres","72","thousands","3","v86719754","1.53","3345","","","","0"
+"2013","Canada","2016A000011124","Radio and television broadcasting [BS51510]","Cubic metres","72","thousands","3","v86719755","1.54","3","","","","0"
+"2013","Canada","2016A000011124","Publishing, pay and specialty services, telecommunications and other information services [BS51B00]","Cubic metres","72","thousands","3","v86719756","1.55","5753","","","","0"
+"2013","Canada","2016A000011124","Depository credit intermediation and monetary authorities [BS52B00]","Cubic metres","72","thousands","3","v86719757","1.56","25920","","","","0"
+"2013","Canada","2016A000011124","Insurance carriers [BS52410]","Cubic metres","72","thousands","3","v86719758","1.57","391","","","","0"
+"2013","Canada","2016A000011124","Lessors of real estate [BS53110]","Cubic metres","72","thousands","3","v86719759","1.58","190964","","","","0"
+"2013","Canada","2016A000011124","Owner-occupied dwellings [BS5311A]","Cubic metres","72","thousands","3","v86719760","1.59","0","","","","0"
+"2013","Canada","2016A000011124","Rental and leasing services and lessors of non-financial intangible assets (except copyrighted works) [BS53B00]","Cubic metres","72","thousands","3","v86719761","1.60","5706","","","","0"
+"2013","Canada","2016A000011124","Other finance, insurance and real estate services and management of companies and enterprises [BS5A000]","Cubic metres","72","thousands","3","v86719762","1.61","93937","","","","0"
+"2013","Canada","2016A000011124","Legal, accounting and architectural, engineering and related services [BS541C0]","Cubic metres","72","thousands","3","v86719763","1.62","8912","","","","0"
+"2013","Canada","2016A000011124","Computer systems design and other professional, scientific and technical services [BS541D0]","Cubic metres","72","thousands","3","v86719764","1.63","5098","","","","0"
+"2013","Canada","2016A000011124","Advertising, public relations and related services [BS54180]","Cubic metres","72","thousands","3","v86719765","1.64","130","","","","0"
+"2013","Canada","2016A000011124","Administrative and support services [BS56100]","Cubic metres","72","thousands","3","v86719766","1.65","3553","","","","0"
+"2013","Canada","2016A000011124","Waste management and remediation services [BS56200]","Cubic metres","72","thousands","3","v86719767","1.66","14138","","","","0"
+"2013","Canada","2016A000011124","Educational services [BS61000]","Cubic metres","72","thousands","3","v86719768","1.67","16138","","","","0"
+"2013","Canada","2016A000011124","Health care and social assistance [BS62000]","Cubic metres","72","thousands","3","v86719769","1.68","88342","","","","0"
+"2013","Canada","2016A000011124","Arts, entertainment and recreation [BS71000]","Cubic metres","72","thousands","3","v86719770","1.69","6356","","","","0"
+"2013","Canada","2016A000011124","Accommodation and food services [BS72000]","Cubic metres","72","thousands","3","v86719771","1.70","60493","","","","0"
+"2013","Canada","2016A000011124","Repair and maintenance [BS81100]","Cubic metres","72","thousands","3","v86719772","1.71","14145","","","","0"
+"2013","Canada","2016A000011124","Personal services and private households [BS81A00]","Cubic metres","72","thousands","3","v86719773","1.72","9677","","","","0"
+"2013","Canada","2016A000011124","Professional and similar organisations [BS81300]","Cubic metres","72","thousands","3","v86719774","1.73","2502","","","","0"
+"2013","Canada","2016A000011124","Repair and maintenance [FC11000]","Cubic metres","72","thousands","3","v86719775","1.74","0","","","","0"
+"2013","Canada","2016A000011124","Operating supplies [FC12000]","Cubic metres","72","thousands","3","v86719776","1.75","0","","","","0"
+"2013","Canada","2016A000011124","Office supplies [FC13000]","Cubic metres","72","thousands","3","v86719777","1.76","0","","","","0"
+"2013","Canada","2016A000011124","Advertising, promotion, meals, entertainment, and travel [FC20000]","Cubic metres","72","thousands","3","v86719778","1.77","0","","","","0"
+"2013","Canada","2016A000011124","Transportation margins [FC30000]","Cubic metres","72","thousands","3","v86719779","1.78","0","","","","0"
+"2013","Canada","2016A000011124","Non-profit education services [NP61000]","Cubic metres","72","thousands","3","v86719780","1.79","15792","","","","0"
+"2013","Canada","2016A000011124","Non-profit social assistance [NP62400]","Cubic metres","72","thousands","3","v86719781","1.80","26367","","","","0"
+"2013","Canada","2016A000011124","Non-profit arts, entertainment and recreation [NP71000]","Cubic metres","72","thousands","3","v86719782","1.81","11463","","","","0"
+"2013","Canada","2016A000011124","Religious organizations [NP81310]","Cubic metres","72","thousands","3","v86719783","1.82","66175","","","","0"
+"2013","Canada","2016A000011124","Miscellaneous non-profit institutions serving households [NPA0000]","Cubic metres","72","thousands","3","v86719784","1.83","124723","","","","0"
+"2013","Canada","2016A000011124","Educational services (except universities) [GS611B0]","Cubic metres","72","thousands","3","v86719785","1.84","13326","","","","0"
+"2013","Canada","2016A000011124","Universities [GS61130]","Cubic metres","72","thousands","3","v86719786","1.85","17785","","","","0"
+"2013","Canada","2016A000011124","Hospitals [GS62200]","Cubic metres","72","thousands","3","v86719787","1.86","61258","","","","0"
+"2013","Canada","2016A000011124","Nursing and residential care facilities [GS62300]","Cubic metres","72","thousands","3","v86719788","1.87","2285","","","","0"
+"2013","Canada","2016A000011124","Other federal government services [GS91100]","Cubic metres","72","thousands","3","v86719789","1.88","9095","","","","0"
+"2013","Canada","2016A000011124","Other provincial and territorial government services [GS91200]","Cubic metres","72","thousands","3","v86719790","1.89","28060","","","","0"
+"2013","Canada","2016A000011124","Other municipal government services [GS91300]","Cubic metres","72","thousands","3","v86719791","1.90","68298","","","","0"
+"2013","Canada","2016A000011124","Other aboriginal government services [GS91400]","Cubic metres","72","thousands","3","v86719792","1.91","17487","","","","0"
+"2013","Canada","2016A000011124","Households","Cubic metres","72","thousands","3","v86719793","1.92","3122721","","","","0"
+"2015","Canada","2016A000011124","Total, industries and households","Cubic metres","72","thousands","3","v86719702","1.1","36242425","","","","0"
+"2015","Canada","2016A000011124","Total, industries","Cubic metres","72","thousands","3","v86719703","1.2","33112125","","","","0"
+"2015","Canada","2016A000011124","Crop production [BS111]","Cubic metres","72","thousands","3","v86719704","1.3","1760842","","","","0"
+"2015","Canada","2016A000011124","Animal production [BS112]","Cubic metres","72","thousands","3","v86719705","1.4","1410516","","","","0"
+"2015","Canada","2016A000011124","Forestry and logging [BS11300]","Cubic metres","72","thousands","3","v86719706","1.5","174","","","","0"
+"2015","Canada","2016A000011124","Fishing, hunting and trapping [BS11400]","Cubic metres","72","thousands","3","v86719707","1.6","","..","","","0"
+"2015","Canada","2016A000011124","Support activities for agriculture and forestry [BS11500]","Cubic metres","72","thousands","3","v86719708","1.7","","..","","","0"
+"2015","Canada","2016A000011124","Oil and gas extraction [BS21100]","Cubic metres","72","thousands","3","v86719709","1.8","374734","","","","0"
+"2015","Canada","2016A000011124","Coal mining [BS21210]","Cubic metres","72","thousands","3","v86719710","1.9","62815","","","","0"
+"2015","Canada","2016A000011124","Metal ore mining [BS21220]","Cubic metres","72","thousands","3","v86719711","1.10","370020","","","","0"
+"2015","Canada","2016A000011124","Non-metallic mineral mining and quarrying [BS21230]","Cubic metres","72","thousands","3","v86719712","1.11","97532","","","","0"
+"2015","Canada","2016A000011124","Support activities for mining and oil and gas extraction [BS21300]","Cubic metres","72","thousands","3","v86719713","1.12","30","","","","0"
+"2015","Canada","2016A000011124","Electric power generation, transmission and distribution [BS22110]","Cubic metres","72","thousands","3","v86719714","1.13","23318293","","","","0"
+"2015","Canada","2016A000011124","Natural gas distribution, water, sewage and other systems [BS221A0]","Cubic metres","72","thousands","3","v86719715","1.14","1000747","","","","0"
+"2015","Canada","2016A000011124","Residential building construction [BS23A00]","Cubic metres","72","thousands","3","v86719716","1.15","5721","","","","0"
+"2015","Canada","2016A000011124","Non-residential building construction [BS23B00]","Cubic metres","72","thousands","3","v86719717","1.16","2510","","","","0"
+"2015","Canada","2016A000011124","Transportation engineering construction [BS23C10]","Cubic metres","72","thousands","3","v86719718","1.17","223","","","","0"
+"2015","Canada","2016A000011124","Oil and gas engineering construction [BS23C20]","Cubic metres","72","thousands","3","v86719719","1.18","29","","","","0"
+"2015","Canada","2016A000011124","Electric power engineering construction [BS23C30]","Cubic metres","72","thousands","3","v86719720","1.19","100","","","","0"
+"2015","Canada","2016A000011124","Communication engineering construction [BS23C40]","Cubic metres","72","thousands","3","v86719721","1.20","33","","","","0"
+"2015","Canada","2016A000011124","Other engineering construction [BS23C50]","Cubic metres","72","thousands","3","v86719722","1.21","92","","","","0"
+"2015","Canada","2016A000011124","Repair construction [BS23D00]","Cubic metres","72","thousands","3","v86719723","1.22","82","","","","0"
+"2015","Canada","2016A000011124","Other activities of the construction industry [BS23E00]","Cubic metres","72","thousands","3","v86719724","1.23","51","","","","0"
+"2015","Canada","2016A000011124","Food manufacturing [BS311]","Cubic metres","72","thousands","3","v86719725","1.24","306587","","","","0"
+"2015","Canada","2016A000011124","Beverage and tobacco product manufacturing [BS312]","Cubic metres","72","thousands","3","v86719726","1.25","38285","","","","0"
+"2015","Canada","2016A000011124","Textile and textile product mills [BS31A]","Cubic metres","72","thousands","3","v86719727","1.26","4534","","","","0"
+"2015","Canada","2016A000011124","Clothing and leather and allied product manufacturing [BS31B]","Cubic metres","72","thousands","3","v86719728","1.27","309","","","","0"
+"2015","Canada","2016A000011124","Wood product manufacturing [BS321]","Cubic metres","72","thousands","3","v86719729","1.28","30426","","","","0"
+"2015","Canada","2016A000011124","Paper manufacturing [BS322]","Cubic metres","72","thousands","3","v86719730","1.29","1512719","","","","0"
+"2015","Canada","2016A000011124","Printing and related support activities [BS323]","Cubic metres","72","thousands","3","v86719731","1.30","1172","","","","0"
+"2015","Canada","2016A000011124","Petroleum and coal product manufacturing [BS324]","Cubic metres","72","thousands","3","v86719732","1.31","220576","","","","0"
+"2015","Canada","2016A000011124","Chemical manufacturing [BS325]","Cubic metres","72","thousands","3","v86719733","1.32","525340","","","","0"
+"2015","Canada","2016A000011124","Plastic and rubber products manufacturing [BS326]","Cubic metres","72","thousands","3","v86719734","1.33","21895","","","","0"
+"2015","Canada","2016A000011124","Non-metallic mineral product manufacturing [BS327]","Cubic metres","72","thousands","3","v86719735","1.34","40929","","","","0"
+"2015","Canada","2016A000011124","Primary metal manufacturing [BS331]","Cubic metres","72","thousands","3","v86719736","1.35","905604","","","","0"
+"2015","Canada","2016A000011124","Fabricated metal product manufacturing [BS332]","Cubic metres","72","thousands","3","v86719737","1.36","9659","","","","0"
+"2015","Canada","2016A000011124","Machinery manufacturing [BS333]","Cubic metres","72","thousands","3","v86719738","1.37","3923","","","","0"
+"2015","Canada","2016A000011124","Computer and electronic product manufacturing [BS334]","Cubic metres","72","thousands","3","v86719739","1.38","3076","","","","0"
+"2015","Canada","2016A000011124","Electrical equipment and component manufacturing [BS335]","Cubic metres","72","thousands","3","v86719740","1.39","1072","","","","0"
+"2015","Canada","2016A000011124","Transportation equipment manufacturing [BS336]","Cubic metres","72","thousands","3","v86719741","1.40","30375","","","","0"
+"2015","Canada","2016A000011124","Furniture and related product manufacturing [BS337]","Cubic metres","72","thousands","3","v86719742","1.41","1229","","","","0"
+"2015","Canada","2016A000011124","Miscellaneous manufacturing [BS339]","Cubic metres","72","thousands","3","v86719743","1.42","2782","","","","0"
+"2015","Canada","2016A000011124","Wholesale trade [BS41000]","Cubic metres","72","thousands","3","v86719744","1.43","63189","","","","0"
+"2015","Canada","2016A000011124","Retail trade [BS4A000]","Cubic metres","72","thousands","3","v86719745","1.44","52673","","","","0"
+"2015","Canada","2016A000011124","Air transportation [BS48100]","Cubic metres","72","thousands","3","v86719746","1.45","2322","","","","0"
+"2015","Canada","2016A000011124","Rail transportation [BS48200]","Cubic metres","72","thousands","3","v86719747","1.46","4814","","","","0"
+"2015","Canada","2016A000011124","Water transportation [BS48300]","Cubic metres","72","thousands","3","v86719748","1.47","2667","","","","0"
+"2015","Canada","2016A000011124","Truck transportation [BS48400]","Cubic metres","72","thousands","3","v86719749","1.48","11619","","","","0"
+"2015","Canada","2016A000011124","Transit, ground passenger and scenic and sightseeing transportation, taxi and limousine service and support activities for transportation [BS48B00]","Cubic metres","72","thousands","3","v86719750","1.49","30187","","","","0"
+"2015","Canada","2016A000011124","Pipeline transportation [BS48600]","Cubic metres","72","thousands","3","v86719751","1.50","5298","","","","0"
+"2015","Canada","2016A000011124","Postal service and couriers and messengers [BS49A00]","Cubic metres","72","thousands","3","v86719752","1.51","454","","","","0"
+"2015","Canada","2016A000011124","Warehousing and storage [BS49300]","Cubic metres","72","thousands","3","v86719753","1.52","4086","","","","0"
+"2015","Canada","2016A000011124","Motion picture and sound recording industries [BS51200]","Cubic metres","72","thousands","3","v86719754","1.53","2502","","","","0"
+"2015","Canada","2016A000011124","Radio and television broadcasting [BS51510]","Cubic metres","72","thousands","3","v86719755","1.54","0","","","","0"
+"2015","Canada","2016A000011124","Publishing, pay and specialty services, telecommunications and other information services [BS51B00]","Cubic metres","72","thousands","3","v86719756","1.55","4221","","","","0"
+"2015","Canada","2016A000011124","Depository credit intermediation and monetary authorities [BS52B00]","Cubic metres","72","thousands","3","v86719757","1.56","20909","","","","0"
+"2015","Canada","2016A000011124","Insurance carriers [BS52410]","Cubic metres","72","thousands","3","v86719758","1.57","324","","","","0"
+"2015","Canada","2016A000011124","Lessors of real estate [BS53110]","Cubic metres","72","thousands","3","v86719759","1.58","164605","","","","0"
+"2015","Canada","2016A000011124","Owner-occupied dwellings [BS5311A]","Cubic metres","72","thousands","3","v86719760","1.59","0","","","","0"
+"2015","Canada","2016A000011124","Rental and leasing services and lessors of non-financial intangible assets (except copyrighted works) [BS53B00]","Cubic metres","72","thousands","3","v86719761","1.60","5545","","","","0"
+"2015","Canada","2016A000011124","Other finance, insurance and real estate services and management of companies and enterprises [BS5A000]","Cubic metres","72","thousands","3","v86719762","1.61","85566","","","","0"
+"2015","Canada","2016A000011124","Legal, accounting and architectural, engineering and related services [BS541C0]","Cubic metres","72","thousands","3","v86719763","1.62","7094","","","","0"
+"2015","Canada","2016A000011124","Computer systems design and other professional, scientific and technical services [BS541D0]","Cubic metres","72","thousands","3","v86719764","1.63","4242","","","","0"
+"2015","Canada","2016A000011124","Advertising, public relations and related services [BS54180]","Cubic metres","72","thousands","3","v86719765","1.64","97","","","","0"
+"2015","Canada","2016A000011124","Administrative and support services [BS56100]","Cubic metres","72","thousands","3","v86719766","1.65","3174","","","","0"
+"2015","Canada","2016A000011124","Waste management and remediation services [BS56200]","Cubic metres","72","thousands","3","v86719767","1.66","26291","","","","0"
+"2015","Canada","2016A000011124","Educational services [BS61000]","Cubic metres","72","thousands","3","v86719768","1.67","14161","","","","0"
+"2015","Canada","2016A000011124","Health care and social assistance [BS62000]","Cubic metres","72","thousands","3","v86719769","1.68","73814","","","","0"
+"2015","Canada","2016A000011124","Arts, entertainment and recreation [BS71000]","Cubic metres","72","thousands","3","v86719770","1.69","5673","","","","0"
+"2015","Canada","2016A000011124","Accommodation and food services [BS72000]","Cubic metres","72","thousands","3","v86719771","1.70","58743","","","","0"
+"2015","Canada","2016A000011124","Repair and maintenance [BS81100]","Cubic metres","72","thousands","3","v86719772","1.71","13616","","","","0"
+"2015","Canada","2016A000011124","Personal services and private households [BS81A00]","Cubic metres","72","thousands","3","v86719773","1.72","7263","","","","0"
+"2015","Canada","2016A000011124","Professional and similar organisations [BS81300]","Cubic metres","72","thousands","3","v86719774","1.73","1650","","","","0"
+"2015","Canada","2016A000011124","Repair and maintenance [FC11000]","Cubic metres","72","thousands","3","v86719775","1.74","0","","","","0"
+"2015","Canada","2016A000011124","Operating supplies [FC12000]","Cubic metres","72","thousands","3","v86719776","1.75","0","","","","0"
+"2015","Canada","2016A000011124","Office supplies [FC13000]","Cubic metres","72","thousands","3","v86719777","1.76","0","","","","0"
+"2015","Canada","2016A000011124","Advertising, promotion, meals, entertainment, and travel [FC20000]","Cubic metres","72","thousands","3","v86719778","1.77","0","","","","0"
+"2015","Canada","2016A000011124","Transportation margins [FC30000]","Cubic metres","72","thousands","3","v86719779","1.78","0","","","","0"
+"2015","Canada","2016A000011124","Non-profit education services [NP61000]","Cubic metres","72","thousands","3","v86719780","1.79","13465","","","","0"
+"2015","Canada","2016A000011124","Non-profit social assistance [NP62400]","Cubic metres","72","thousands","3","v86719781","1.80","20908","","","","0"
+"2015","Canada","2016A000011124","Non-profit arts, entertainment and recreation [NP71000]","Cubic metres","72","thousands","3","v86719782","1.81","8932","","","","0"
+"2015","Canada","2016A000011124","Religious organizations [NP81310]","Cubic metres","72","thousands","3","v86719783","1.82","47240","","","","0"
+"2015","Canada","2016A000011124","Miscellaneous non-profit institutions serving households [NPA0000]","Cubic metres","72","thousands","3","v86719784","1.83","103089","","","","0"
+"2015","Canada","2016A000011124","Educational services (except universities) [GS611B0]","Cubic metres","72","thousands","3","v86719785","1.84","11832","","","","0"
+"2015","Canada","2016A000011124","Universities [GS61130]","Cubic metres","72","thousands","3","v86719786","1.85","15527","","","","0"
+"2015","Canada","2016A000011124","Hospitals [GS62200]","Cubic metres","72","thousands","3","v86719787","1.86","51987","","","","0"
+"2015","Canada","2016A000011124","Nursing and residential care facilities [GS62300]","Cubic metres","72","thousands","3","v86719788","1.87","2064","","","","0"
+"2015","Canada","2016A000011124","Other federal government services [GS91100]","Cubic metres","72","thousands","3","v86719789","1.88","7145","","","","0"
+"2015","Canada","2016A000011124","Other provincial and territorial government services [GS91200]","Cubic metres","72","thousands","3","v86719790","1.89","15704","","","","0"
+"2015","Canada","2016A000011124","Other municipal government services [GS91300]","Cubic metres","72","thousands","3","v86719791","1.90","56025","","","","0"
+"2015","Canada","2016A000011124","Other aboriginal government services [GS91400]","Cubic metres","72","thousands","3","v86719792","1.91","16372","","","","0"
+"2015","Canada","2016A000011124","Households","Cubic metres","72","thousands","3","v86719793","1.92","3130300","","","","0"
+"2017","Canada","2016A000011124","Total, industries and households","Cubic metres","72","thousands","3","v86719702","1.1","36645559","","","","0"
+"2017","Canada","2016A000011124","Total, industries","Cubic metres","72","thousands","3","v86719703","1.2","33677103","","","","0"
+"2017","Canada","2016A000011124","Crop production [BS111]","Cubic metres","72","thousands","3","v86719704","1.3","2132260","","","","0"
+"2017","Canada","2016A000011124","Animal production [BS112]","Cubic metres","72","thousands","3","v86719705","1.4","1528630","","","","0"
+"2017","Canada","2016A000011124","Forestry and logging [BS11300]","Cubic metres","72","thousands","3","v86719706","1.5","366","","","","0"
+"2017","Canada","2016A000011124","Fishing, hunting and trapping [BS11400]","Cubic metres","72","thousands","3","v86719707","1.6","","..","","","0"
+"2017","Canada","2016A000011124","Support activities for agriculture and forestry [BS11500]","Cubic metres","72","thousands","3","v86719708","1.7","","..","","","0"
+"2017","Canada","2016A000011124","Oil and gas extraction [BS21100]","Cubic metres","72","thousands","3","v86719709","1.8","415486","","","","0"
+"2017","Canada","2016A000011124","Coal mining [BS21210]","Cubic metres","72","thousands","3","v86719710","1.9","60729","","","","0"
+"2017","Canada","2016A000011124","Metal ore mining [BS21220]","Cubic metres","72","thousands","3","v86719711","1.10","427089","","","","0"
+"2017","Canada","2016A000011124","Non-metallic mineral mining and quarrying [BS21230]","Cubic metres","72","thousands","3","v86719712","1.11","100153","","","","0"
+"2017","Canada","2016A000011124","Support activities for mining and oil and gas extraction [BS21300]","Cubic metres","72","thousands","3","v86719713","1.12","17","","","","0"
+"2017","Canada","2016A000011124","Electric power generation, transmission and distribution [BS22110]","Cubic metres","72","thousands","3","v86719714","1.13","23267423","","","","0"
+"2017","Canada","2016A000011124","Natural gas distribution, water, sewage and other systems [BS221A0]","Cubic metres","72","thousands","3","v86719715","1.14","1058038","","","","0"
+"2017","Canada","2016A000011124","Residential building construction [BS23A00]","Cubic metres","72","thousands","3","v86719716","1.15","5255","","","","0"
+"2017","Canada","2016A000011124","Non-residential building construction [BS23B00]","Cubic metres","72","thousands","3","v86719717","1.16","1810","","","","0"
+"2017","Canada","2016A000011124","Transportation engineering construction [BS23C10]","Cubic metres","72","thousands","3","v86719718","1.17","204","","","","0"
+"2017","Canada","2016A000011124","Oil and gas engineering construction [BS23C20]","Cubic metres","72","thousands","3","v86719719","1.18","21","","","","0"
+"2017","Canada","2016A000011124","Electric power engineering construction [BS23C30]","Cubic metres","72","thousands","3","v86719720","1.19","83","","","","0"
+"2017","Canada","2016A000011124","Communication engineering construction [BS23C40]","Cubic metres","72","thousands","3","v86719721","1.20","35","","","","0"
+"2017","Canada","2016A000011124","Other engineering construction [BS23C50]","Cubic metres","72","thousands","3","v86719722","1.21","46","","","","0"
+"2017","Canada","2016A000011124","Repair construction [BS23D00]","Cubic metres","72","thousands","3","v86719723","1.22","73","","","","0"
+"2017","Canada","2016A000011124","Other activities of the construction industry [BS23E00]","Cubic metres","72","thousands","3","v86719724","1.23","39","","","","0"
+"2017","Canada","2016A000011124","Food manufacturing [BS311]","Cubic metres","72","thousands","3","v86719725","1.24","262652","","","","0"
+"2017","Canada","2016A000011124","Beverage and tobacco product manufacturing [BS312]","Cubic metres","72","thousands","3","v86719726","1.25","48899","","","","0"
+"2017","Canada","2016A000011124","Textile and textile product mills [BS31A]","Cubic metres","72","thousands","3","v86719727","1.26","1814","","","","0"
+"2017","Canada","2016A000011124","Clothing and leather and allied product manufacturing [BS31B]","Cubic metres","72","thousands","3","v86719728","1.27","680","","","","0"
+"2017","Canada","2016A000011124","Wood product manufacturing [BS321]","Cubic metres","72","thousands","3","v86719729","1.28","38834","","","","0"
+"2017","Canada","2016A000011124","Paper manufacturing [BS322]","Cubic metres","72","thousands","3","v86719730","1.29","1484890","","","","0"
+"2017","Canada","2016A000011124","Printing and related support activities [BS323]","Cubic metres","72","thousands","3","v86719731","1.30","870","","","","0"
+"2017","Canada","2016A000011124","Petroleum and coal product manufacturing [BS324]","Cubic metres","72","thousands","3","v86719732","1.31","247066","","","","0"
+"2017","Canada","2016A000011124","Chemical manufacturing [BS325]","Cubic metres","72","thousands","3","v86719733","1.32","596480","","","","0"
+"2017","Canada","2016A000011124","Plastic and rubber products manufacturing [BS326]","Cubic metres","72","thousands","3","v86719734","1.33","22517","","","","0"
+"2017","Canada","2016A000011124","Non-metallic mineral product manufacturing [BS327]","Cubic metres","72","thousands","3","v86719735","1.34","48824","","","","0"
+"2017","Canada","2016A000011124","Primary metal manufacturing [BS331]","Cubic metres","72","thousands","3","v86719736","1.35","953981","","","","0"
+"2017","Canada","2016A000011124","Fabricated metal product manufacturing [BS332]","Cubic metres","72","thousands","3","v86719737","1.36","19196","","","","0"
+"2017","Canada","2016A000011124","Machinery manufacturing [BS333]","Cubic metres","72","thousands","3","v86719738","1.37","1712","","","","0"
+"2017","Canada","2016A000011124","Computer and electronic product manufacturing [BS334]","Cubic metres","72","thousands","3","v86719739","1.38","1778","","","","0"
+"2017","Canada","2016A000011124","Electrical equipment and component manufacturing [BS335]","Cubic metres","72","thousands","3","v86719740","1.39","2140","","","","0"
+"2017","Canada","2016A000011124","Transportation equipment manufacturing [BS336]","Cubic metres","72","thousands","3","v86719741","1.40","28209","","","","0"
+"2017","Canada","2016A000011124","Furniture and related product manufacturing [BS337]","Cubic metres","72","thousands","3","v86719742","1.41","649","","","","0"
+"2017","Canada","2016A000011124","Miscellaneous manufacturing [BS339]","Cubic metres","72","thousands","3","v86719743","1.42","3918","","","","0"
+"2017","Canada","2016A000011124","Wholesale trade [BS41000]","Cubic metres","72","thousands","3","v86719744","1.43","53110","","","","0"
+"2017","Canada","2016A000011124","Retail trade [BS4A000]","Cubic metres","72","thousands","3","v86719745","1.44","43491","","","","0"
+"2017","Canada","2016A000011124","Air transportation [BS48100]","Cubic metres","72","thousands","3","v86719746","1.45","2028","","","","0"
+"2017","Canada","2016A000011124","Rail transportation [BS48200]","Cubic metres","72","thousands","3","v86719747","1.46","4703","","","","0"
+"2017","Canada","2016A000011124","Water transportation [BS48300]","Cubic metres","72","thousands","3","v86719748","1.47","2037","","","","0"
+"2017","Canada","2016A000011124","Truck transportation [BS48400]","Cubic metres","72","thousands","3","v86719749","1.48","10113","","","","0"
+"2017","Canada","2016A000011124","Transit, ground passenger and scenic and sightseeing transportation, taxi and limousine service and support activities for transportation [BS48B00]","Cubic metres","72","thousands","3","v86719750","1.49","30025","","","","0"
+"2017","Canada","2016A000011124","Pipeline transportation [BS48600]","Cubic metres","72","thousands","3","v86719751","1.50","4986","","","","0"
+"2017","Canada","2016A000011124","Postal service and couriers and messengers [BS49A00]","Cubic metres","72","thousands","3","v86719752","1.51","0","","","","0"
+"2017","Canada","2016A000011124","Warehousing and storage [BS49300]","Cubic metres","72","thousands","3","v86719753","1.52","4753","","","","0"
+"2017","Canada","2016A000011124","Motion picture and sound recording industries [BS51200]","Cubic metres","72","thousands","3","v86719754","1.53","2657","","","","0"
+"2017","Canada","2016A000011124","Radio and television broadcasting [BS51510]","Cubic metres","72","thousands","3","v86719755","1.54","0","","","","0"
+"2017","Canada","2016A000011124","Publishing, pay and specialty services, telecommunications and other information services [BS51B00]","Cubic metres","72","thousands","3","v86719756","1.55","11060","","","","0"
+"2017","Canada","2016A000011124","Depository credit intermediation and monetary authorities [BS52B00]","Cubic metres","72","thousands","3","v86719757","1.56","18408","","","","0"
+"2017","Canada","2016A000011124","Insurance carriers [BS52410]","Cubic metres","72","thousands","3","v86719758","1.57","284","","","","0"
+"2017","Canada","2016A000011124","Lessors of real estate [BS53110]","Cubic metres","72","thousands","3","v86719759","1.58","140349","","","","0"
+"2017","Canada","2016A000011124","Owner-occupied dwellings [BS5311A]","Cubic metres","72","thousands","3","v86719760","1.59","0","","","","0"
+"2017","Canada","2016A000011124","Rental and leasing services and lessors of non-financial intangible assets (except copyrighted works) [BS53B00]","Cubic metres","72","thousands","3","v86719761","1.60","5771","","","","0"
+"2017","Canada","2016A000011124","Other finance, insurance and real estate services and management of companies and enterprises [BS5A000]","Cubic metres","72","thousands","3","v86719762","1.61","73320","","","","0"
+"2017","Canada","2016A000011124","Legal, accounting and architectural, engineering and related services [BS541C0]","Cubic metres","72","thousands","3","v86719763","1.62","6285","","","","0"
+"2017","Canada","2016A000011124","Computer systems design and other professional, scientific and technical services [BS541D0]","Cubic metres","72","thousands","3","v86719764","1.63","3764","","","","0"
+"2017","Canada","2016A000011124","Advertising, public relations and related services [BS54180]","Cubic metres","72","thousands","3","v86719765","1.64","68","","","","0"
+"2017","Canada","2016A000011124","Administrative and support services [BS56100]","Cubic metres","72","thousands","3","v86719766","1.65","2902","","","","0"
+"2017","Canada","2016A000011124","Waste management and remediation services [BS56200]","Cubic metres","72","thousands","3","v86719767","1.66","28622","","","","0"
+"2017","Canada","2016A000011124","Educational services [BS61000]","Cubic metres","72","thousands","3","v86719768","1.67","15043","","","","0"
+"2017","Canada","2016A000011124","Health care and social assistance [BS62000]","Cubic metres","72","thousands","3","v86719769","1.68","62512","","","","0"
+"2017","Canada","2016A000011124","Arts, entertainment and recreation [BS71000]","Cubic metres","72","thousands","3","v86719770","1.69","5155","","","","0"
+"2017","Canada","2016A000011124","Accommodation and food services [BS72000]","Cubic metres","72","thousands","3","v86719771","1.70","55624","","","","0"
+"2017","Canada","2016A000011124","Repair and maintenance [BS81100]","Cubic metres","72","thousands","3","v86719772","1.71","12994","","","","0"
+"2017","Canada","2016A000011124","Personal services and private households [BS81A00]","Cubic metres","72","thousands","3","v86719773","1.72","6263","","","","0"
+"2017","Canada","2016A000011124","Professional and similar organisations [BS81300]","Cubic metres","72","thousands","3","v86719774","1.73","1117","","","","0"
+"2017","Canada","2016A000011124","Repair and maintenance [FC11000]","Cubic metres","72","thousands","3","v86719775","1.74","0","","","","0"
+"2017","Canada","2016A000011124","Operating supplies [FC12000]","Cubic metres","72","thousands","3","v86719776","1.75","0","","","","0"
+"2017","Canada","2016A000011124","Office supplies [FC13000]","Cubic metres","72","thousands","3","v86719777","1.76","0","","","","0"
+"2017","Canada","2016A000011124","Advertising, promotion, meals, entertainment, and travel [FC20000]","Cubic metres","72","thousands","3","v86719778","1.77","0","","","","0"
+"2017","Canada","2016A000011124","Transportation margins [FC30000]","Cubic metres","72","thousands","3","v86719779","1.78","0","","","","0"
+"2017","Canada","2016A000011124","Non-profit education services [NP61000]","Cubic metres","72","thousands","3","v86719780","1.79","12666","","","","0"
+"2017","Canada","2016A000011124","Non-profit social assistance [NP62400]","Cubic metres","72","thousands","3","v86719781","1.80","19525","","","","0"
+"2017","Canada","2016A000011124","Non-profit arts, entertainment and recreation [NP71000]","Cubic metres","72","thousands","3","v86719782","1.81","7524","","","","0"
+"2017","Canada","2016A000011124","Religious organizations [NP81310]","Cubic metres","72","thousands","3","v86719783","1.82","19431","","","","0"
+"2017","Canada","2016A000011124","Miscellaneous non-profit institutions serving households [NPA0000]","Cubic metres","72","thousands","3","v86719784","1.83","96374","","","","0"
+"2017","Canada","2016A000011124","Educational services (except universities) [GS611B0]","Cubic metres","72","thousands","3","v86719785","1.84","9742","","","","0"
+"2017","Canada","2016A000011124","Universities [GS61130]","Cubic metres","72","thousands","3","v86719786","1.85","13161","","","","0"
+"2017","Canada","2016A000011124","Hospitals [GS62200]","Cubic metres","72","thousands","3","v86719787","1.86","43219","","","","0"
+"2017","Canada","2016A000011124","Nursing and residential care facilities [GS62300]","Cubic metres","72","thousands","3","v86719788","1.87","1685","","","","0"
+"2017","Canada","2016A000011124","Other federal government services [GS91100]","Cubic metres","72","thousands","3","v86719789","1.88","5726","","","","0"
+"2017","Canada","2016A000011124","Other provincial and territorial government services [GS91200]","Cubic metres","72","thousands","3","v86719790","1.89","12327","","","","0"
+"2017","Canada","2016A000011124","Other municipal government services [GS91300]","Cubic metres","72","thousands","3","v86719791","1.90","46216","","","","0"
+"2017","Canada","2016A000011124","Other aboriginal government services [GS91400]","Cubic metres","72","thousands","3","v86719792","1.91","19197","","","","0"
+"2017","Canada","2016A000011124","Households","Cubic metres","72","thousands","3","v86719793","1.92","2968455","","","","0"
+"2019","Canada","2016A000011124","Total, industries and households","Cubic metres","72","thousands","3","v86719702","1.1","36116379","","p","","0"
+"2019","Canada","2016A000011124","Total, industries","Cubic metres","72","thousands","3","v86719703","1.2","33118098","","p","","0"
+"2019","Canada","2016A000011124","Crop production [BS111]","Cubic metres","72","thousands","3","v86719704","1.3","1775303","","p","","0"
+"2019","Canada","2016A000011124","Animal production [BS112]","Cubic metres","72","thousands","3","v86719705","1.4","1237001","","p","","0"
+"2019","Canada","2016A000011124","Forestry and logging [BS11300]","Cubic metres","72","thousands","3","v86719706","1.5","393","","p","","0"
+"2019","Canada","2016A000011124","Fishing, hunting and trapping [BS11400]","Cubic metres","72","thousands","3","v86719707","1.6","","..","","","0"
+"2019","Canada","2016A000011124","Support activities for agriculture and forestry [BS11500]","Cubic metres","72","thousands","3","v86719708","1.7","","..","","","0"
+"2019","Canada","2016A000011124","Oil and gas extraction [BS21100]","Cubic metres","72","thousands","3","v86719709","1.8","445771","","p","","0"
+"2019","Canada","2016A000011124","Coal mining [BS21210]","Cubic metres","72","thousands","3","v86719710","1.9","60330","","p","","0"
+"2019","Canada","2016A000011124","Metal ore mining [BS21220]","Cubic metres","72","thousands","3","v86719711","1.10","306203","","p","","0"
+"2019","Canada","2016A000011124","Non-metallic mineral mining and quarrying [BS21230]","Cubic metres","72","thousands","3","v86719712","1.11","121367","","p","","0"
+"2019","Canada","2016A000011124","Support activities for mining and oil and gas extraction [BS21300]","Cubic metres","72","thousands","3","v86719713","1.12","13","","p","","0"
+"2019","Canada","2016A000011124","Electric power generation, transmission and distribution [BS22110]","Cubic metres","72","thousands","3","v86719714","1.13","23464680","","p","","0"
+"2019","Canada","2016A000011124","Natural gas distribution, water, sewage and other systems [BS221A0]","Cubic metres","72","thousands","3","v86719715","1.14","1101331","","p","","0"
+"2019","Canada","2016A000011124","Residential building construction [BS23A00]","Cubic metres","72","thousands","3","v86719716","1.15","4581","","p","","0"
+"2019","Canada","2016A000011124","Non-residential building construction [BS23B00]","Cubic metres","72","thousands","3","v86719717","1.16","1726","","p","","0"
+"2019","Canada","2016A000011124","Transportation engineering construction [BS23C10]","Cubic metres","72","thousands","3","v86719718","1.17","175","","p","","0"
+"2019","Canada","2016A000011124","Oil and gas engineering construction [BS23C20]","Cubic metres","72","thousands","3","v86719719","1.18","17","","p","","0"
+"2019","Canada","2016A000011124","Electric power engineering construction [BS23C30]","Cubic metres","72","thousands","3","v86719720","1.19","53","","p","","0"
+"2019","Canada","2016A000011124","Communication engineering construction [BS23C40]","Cubic metres","72","thousands","3","v86719721","1.20","32","","p","","0"
+"2019","Canada","2016A000011124","Other engineering construction [BS23C50]","Cubic metres","72","thousands","3","v86719722","1.21","32","","p","","0"
+"2019","Canada","2016A000011124","Repair construction [BS23D00]","Cubic metres","72","thousands","3","v86719723","1.22","56","","p","","0"
+"2019","Canada","2016A000011124","Other activities of the construction industry [BS23E00]","Cubic metres","72","thousands","3","v86719724","1.23","34","","p","","0"
+"2019","Canada","2016A000011124","Food manufacturing [BS311]","Cubic metres","72","thousands","3","v86719725","1.24","298193","","p","","0"
+"2019","Canada","2016A000011124","Beverage and tobacco product manufacturing [BS312]","Cubic metres","72","thousands","3","v86719726","1.25","45201","","p","","0"
+"2019","Canada","2016A000011124","Textile and textile product mills [BS31A]","Cubic metres","72","thousands","3","v86719727","1.26","2254","","p","","0"
+"2019","Canada","2016A000011124","Clothing and leather and allied product manufacturing [BS31B]","Cubic metres","72","thousands","3","v86719728","1.27","358","","p","","0"
+"2019","Canada","2016A000011124","Wood product manufacturing [BS321]","Cubic metres","72","thousands","3","v86719729","1.28","36547","","p","","0"
+"2019","Canada","2016A000011124","Paper manufacturing [BS322]","Cubic metres","72","thousands","3","v86719730","1.29","1512364","","p","","0"
+"2019","Canada","2016A000011124","Printing and related support activities [BS323]","Cubic metres","72","thousands","3","v86719731","1.30","1163","","p","","0"
+"2019","Canada","2016A000011124","Petroleum and coal product manufacturing [BS324]","Cubic metres","72","thousands","3","v86719732","1.31","258399","","p","","0"
+"2019","Canada","2016A000011124","Chemical manufacturing [BS325]","Cubic metres","72","thousands","3","v86719733","1.32","515452","","p","","0"
+"2019","Canada","2016A000011124","Plastic and rubber products manufacturing [BS326]","Cubic metres","72","thousands","3","v86719734","1.33","23125","","p","","0"
+"2019","Canada","2016A000011124","Non-metallic mineral product manufacturing [BS327]","Cubic metres","72","thousands","3","v86719735","1.34","44020","","p","","0"
+"2019","Canada","2016A000011124","Primary metal manufacturing [BS331]","Cubic metres","72","thousands","3","v86719736","1.35","995551","","p","","0"
+"2019","Canada","2016A000011124","Fabricated metal product manufacturing [BS332]","Cubic metres","72","thousands","3","v86719737","1.36","12596","","p","","0"
+"2019","Canada","2016A000011124","Machinery manufacturing [BS333]","Cubic metres","72","thousands","3","v86719738","1.37","2216","","p","","0"
+"2019","Canada","2016A000011124","Computer and electronic product manufacturing [BS334]","Cubic metres","72","thousands","3","v86719739","1.38","2066","","p","","0"
+"2019","Canada","2016A000011124","Electrical equipment and component manufacturing [BS335]","Cubic metres","72","thousands","3","v86719740","1.39","1457","","p","","0"
+"2019","Canada","2016A000011124","Transportation equipment manufacturing [BS336]","Cubic metres","72","thousands","3","v86719741","1.40","26536","","p","","0"
+"2019","Canada","2016A000011124","Furniture and related product manufacturing [BS337]","Cubic metres","72","thousands","3","v86719742","1.41","1154","","p","","0"
+"2019","Canada","2016A000011124","Miscellaneous manufacturing [BS339]","Cubic metres","72","thousands","3","v86719743","1.42","2963","","p","","0"
+"2019","Canada","2016A000011124","Wholesale trade [BS41000]","Cubic metres","72","thousands","3","v86719744","1.43","46675","","p","","0"
+"2019","Canada","2016A000011124","Retail trade [BS4A000]","Cubic metres","72","thousands","3","v86719745","1.44","36269","","p","","0"
+"2019","Canada","2016A000011124","Air transportation [BS48100]","Cubic metres","72","thousands","3","v86719746","1.45","1361","","p","","0"
+"2019","Canada","2016A000011124","Rail transportation [BS48200]","Cubic metres","72","thousands","3","v86719747","1.46","3634","","p","","0"
+"2019","Canada","2016A000011124","Water transportation [BS48300]","Cubic metres","72","thousands","3","v86719748","1.47","1465","","p","","0"
+"2019","Canada","2016A000011124","Truck transportation [BS48400]","Cubic metres","72","thousands","3","v86719749","1.48","9196","","p","","0"
+"2019","Canada","2016A000011124","Transit, ground passenger and scenic and sightseeing transportation, taxi and limousine service and support activities for transportation [BS48B00]","Cubic metres","72","thousands","3","v86719750","1.49","29240","","p","","0"
+"2019","Canada","2016A000011124","Pipeline transportation [BS48600]","Cubic metres","72","thousands","3","v86719751","1.50","4093","","p","","0"
+"2019","Canada","2016A000011124","Postal service and couriers and messengers [BS49A00]","Cubic metres","72","thousands","3","v86719752","1.51","0","","p","","0"
+"2019","Canada","2016A000011124","Warehousing and storage [BS49300]","Cubic metres","72","thousands","3","v86719753","1.52","4076","","p","","0"
+"2019","Canada","2016A000011124","Motion picture and sound recording industries [BS51200]","Cubic metres","72","thousands","3","v86719754","1.53","2268","","p","","0"
+"2019","Canada","2016A000011124","Radio and television broadcasting [BS51510]","Cubic metres","72","thousands","3","v86719755","1.54","0","","p","","0"
+"2019","Canada","2016A000011124","Publishing, pay and specialty services, telecommunications and other information services [BS51B00]","Cubic metres","72","thousands","3","v86719756","1.55","13072","","p","","0"
+"2019","Canada","2016A000011124","Depository credit intermediation and monetary authorities [BS52B00]","Cubic metres","72","thousands","3","v86719757","1.56","15716","","p","","0"
+"2019","Canada","2016A000011124","Insurance carriers [BS52410]","Cubic metres","72","thousands","3","v86719758","1.57","230","","p","","0"
+"2019","Canada","2016A000011124","Lessors of real estate [BS53110]","Cubic metres","72","thousands","3","v86719759","1.58","123888","","p","","0"
+"2019","Canada","2016A000011124","Owner-occupied dwellings [BS5311A]","Cubic metres","72","thousands","3","v86719760","1.59","0","","p","","0"
+"2019","Canada","2016A000011124","Rental and leasing services and lessors of non-financial intangible assets (except copyrighted works) [BS53B00]","Cubic metres","72","thousands","3","v86719761","1.60","5230","","p","","0"
+"2019","Canada","2016A000011124","Other finance, insurance and real estate services and management of companies and enterprises [BS5A000]","Cubic metres","72","thousands","3","v86719762","1.61","60069","","p","","0"
+"2019","Canada","2016A000011124","Legal, accounting and architectural, engineering and related services [BS541C0]","Cubic metres","72","thousands","3","v86719763","1.62","5751","","p","","0"
+"2019","Canada","2016A000011124","Computer systems design and other professional, scientific and technical services [BS541D0]","Cubic metres","72","thousands","3","v86719764","1.63","3391","","p","","0"
+"2019","Canada","2016A000011124","Advertising, public relations and related services [BS54180]","Cubic metres","72","thousands","3","v86719765","1.64","55","","p","","0"
+"2019","Canada","2016A000011124","Administrative and support services [BS56100]","Cubic metres","72","thousands","3","v86719766","1.65","2622","","p","","0"
+"2019","Canada","2016A000011124","Waste management and remediation services [BS56200]","Cubic metres","72","thousands","3","v86719767","1.66","26254","","p","","0"
+"2019","Canada","2016A000011124","Educational services [BS61000]","Cubic metres","72","thousands","3","v86719768","1.67","13961","","p","","0"
+"2019","Canada","2016A000011124","Health care and social assistance [BS62000]","Cubic metres","72","thousands","3","v86719769","1.68","59095","","p","","0"
+"2019","Canada","2016A000011124","Arts, entertainment and recreation [BS71000]","Cubic metres","72","thousands","3","v86719770","1.69","4568","","p","","0"
+"2019","Canada","2016A000011124","Accommodation and food services [BS72000]","Cubic metres","72","thousands","3","v86719771","1.70","49850","","p","","0"
+"2019","Canada","2016A000011124","Repair and maintenance [BS81100]","Cubic metres","72","thousands","3","v86719772","1.71","11722","","p","","0"
+"2019","Canada","2016A000011124","Personal services and private households [BS81A00]","Cubic metres","72","thousands","3","v86719773","1.72","5443","","p","","0"
+"2019","Canada","2016A000011124","Professional and similar organisations [BS81300]","Cubic metres","72","thousands","3","v86719774","1.73","769","","p","","0"
+"2019","Canada","2016A000011124","Repair and maintenance [FC11000]","Cubic metres","72","thousands","3","v86719775","1.74","0","","p","","0"
+"2019","Canada","2016A000011124","Operating supplies [FC12000]","Cubic metres","72","thousands","3","v86719776","1.75","0","","p","","0"
+"2019","Canada","2016A000011124","Office supplies [FC13000]","Cubic metres","72","thousands","3","v86719777","1.76","0","","p","","0"
+"2019","Canada","2016A000011124","Advertising, promotion, meals, entertainment, and travel [FC20000]","Cubic metres","72","thousands","3","v86719778","1.77","0","","p","","0"
+"2019","Canada","2016A000011124","Transportation margins [FC30000]","Cubic metres","72","thousands","3","v86719779","1.78","0","","p","","0"
+"2019","Canada","2016A000011124","Non-profit education services [NP61000]","Cubic metres","72","thousands","3","v86719780","1.79","10735","","p","","0"
+"2019","Canada","2016A000011124","Non-profit social assistance [NP62400]","Cubic metres","72","thousands","3","v86719781","1.80","16071","","p","","0"
+"2019","Canada","2016A000011124","Non-profit arts, entertainment and recreation [NP71000]","Cubic metres","72","thousands","3","v86719782","1.81","6517","","p","","0"
+"2019","Canada","2016A000011124","Religious organizations [NP81310]","Cubic metres","72","thousands","3","v86719783","1.82","31423","","p","","0"
+"2019","Canada","2016A000011124","Miscellaneous non-profit institutions serving households [NPA0000]","Cubic metres","72","thousands","3","v86719784","1.83","81391","","p","","0"
+"2019","Canada","2016A000011124","Educational services (except universities) [GS611B0]","Cubic metres","72","thousands","3","v86719785","1.84","8298","","p","","0"
+"2019","Canada","2016A000011124","Universities [GS61130]","Cubic metres","72","thousands","3","v86719786","1.85","11028","","p","","0"
+"2019","Canada","2016A000011124","Hospitals [GS62200]","Cubic metres","72","thousands","3","v86719787","1.86","35927","","p","","0"
+"2019","Canada","2016A000011124","Nursing and residential care facilities [GS62300]","Cubic metres","72","thousands","3","v86719788","1.87","1396","","p","","0"
+"2019","Canada","2016A000011124","Other federal government services [GS91100]","Cubic metres","72","thousands","3","v86719789","1.88","4065","","p","","0"
+"2019","Canada","2016A000011124","Other provincial and territorial government services [GS91200]","Cubic metres","72","thousands","3","v86719790","1.89","9825","","p","","0"
+"2019","Canada","2016A000011124","Other municipal government services [GS91300]","Cubic metres","72","thousands","3","v86719791","1.90","40578","","p","","0"
+"2019","Canada","2016A000011124","Other aboriginal government services [GS91400]","Cubic metres","72","thousands","3","v86719792","1.91","20171","","p","","0"
+"2019","Canada","2016A000011124","Households","Cubic metres","72","thousands","3","v86719793","1.92","2998282","","p","","0"

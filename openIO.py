@@ -19,14 +19,17 @@ import logging
 import warnings
 import gzip
 import pickle
+import math
 
 
 class IOTables:
-    def __init__(self, folder_path, exiobase_folder, endogenizing_capitals=False):
+    def __init__(self, folder_path, exiobase_folder, endogenizing_capitals=False, aggregated_ghgs=True):
         """
         :param folder_path: [string] the path to the folder with the economic data (e.g. /../Detail level/)
         :param exiobase_folder: [string] path to exiobase folder for international imports (optional)
         :param endogenizing_capitals: [boolean] True if you want to endogenize capitals
+        :param aggregated_ghgs: [boolean] True to work with aggregated GHG physical flow accounts. False requires you to
+        have access to the disaggregated files provided by StatCan.
         """
 
         # ignoring some warnings
@@ -50,6 +53,7 @@ class IOTables:
         self.level_of_detail = [i for i in folder_path.split('/') if 'level' in i][0]
         self.exiobase_folder = exiobase_folder
         self.endogenizing = endogenizing_capitals
+        self.aggregated_ghgs = aggregated_ghgs
 
         # values
         self.V = pd.DataFrame()
@@ -193,7 +197,10 @@ class IOTables:
         self.match_npri_data_to_iots()
 
         logger.info("Matching GHG accounts to IOT sectors...")
-        self.match_ghg_accounts_to_iots()
+        if self.aggregated_ghgs:
+            self.match_aggregated_ghg_accounts_to_iots()
+        else:
+            self.match_disaggregated_ghg_accounts_to_iots()
 
         logger.info("Matching water accounts to IOT sectors...")
         self.match_water_accounts_to_iots()
@@ -242,7 +249,7 @@ class IOTables:
             # starting_line_values is the line in which the first value appears
             starting_line_values = 16
 
-        elif self.year in [2018, 2019]:
+        elif self.year in [2018, 2019, 2020]:
             # starting_line is the line in which the Supply table starts (the first green row)
             starting_line = 3
             # starting_line_values is the line in which the first value appears
@@ -967,7 +974,7 @@ class IOTables:
         if self.endogenizing:
             with gzip.open(pkg_resources.resource_stream(
                     __name__, '/Data/Capitals_endogenization_exiobase/K_cfc_pxp_exio3.8.2_' +
-                              str(self.year) + '.gz.pickle'),'rb') as f:
+                              str(self.year) + '.gz.pickle'), 'rb') as f:
                 self.K_exio = pickle.load(f)
 
         # save the matrices from exiobase because we need them later
@@ -1124,7 +1131,7 @@ class IOTables:
             assert (self.A.sum() + self.R.sum() + self.K.sum() +
                     self.link_openio_exio_A.sum() + self.link_openio_exio_K.sum())[
                        (self.A.sum() + self.R.sum() + self.K.sum() +
-                        self.link_openio_exio_A.sum() + self.link_openio_exio_K.sum()) < 0.95].sum() == 0
+                        self.link_openio_exio_A.sum() + self.link_openio_exio_K.sum()) < 0.935].sum() == 0
         else:
             assert (self.A.sum() + self.R.sum() + self.link_openio_exio_A.sum())[
                        (self.A.sum() + self.R.sum() + self.link_openio_exio_A.sum()) < 0.95].sum() == 0
@@ -1145,6 +1152,11 @@ class IOTables:
             self.link_openio_exio_Y /= 1.4856
             if self.endogenizing:
                 self.link_openio_exio_K /= 1.4856
+        elif self.year == 2020:
+            self.link_openio_exio_A /= 1.5298
+            self.link_openio_exio_Y /= 1.5298
+            if self.endogenizing:
+                self.link_openio_exio_K /= 1.5298
 
     def remove_abroad_enclaves(self):
         """
@@ -1317,9 +1329,87 @@ class IOTables:
         assert self.F.sum().sum() / total_emissions_origin > 0.98
         assert self.F.sum().sum() / total_emissions_origin < 1.02
 
-    def match_ghg_accounts_to_iots(self):
+    def match_aggregated_ghg_accounts_to_iots(self):
         """
-        Method matching GHG accounts to IOIC classification selected by the user
+        Method matching GHG accounts to IOCC classification selected by the user
+        :return: self.F and self.FY with GHG flows included
+        """
+
+        GHG = pd.read_csv(pkg_resources.resource_stream(__name__, '/Data/Environmental_data/GHG_emissions.csv'))
+        # drop unnessecary columns
+        GHG = GHG.loc[:, ['REF_DATE', 'GEO', 'Sector', 'VALUE']]
+        GHG = GHG.loc[[i for i in GHG.index if GHG.REF_DATE[i] == self.year and GHG.GEO[i] != 'Canada']]
+        # ktCO2eq to kgCO2eq
+        GHG.VALUE *= 1000000
+        # separate code from name of the sector
+        GHG.loc[:, 'Code'] = [i.split(' [')[1].split(']')[0] if '[' in i else np.nan for i in GHG.Sector]
+        GHG.loc[:, 'Sector'] = [i.split(' [')[0] if '[' in i else i for i in GHG.Sector]
+
+        # starting with the GHG emissions of hosueholds
+        Household_GHG = GHG.loc[[i for i in GHG.index if 'Households: ' in GHG.Sector[i]]]
+        # rename provinces
+        Household_GHG.GEO = [{v: k for k, v in self.matching_dict.items()}[i] for i in Household_GHG.GEO]
+        # rename to match with COICOP
+        Household_GHG.loc[
+            Household_GHG.Sector == 'Households: Motor fuels and lubricants', 'Sector'] = 'Fuels and lubricants'
+        Household_GHG.loc[Household_GHG.Sector == 'Households: Electricity and other fuels', 'Sector'] = 'Gas'
+        # provide the COICOP code
+        Household_GHG.loc[Household_GHG.Sector == 'Fuels and lubricants', 'Code'] = 'PEC07220'
+        Household_GHG.loc[Household_GHG.Sector == 'Gas', 'Code'] = 'PEC04520'
+        # pivot to obtain a vector of GHG emissions
+        Household_GHG = Household_GHG.pivot(values='VALUE', index='REF_DATE', columns=['GEO', 'Sector'])
+        # remove the denomination of index and columns
+        Household_GHG.index.name = None
+        Household_GHG.columns.names = None, None
+        # rename index
+        Household_GHG.index = ['GHG emissions']
+        # rename columns
+        Household_GHG.columns = pd.MultiIndex.from_tuples(
+            [(i[0], 'Household final consumption expenditure', i[1]) for i in Household_GHG.columns])
+
+        self.FY = pd.DataFrame(0, Household_GHG.index, self.Y.columns).merge(Household_GHG, 'right').fillna(0)
+        self.FY.index = ['GHG emissions']
+
+        # now for the emissions of the production sectors
+        GHG = GHG.dropna(subset=['Code']).fillna(0)
+        GHG.set_index(pd.MultiIndex.from_tuples(tuple(
+            list(zip([{v: k for k, v in self.matching_dict.items()}[i] for i in GHG.GEO], GHG.Code.tolist())))),
+                      inplace=True)
+        GHG = GHG.VALUE
+
+        # load concordance between GHG physical flow accounts and S&T classification
+        concordance = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Concordances/GHG_concordance.xlsx'),
+                                    self.level_of_detail)
+        concordance.set_index('GHG codes', inplace=True)
+        to_drop = concordance.loc[concordance.loc[:, 'IOIC'].isna()].index
+        concordance.drop(to_drop, inplace=True)
+
+        ghgs = pd.DataFrame()
+        for code in concordance.index:
+            # S&T are more precise than GHG physical flow accounts, so we use market share to distribute GHGs
+            sectors_to_split = [i[1] for i in self.industries if
+                                i[0] in concordance.loc[code].dropna().values.tolist()]
+            output_sectors_to_split = self.V.loc[:,
+                                      [i for i in self.V.columns if i[1] in sectors_to_split]].sum()
+            share_sectors_to_split = pd.DataFrame(0, output_sectors_to_split.index,
+                                                  ['GHG emissions'])
+            for province in self.matching_dict:
+                df = (output_sectors_to_split.loc[province] / output_sectors_to_split.loc[province].sum()).fillna(0)
+                share_sectors_to_split.loc[province, 'GHG emissions'] = (
+                            df.T * GHG.loc(axis=0)[:, code].loc[province].values).values
+            ghgs = pd.concat([ghgs, share_sectors_to_split])
+
+        # adding GHG accounts to pollutants
+        self.F = pd.concat([self.F, ghgs.T])
+
+        # reindexing
+        self.F = self.F.reindex(self.U.columns, axis=1)
+
+        self.emission_metadata.loc['GHG emissions', 'Unit'] = 'kgCO2e'
+
+    def match_disaggregated_ghg_accounts_to_iots(self):
+        """
+        Method matching GHG accounts to IOCC classification selected by the user
         :return: self.F and self.FY with GHG flows included
         """
 
@@ -1329,7 +1419,7 @@ class IOTables:
                 'L61 ghg emissions by gas')
             GHG = GHG.loc[
                 [i for i in GHG.index if GHG.loc[i, 'Reference Year'] == self.year and GHG.Geography[i] != 'Canada']]
-        elif self.year == 2019:
+        elif self.year in [2019, 2020]:
             GHG = pd.read_excel(
                 pkg_resources.resource_stream(__name__, '/Data/Environmental_data/GHG_emissions_by_gas_RY2019.xlsx'),
                 'L61 ghg emissions by gas')
@@ -1484,10 +1574,14 @@ class IOTables:
             year_for_water = 2015
         elif self.year == 2016:
             year_for_water = 2015
-        elif self.year > 2017:
+        elif self.year == 2017:
             year_for_water = 2017
-        else:
-            year_for_water = self.year
+        elif self.year == 2018:
+            year_for_water = 2017
+        elif self.year == 2019:
+            year_for_water = 2019
+        elif self.year == 2020:
+            year_for_water = 2019
         # select the year of the data
         water = water.loc[
             [i for i in water.index if water.REF_DATE[i] == int(year_for_water)], ['Sector', 'VALUE']].fillna(0)
@@ -1688,24 +1782,19 @@ class IOTables:
 
         self.minerals = pd.DataFrame(0, index=dict_data, columns=self.q.index)
 
-        if self.year in [2014, 2015, 2016, 2017, 2018]:
-            for mineral in dict_data:
+        for mineral in dict_data:
+            # check if data for year is available
+            if not math.isnan(xl.loc[mineral, self.year]):
                 df = xl.loc[mineral, self.year] * distrib_minerals.loc(axis=0)[:, dict_data[mineral]]
-                df.columns = [mineral]
-                df = df.T
-                self.minerals.loc[mineral, df.columns] = df.loc[mineral]
-        # no data for 2019 so use 2018 data
-        elif self.year == 2019:
-            for mineral in dict_data:
-                df = xl.loc[mineral, 2018] * distrib_minerals.loc(axis=0)[:, dict_data[mineral]]
-                df.columns = [mineral]
-                df = df.T
-                self.minerals.loc[mineral, df.columns] = df.loc[mineral]
+            # if it's not, take latest available year value
+            else:
+                df = xl.loc[mineral].dropna().iloc[-1] * distrib_minerals.loc(axis=0)[:, dict_data[mineral]]
+            df.columns = [mineral]
+            df = df.T
+            self.minerals.loc[mineral, df.columns] = df.loc[mineral]
 
         # convert from thousand carats to metric tons
         self.minerals.loc['Diamond'] *= 0.0002
-        # Li content per spodumene: https://www2.bgs.ac.uk/mineralsuk/download/mineralProfiles/lithium_profile.pdf
-        self.minerals.loc['Lithium'] *= 0.037
         # from metric tons to kgs
         self.minerals *= 1000
 
@@ -1718,17 +1807,18 @@ class IOTables:
         :return: self.C, self.methods_metadata
         """
 
-        IW = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Characterization_factors/impact_world_plus_2.0_dev.xlsx'))
+        IW = pd.read_excel(pkg_resources.resource_stream(
+            __name__, '/Data/Characterization_factors/impact_world_plus_2.0.1_dev.xlsx'))
 
         pivoting = pd.pivot_table(IW, values='CF value', index=('Impact category', 'CF unit'),
                                   columns=['Elem flow name', 'Compartment', 'Sub-compartment']).fillna(0)
 
         try:
-            concordance = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Concordances/openIO_IW_concordance.xlsx'),
-                                        str(self.NPRI_file_year))
+            concordance = pd.read_excel(pkg_resources.resource_stream(
+                __name__, '/Data/Concordances/openIO_IW_concordance.xlsx'), str(self.NPRI_file_year))
         except ValueError:
-            concordance = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Concordances/openIO_IW_concordance.xlsx'),
-                                        '2016')
+            concordance = pd.read_excel(pkg_resources.resource_stream(
+                __name__, '/Data/Concordances/openIO_IW_concordance.xlsx'), '2016')
         concordance.set_index('OpenIO flows', inplace=True)
 
         # applying concordance
@@ -1760,6 +1850,9 @@ class IOTables:
                 except KeyError:
                     pass
 
+        # Non IW characterization factors
+        if self.aggregated_ghgs:
+            self.C.loc[('Climate change, short term','kg CO2 eq (short)'), 'GHG emissions'] = 1
         self.C.loc[('Water use', 'm3'), [i for i in self.C.columns if i[1] == 'Water']] = 1
         self.C.loc[('Energy use', 'TJ'), [i for i in self.C.columns if i == 'Energy']] = 1
         self.C = self.C.fillna(0)
@@ -1800,24 +1893,44 @@ class IOTables:
                      'Water availability, terrestrial ecosystem',
                      'Water scarcity'], axis=0, level=0, inplace=True)
 
+        if self.aggregated_ghgs:
+            self.C.drop(['Climate change, ecosystem quality, long term',
+                         'Climate change, ecosystem quality, short term',
+                         'Climate change, human health, long term',
+                         'Climate change, human health, short term',
+                         'Climate change, long term',
+                         'Marine acidification, short term',
+                         'Marine acidification, long term'], axis=0, level=0, inplace=True)
+
         # importing characterization matrix IMPACT World+/exiobase
         self.C_exio = pd.read_excel(pkg_resources.resource_stream(
-            __name__, '/Data/Characterization_factors/impact_world_plus_2.0_exiobase.xlsx'), index_col='Unnamed: 0')
+            __name__, '/Data/Characterization_factors/impact_world_plus_2.0.1_expert_version_exiobase.xlsx'),
+            index_col='Unnamed: 0')
         self.C_exio.index = pd.MultiIndex.from_tuples(list(zip(
             [i.split(' (')[0] for i in self.C_exio.index],
             [i.split(' (')[1].split(')')[0] for i in self.C_exio.index])))
 
         self.C_exio.drop(['Fossil and nuclear energy use',
-                         'Ionizing radiations',
-                         'Ionizing radiation, ecosystem quality',
-                         'Ionizing radiation, human health',
-                         'Land occupation, biodiversity',
-                         'Land transformation, biodiversity',
-                         'Thermally polluted water',
-                         'Water availability, freshwater ecosystem',
-                         'Water availability, human health',
-                         'Water availability, terrestrial ecosystem',
-                         'Water scarcity'], axis=0, level=0, inplace=True)
+                          'Ionizing radiations',
+                          'Ionizing radiation, ecosystem quality',
+                          'Ionizing radiation, human health',
+                          'Land occupation, biodiversity',
+                          'Land transformation, biodiversity',
+                          'Thermally polluted water',
+                          'Water availability, freshwater ecosystem',
+                          'Water availability, human health',
+                          'Water availability, terrestrial ecosystem',
+                          'Water scarcity'], axis=0, level=0, inplace=True)
+
+        if self.aggregated_ghgs:
+            self.C_exio.drop(['Climate change, ecosystem quality, long term',
+                              'Climate change, ecosystem quality, short term',
+                              'Climate change, human health, long term',
+                              'Climate change, human health, short term',
+                              'Climate change, long term',
+                              'Marine acidification, short term',
+                              'Marine acidification, long term'], axis=0, level=0, inplace=True)
+
         # adding water use to exiobase flows to match with water use from STATCAN physical accounts
         # water use in exiobase is identified through "water withdrawal" and NOT "water consumption"
         adding_water_use = pd.DataFrame(0, index=pd.MultiIndex.from_product([['Water use'], ['m3']]),
@@ -1857,76 +1970,115 @@ class IOTables:
         crops_exio = ['Paddy rice', 'Wheat', 'Cereal grains nec', 'Vegetables, fruit, nuts', 'Oil seeds',
                       'Sugar cane, sugar beet', 'Plant-based fibers', 'Crops nec']
         animals_exio = ['Cattle', 'Pigs', 'Poultry', 'Meat animals nec', 'Raw milk', 'Wool, silk-worm cocoons']
-        # identify the three GHGs that are covered by openIO
-        CO2 = [i for i in self.F_exio.index if 'CO2' in i]
-        CH4 = [i for i in self.F_exio.index if 'CH4' in i]
-        N2O = [i for i in self.F_exio.index if 'N2O' in i]
-        # isolate GHG emissions from crop production in Exiobase
-        crops_emissions = pd.concat(
-            [self.F_exio.loc(axis=1)[:, crops_exio].groupby(axis=1, level=0).sum().loc[CO2].sum(),
-             self.F_exio.loc(axis=1)[:, crops_exio].groupby(axis=1, level=0).sum().loc[CH4].sum(),
-             self.F_exio.loc(axis=1)[:, crops_exio].groupby(axis=1, level=0).sum().loc[N2O].sum()],
-            axis=1)
-        crops_emissions.columns = ['Carbon dioxide', 'Methane', 'Dinitrogen monoxide']
-        crops_emissions = crops_emissions.loc['CA']
-        # isolate GHG emissions from meat production in Exiobase
-        meat_emissions = pd.concat(
-            [self.F_exio.loc(axis=1)[:, animals_exio].groupby(axis=1, level=0).sum().loc[CO2].sum(),
-             self.F_exio.loc(axis=1)[:, animals_exio].groupby(axis=1, level=0).sum().loc[CH4].sum(),
-             self.F_exio.loc(axis=1)[:, animals_exio].groupby(axis=1, level=0).sum().loc[N2O].sum()], axis=1)
-        meat_emissions.columns = ['Carbon dioxide', 'Methane', 'Dinitrogen monoxide']
-        meat_emissions = meat_emissions.loc['CA']
-        # get the totals per GHG
-        tot_co2 = crops_emissions.loc['Carbon dioxide'] + meat_emissions.loc['Carbon dioxide']
-        tot_ch4 = crops_emissions.loc['Methane'] + meat_emissions.loc['Methane']
-        tot_n2o = crops_emissions.loc['Dinitrogen monoxide'] + meat_emissions.loc['Dinitrogen monoxide']
-        # calculate the distribution, according to Exiobase
-        crops_emissions.loc['Carbon dioxide'] /= tot_co2
-        crops_emissions.loc['Methane'] /= tot_ch4
-        crops_emissions.loc['Dinitrogen monoxide'] /= tot_n2o
-        # calculate the distribution, according to Exiobase
-        meat_emissions.loc['Carbon dioxide'] /= tot_co2
-        meat_emissions.loc['Methane'] /= tot_ch4
-        meat_emissions.loc['Dinitrogen monoxide'] /= tot_n2o
-        # store it in a single dataframe
-        ghgs_exio_distribution = pd.concat([crops_emissions, meat_emissions], axis=1)
-        ghgs_exio_distribution.columns = ['Crops', 'Meat']
 
-        # now that we have the distribution of GHG per big sector, we apply this distribution to openIO data
-        for ghg in ['Carbon dioxide', 'Methane', 'Dinitrogen monoxide']:
+        if self.aggregated_ghgs:
+            # calculate total GHGs for each sector of exiobase
+            GHG_in_kgCO2e_exio = self.C_exio.dot(self.F_exio)
+            # divide by 1,000,000 to get from millions euros to euros
+            GHG_in_kgCO2e_exio /= 1000000
+            # select climate change row and select Canada row
+            GHG_in_kgCO2e_exio = GHG_in_kgCO2e_exio.loc[
+                [('Climate change, short term', 'kg CO2 eq (short)')]].iloc[0].loc['CA']
+            crop_emissions_exio = GHG_in_kgCO2e_exio.loc[crops_exio].sum()
+            meat_emissions_exio = GHG_in_kgCO2e_exio.loc[animals_exio].sum()
+            tot_emissions = crop_emissions_exio + meat_emissions_exio
+            crop_emissions_exio /= tot_emissions
+            meat_emissions_exio /= tot_emissions
 
-            tot = self.F.loc[[i for i in self.F.index if i[1] == ghg], [i for i in self.F.columns if i[1] in [
+            tot = self.F.loc['GHG emissions', [i for i in self.F.columns if i[1] in [
                 'Crop production (except cannabis, greenhouse, nursery and floriculture production)',
                 'Greenhouse, nursery and floriculture production (except cannabis)',
-                'Animal production (except aquaculture)', 'Aquaculture']]].groupby(axis=1, level=0).sum()
-
-            crops = self.F.loc[[i for i in self.F.index if i[1] == ghg], [i for i in self.F.columns if i[1] in [
+                'Animal production (except aquaculture)', 'Aquaculture']]].groupby(axis=0, level=0).sum()
+            crops = self.F.loc['GHG emissions', [i for i in self.F.columns if i[1] in [
                 'Crop production (except cannabis, greenhouse, nursery and floriculture production)',
                 'Greenhouse, nursery and floriculture production (except cannabis)']]]
-
-            animals = self.F.loc[[i for i in self.F.index if i[1] == ghg], [i for i in self.F.columns if i[1] in [
+            animals = self.F.loc['GHG emissions', [i for i in self.F.columns if i[1] in [
                 'Animal production (except aquaculture)', 'Aquaculture']]]
 
-            for province in tot.columns:
-                tot_prod_crop_and_meat_province = tot.loc[[(province, ghg, 'Air')], province].iloc[0]
+            for province in tot.index:
+                self.F.loc['GHG emissions', [i for i in self.F.columns if i[0] == province and i[1] in [
+                    'Crop production (except cannabis, greenhouse, nursery and floriculture production)',
+                    'Greenhouse, nursery and floriculture production (except cannabis)']]] = pd.concat(
+                    [(crops.loc[province] / crops.loc[province].sum() * tot.loc[province] * crop_emissions_exio)],
+                    keys=[province])
+                self.F.loc['GHG emissions', [i for i in self.F.columns if i[0] == province and i[1] in [
+                    'Animal production (except aquaculture)', 'Aquaculture']]] = pd.concat(
+                    [animals.loc[province] / animals.loc[province].sum() * tot.loc[province] * meat_emissions_exio],
+                    keys=[province])
 
-                exio_crop_distrib = ghgs_exio_distribution.loc[ghg, 'Crops']
-                crops.loc[[(province, ghg, 'Air')]] = (crops.loc[[(province, ghg, 'Air')]] /
-                                                       crops.loc[[(province, ghg, 'Air')]].sum().sum() *
-                                                       exio_crop_distrib * tot_prod_crop_and_meat_province)
-                self.F.loc[[i for i in self.F.index if i[1] == ghg and i[0] == province], [
-                    i for i in self.F.columns if i[1] in [
-                        'Crop production (except cannabis, greenhouse, nursery and floriculture production)',
-                        'Greenhouse, nursery and floriculture production (except cannabis)']]] = crops.loc[[(province, ghg, 'Air')]]
+            self.F.loc['GHG emissions'] = self.F.loc['GHG emissions'].fillna(0)
 
-                exio_animal_distrib = ghgs_exio_distribution.loc[ghg, 'Meat']
-                animals.loc[[(province, ghg, 'Air')]] = (animals.loc[[(province, ghg, 'Air')]] /
-                                                         animals.loc[[(province, ghg, 'Air')]].sum().sum() *
-                                                         exio_animal_distrib * tot_prod_crop_and_meat_province)
+        else:
+            # identify the three GHGs that are covered by openIO
+            CO2 = [i for i in self.F_exio.index if 'CO2' in i]
+            CH4 = [i for i in self.F_exio.index if 'CH4' in i]
+            N2O = [i for i in self.F_exio.index if 'N2O' in i]
+            # isolate GHG emissions from crop production in Exiobase
+            crops_emissions = pd.concat(
+                [self.F_exio.loc(axis=1)[:, crops_exio].groupby(axis=1, level=0).sum().loc[CO2].sum(),
+                 self.F_exio.loc(axis=1)[:, crops_exio].groupby(axis=1, level=0).sum().loc[CH4].sum(),
+                 self.F_exio.loc(axis=1)[:, crops_exio].groupby(axis=1, level=0).sum().loc[N2O].sum()],
+                axis=1)
+            crops_emissions.columns = ['Carbon dioxide', 'Methane', 'Dinitrogen monoxide']
+            crops_emissions = crops_emissions.loc['CA']
+            # isolate GHG emissions from meat production in Exiobase
+            meat_emissions = pd.concat(
+                [self.F_exio.loc(axis=1)[:, animals_exio].groupby(axis=1, level=0).sum().loc[CO2].sum(),
+                 self.F_exio.loc(axis=1)[:, animals_exio].groupby(axis=1, level=0).sum().loc[CH4].sum(),
+                 self.F_exio.loc(axis=1)[:, animals_exio].groupby(axis=1, level=0).sum().loc[N2O].sum()], axis=1)
+            meat_emissions.columns = ['Carbon dioxide', 'Methane', 'Dinitrogen monoxide']
+            meat_emissions = meat_emissions.loc['CA']
+            # get the totals per GHG
+            tot_co2 = crops_emissions.loc['Carbon dioxide'] + meat_emissions.loc['Carbon dioxide']
+            tot_ch4 = crops_emissions.loc['Methane'] + meat_emissions.loc['Methane']
+            tot_n2o = crops_emissions.loc['Dinitrogen monoxide'] + meat_emissions.loc['Dinitrogen monoxide']
+            # calculate the distribution, according to Exiobase
+            crops_emissions.loc['Carbon dioxide'] /= tot_co2
+            crops_emissions.loc['Methane'] /= tot_ch4
+            crops_emissions.loc['Dinitrogen monoxide'] /= tot_n2o
+            # calculate the distribution, according to Exiobase
+            meat_emissions.loc['Carbon dioxide'] /= tot_co2
+            meat_emissions.loc['Methane'] /= tot_ch4
+            meat_emissions.loc['Dinitrogen monoxide'] /= tot_n2o
+            # store it in a single dataframe
+            ghgs_exio_distribution = pd.concat([crops_emissions, meat_emissions], axis=1)
+            ghgs_exio_distribution.columns = ['Crops', 'Meat']
 
-                self.F.loc[[i for i in self.F.index if i[1] == ghg and i[0] == province], [
-                    i for i in self.F.columns if i[1] in [
-                        'Animal production (except aquaculture)','Aquaculture']]] = animals.loc[[(province, ghg, 'Air')]]
+            # now that we have the distribution of GHG per big sector, we apply this distribution to openIO data
+            for ghg in ['Carbon dioxide', 'Methane', 'Dinitrogen monoxide']:
+
+                tot = self.F.loc[[i for i in self.F.index if i[1] == ghg], [i for i in self.F.columns if i[1] in [
+                    'Crop production (except cannabis, greenhouse, nursery and floriculture production)',
+                    'Greenhouse, nursery and floriculture production (except cannabis)',
+                    'Animal production (except aquaculture)', 'Aquaculture']]].groupby(axis=1, level=0).sum()
+
+                crops = self.F.loc[[i for i in self.F.index if i[1] == ghg], [i for i in self.F.columns if i[1] in [
+                    'Crop production (except cannabis, greenhouse, nursery and floriculture production)',
+                    'Greenhouse, nursery and floriculture production (except cannabis)']]]
+
+                animals = self.F.loc[[i for i in self.F.index if i[1] == ghg], [i for i in self.F.columns if i[1] in [
+                    'Animal production (except aquaculture)', 'Aquaculture']]]
+
+                for province in tot.columns:
+                    tot_prod_crop_and_meat_province = tot.loc[[(province, ghg, 'Air')], province].iloc[0]
+
+                    exio_crop_distrib = ghgs_exio_distribution.loc[ghg, 'Crops']
+                    crops.loc[[(province, ghg, 'Air')]] = (crops.loc[[(province, ghg, 'Air')]] /
+                                                           crops.loc[[(province, ghg, 'Air')]].sum().sum() *
+                                                           exio_crop_distrib * tot_prod_crop_and_meat_province)
+                    self.F.loc[[i for i in self.F.index if i[1] == ghg and i[0] == province], [
+                        i for i in self.F.columns if i[1] in [
+                            'Crop production (except cannabis, greenhouse, nursery and floriculture production)',
+                            'Greenhouse, nursery and floriculture production (except cannabis)']]] = crops.loc[[(province, ghg, 'Air')]]
+
+                    exio_animal_distrib = ghgs_exio_distribution.loc[ghg, 'Meat']
+                    animals.loc[[(province, ghg, 'Air')]] = (animals.loc[[(province, ghg, 'Air')]] /
+                                                             animals.loc[[(province, ghg, 'Air')]].sum().sum() *
+                                                             exio_animal_distrib * tot_prod_crop_and_meat_province)
+
+                    self.F.loc[[i for i in self.F.index if i[1] == ghg and i[0] == province], [
+                        i for i in self.F.columns if i[1] in [
+                            'Animal production (except aquaculture)','Aquaculture']]] = animals.loc[[(province, ghg, 'Air')]]
 
     def differentiate_country_names_openio_exio(self):
         """
@@ -2108,12 +2260,14 @@ class IOTables:
 
         self.F = self.F.dot(self.V.dot(self.inv_g).T)
         self.F = pd.concat([self.F, self.minerals])
-        self.add_HFCs_emissions()
+        self.add_hfc_emissions()
         self.S = self.F.dot(self.inv_q)
         self.S = pd.concat([self.S, self.S_exio]).fillna(0)
         self.S = self.S.reindex(self.A.columns, axis=1)
         # change provinces metadata for S here
         self.S.columns = self.A.columns
+        if self.aggregated_ghgs:
+            self.S = self.S.fillna(0)
 
         # adding empty flows to FY to allow multiplication with self.C
         self.FY = pd.concat([pd.DataFrame(0, self.F.index, self.Y.columns), self.FY])
@@ -2122,7 +2276,7 @@ class IOTables:
 
         self.emission_metadata = pd.concat([self.emission_metadata, self.unit_exio])
 
-    def add_HFCs_emissions(self):
+    def add_hfc_emissions(self):
         """
         Method matching HFCs accounts to IOIC product classification.
         Source of the data: https://doi.org/10.5281/zenodo.7432088
@@ -2132,7 +2286,7 @@ class IOTables:
         with open(pkg_resources.resource_filename(__name__, '/Data/Concordances/concordance_HFCs.json'), 'r') as f:
             industry_mapping = json.load(f)
 
-        ### environmental values
+        # environmental values
         all_GES = pd.read_excel(pkg_resources.resource_stream(
             __name__, '/Data/Environmental_data/SF6_HFC_PFC_emissions.xlsx'), 'Canada_UNFCCC_emissions', index_col=0)
         all_GES = all_GES.dropna(axis=0, subset=['numberValue'])
@@ -2147,7 +2301,7 @@ class IOTables:
         hfcs = hfcs.loc[hfcs['category'].isin([k for k in industry_mapping.keys()])].reset_index(drop=True)
 
         # convert to kg
-        mass_conversion_factors = { "kg": 1, "t": 1000, "kt": 1000000 }
+        mass_conversion_factors = {"kg": 1, "t": 1000, "kt": 1000000}
         hfcs['numberValue'] = hfcs['unit'].map(mass_conversion_factors).mul(hfcs['numberValue'])
 
         hfcs = hfcs.loc[(hfcs['measure'] == 'Net emissions/removals') & (hfcs['year'] == self.year), ['category', 'gas',
@@ -2156,8 +2310,8 @@ class IOTables:
         hfcs = hfcs.set_index(['gas', 'category'])
         hfcs.rename_axis(['gas', 'category'])
 
-        ### economic values
-        V = self.V.groupby(axis='columns',level=0).sum()
+        # economic values
+        V = self.V.groupby(axis='columns', level=0).sum()
 
         R = pd.DataFrame(columns=V.index)
 
@@ -2174,7 +2328,7 @@ class IOTables:
         idx = pd.MultiIndex.from_tuples(R.index, names=['province', 'category'])
         R = R.reset_index(drop=True).set_index(idx)
 
-        ### combine economic and environmental values (left outer join)
+        # combine economic and environmental values (left outer join)
         W = hfcs.join(R)
         W.loc[:, W.columns != 'numberValue'] = W.loc[:, W.columns != 'numberValue'].mul(W['numberValue'], 0)
         W = W.drop(columns='numberValue').groupby(level=['gas', 'province']).sum()
@@ -2195,11 +2349,6 @@ class IOTables:
         :return:
         """
 
-        # identify biogenic and fossil CO2 emissions in Exiobase
-        CO2_fossil = [i for i in self.F_exio.index if 'CO2' in i and 'biogenic' not in i and 'peat decay' not in i]
-        CO2_bio = [i for i in self.F_exio.index if 'CO2' in i and 'biogenic' in i or 'peat decay' in i]
-        CO2 = [i for i in self.F_exio.index if 'CO2' in i]
-
         # loading concordances between exiobase classification and IOIC
         ioic_exio = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Concordances/IOIC_EXIOBASE.xlsx'),
                                   'commodities')
@@ -2209,69 +2358,92 @@ class IOTables:
         ioic_exio /= ioic_exio.sum()
         ioic_exio = ioic_exio.fillna(0)
 
-        # apply the distribution of biogenic CO2 from Exiobase to openIO sectors
-        bio = self.F_exio.loc[CO2_bio, 'CA'].dot(ioic_exio.T).sum() / self.F_exio.loc[CO2, 'CA'].dot(
-            ioic_exio.T).sum()
-        bio = bio.fillna(0)
-        bio = pd.DataFrame(pd.concat([bio] * len([i for i in self.S.columns.levels[0] if 'CA-' in i])), columns=[
-            'Carbon dioxide - biogenic'])
-        bio.index = [i for i in self.S.columns if 'CA-' in i[0]]
-        bio_openio = self.S.loc[[i for i in self.S.index if 'Carbon dioxide' == i[1]],
-                                [i for i in self.S.columns if 'CA-' in i[0]]].copy()
-        bio_openio = np.multiply(bio_openio, bio.iloc[:, 0])
-        bio_openio.index = [(i[0], 'Carbon dioxide - biogenic', i[2]) for i in bio_openio.index]
+        if self.aggregated_ghgs:
+            # identify biogenic in Exiobase
+            CO2_bio = [i for i in self.F_exio.index if 'CO2' in i and 'biogenic' in i or 'peat decay' in i]
+            # determine the share of fossil emissions impact
+            share_fossil = 1 - (self.F_exio.loc[CO2_bio, 'CA'].dot(ioic_exio.T).sum() /
+                                self.C_exio.dot(self.F_exio).loc[
+                                    ('Climate change, short term', 'kg CO2 eq (short)'), 'CA'].dot(
+                                    ioic_exio.T)).fillna(0)
+            share_fossil = pd.DataFrame(
+                pd.concat([share_fossil] * len([i for i in self.S.columns.levels[0] if 'CA-' in i])),
+                columns=['GHG emissions'])
+            share_fossil.index = pd.MultiIndex.from_tuples([i for i in self.S.columns if 'CA-' in i[0]])
+            # apply biogenic correction to self.F and self.S
+            self.F.loc['GHG emissions'] *= share_fossil.loc[:, 'GHG emissions']
+            self.S.loc['GHG emissions'] *= share_fossil.loc[:, 'GHG emissions']
+            self.S = self.S.fillna(0)
 
-        # apply the distribution of fossil CO2 from Exiobase to openIO sectors
-        fossil = self.F_exio.loc[CO2_fossil, 'CA'].dot(ioic_exio.T).sum() / self.F_exio.loc[CO2, 'CA'].dot(
-            ioic_exio.T).sum()
-        fossil = fossil.fillna(0)
-        fossil = pd.DataFrame(pd.concat([fossil] * len([i for i in self.S.columns.levels[0] if 'CA-' in i])), columns=[
-            'Carbon dioxide - fossil'])
-        fossil.index = [i for i in self.S.columns if 'CA-' in i[0]]
-        fossil_openio = self.S.loc[[i for i in self.S.index if 'Carbon dioxide' == i[1]],
-                                   [i for i in self.S.columns if 'CA-' in i[0]]].copy()
-        fossil_openio = np.multiply(fossil_openio, fossil.iloc[:, 0])
-        fossil_openio.index = [(i[0], 'Carbon dioxide - fossil', i[2]) for i in fossil_openio.index]
+        else:
+            # identify biogenic and fossil CO2 emissions in Exiobase
+            CO2_fossil = [i for i in self.F_exio.index if 'CO2' in i and 'biogenic' not in i and 'peat decay' not in i]
+            CO2_bio = [i for i in self.F_exio.index if 'CO2' in i and 'biogenic' in i or 'peat decay' in i]
+            CO2 = [i for i in self.F_exio.index if 'CO2' in i]
 
-        # drop total CO2 emissions
-        self.S.drop([i for i in self.S.index if 'Carbon dioxide' == i[1]], inplace=True)
-        # add fossil and biogenic CO2 emissions
-        self.S = pd.concat([self.S, fossil_openio.reindex(self.S.columns, axis=1).fillna(0),
-                            bio_openio.reindex(self.S.columns, axis=1).fillna(0)])
+            # apply the distribution of biogenic CO2 from Exiobase to openIO sectors
+            bio = self.F_exio.loc[CO2_bio, 'CA'].dot(ioic_exio.T).sum() / self.F_exio.loc[CO2, 'CA'].dot(
+                ioic_exio.T).sum()
+            bio = bio.fillna(0)
+            bio = pd.DataFrame(pd.concat([bio] * len([i for i in self.S.columns.levels[0] if 'CA-' in i])), columns=[
+                'Carbon dioxide - biogenic'])
+            bio.index = [i for i in self.S.columns if 'CA-' in i[0]]
+            bio_openio = self.S.loc[[i for i in self.S.index if 'Carbon dioxide' == i[1]],
+                                    [i for i in self.S.columns if 'CA-' in i[0]]].copy()
+            bio_openio = np.multiply(bio_openio, bio.iloc[:, 0])
+            bio_openio.index = [(i[0], 'Carbon dioxide - biogenic', i[2]) for i in bio_openio.index]
 
-        # same story for self.F
-        bio_openio_scaled = self.F.loc[[i for i in self.F.index if 'Carbon dioxide' == i[1]],
-                                       [i for i in self.F.columns if 'CA-' in i[0]]].copy()
-        bio_openio_scaled = np.multiply(bio_openio_scaled, bio.iloc[:, 0])
-        bio_openio_scaled.index = [(i[0], 'Carbon dioxide - biogenic', i[2]) for i in bio_openio_scaled.index]
-        bio_openio_scaled = bio_openio_scaled.fillna(0)
-        fossil_openio_scaled = self.F.loc[[i for i in self.F.index if 'Carbon dioxide' == i[1]],
-                                          [i for i in self.F.columns if 'CA-' in i[0]]].copy()
-        fossil_openio_scaled = np.multiply(fossil_openio_scaled, fossil.iloc[:, 0])
-        fossil_openio_scaled.index = [(i[0], 'Carbon dioxide - fossil', i[2]) for i in fossil_openio_scaled.index]
-        fossil_openio_scaled = fossil_openio_scaled.fillna(0)
+            # apply the distribution of fossil CO2 from Exiobase to openIO sectors
+            fossil = self.F_exio.loc[CO2_fossil, 'CA'].dot(ioic_exio.T).sum() / self.F_exio.loc[CO2, 'CA'].dot(
+                ioic_exio.T).sum()
+            fossil = fossil.fillna(0)
+            fossil = pd.DataFrame(pd.concat([fossil] * len([i for i in self.S.columns.levels[0] if 'CA-' in i])), columns=[
+                'Carbon dioxide - fossil'])
+            fossil.index = [i for i in self.S.columns if 'CA-' in i[0]]
+            fossil_openio = self.S.loc[[i for i in self.S.index if 'Carbon dioxide' == i[1]],
+                                       [i for i in self.S.columns if 'CA-' in i[0]]].copy()
+            fossil_openio = np.multiply(fossil_openio, fossil.iloc[:, 0])
+            fossil_openio.index = [(i[0], 'Carbon dioxide - fossil', i[2]) for i in fossil_openio.index]
 
-        self.F.drop([i for i in self.F.index if 'Carbon dioxide' == i[1]], inplace=True)
-        self.F = pd.concat([self.F, fossil_openio_scaled.reindex(self.F.columns, axis=1).fillna(0),
-                            bio_openio_scaled.reindex(self.F.columns, axis=1).fillna(0)])
+            # drop total CO2 emissions
+            self.S.drop([i for i in self.S.index if 'Carbon dioxide' == i[1]], inplace=True)
+            # add fossil and biogenic CO2 emissions
+            self.S = pd.concat([self.S, fossil_openio.reindex(self.S.columns, axis=1).fillna(0),
+                                bio_openio.reindex(self.S.columns, axis=1).fillna(0)])
 
-        # and now create biogenic and fossil rows for self.FY
-        self.FY.index = [(i[0], 'Carbon dioxide - fossil', i[2]) if i[1] == 'Carbon dioxide' else i for i in
-                         self.FY.index]
+            # same story for self.F
+            bio_openio_scaled = self.F.loc[[i for i in self.F.index if 'Carbon dioxide' == i[1]],
+                                           [i for i in self.F.columns if 'CA-' in i[0]]].copy()
+            bio_openio_scaled = np.multiply(bio_openio_scaled, bio.iloc[:, 0])
+            bio_openio_scaled.index = [(i[0], 'Carbon dioxide - biogenic', i[2]) for i in bio_openio_scaled.index]
+            bio_openio_scaled = bio_openio_scaled.fillna(0)
+            fossil_openio_scaled = self.F.loc[[i for i in self.F.index if 'Carbon dioxide' == i[1]],
+                                              [i for i in self.F.columns if 'CA-' in i[0]]].copy()
+            fossil_openio_scaled = np.multiply(fossil_openio_scaled, fossil.iloc[:, 0])
+            fossil_openio_scaled.index = [(i[0], 'Carbon dioxide - fossil', i[2]) for i in fossil_openio_scaled.index]
+            fossil_openio_scaled = fossil_openio_scaled.fillna(0)
 
-        # add "fossil" to the elementary flow name in characterization matrix
-        self.C.columns = [(i[0], 'Carbon dioxide - fossil', i[2]) if i[1] == 'Carbon dioxide' else i for i in
-                          self.C.columns]
+            self.F.drop([i for i in self.F.index if 'Carbon dioxide' == i[1]], inplace=True)
+            self.F = pd.concat([self.F, fossil_openio_scaled.reindex(self.F.columns, axis=1).fillna(0),
+                                bio_openio_scaled.reindex(self.F.columns, axis=1).fillna(0)])
 
-        # also add an entry for biogenic carbon in characterization matrix
-        provinces = [i for i in self.A.columns.levels[0] if 'CA-' in i]
-        for province in provinces:
-            self.C.loc[:, [(province, 'Carbon dioxide - biogenic', 'Air')]] = 0
+            # and now create biogenic and fossil rows for self.FY
+            self.FY.index = [(i[0], 'Carbon dioxide - fossil', i[2]) if i[1] == 'Carbon dioxide' else i for i in
+                             self.FY.index]
 
-        # reindex stuff around
-        self.F = self.F.reindex(self.C.columns).fillna(0)
-        self.F = self.F.reindex(self.A.index, axis=1).fillna(0)
-        self.FY = self.FY.reindex(self.F.index).fillna(0)
+            # add "fossil" to the elementary flow name in characterization matrix
+            self.C.columns = [(i[0], 'Carbon dioxide - fossil', i[2]) if i[1] == 'Carbon dioxide' else i for i in
+                              self.C.columns]
+
+            # also add an entry for biogenic carbon in characterization matrix
+            provinces = [i for i in self.A.columns.levels[0] if 'CA-' in i]
+            for province in provinces:
+                self.C.loc[:, [(province, 'Carbon dioxide - biogenic', 'Air')]] = 0
+
+            # reindex stuff around
+            self.F = self.F.reindex(self.C.columns).fillna(0)
+            self.F = self.F.reindex(self.A.index, axis=1).fillna(0)
+            self.FY = self.FY.reindex(self.F.index).fillna(0)
 
     def calc(self):
         """
@@ -2372,13 +2544,16 @@ class IOTables:
         :param IOIC_code: [string] the IOIC_code inhereting the split emissions (will be private or public sector)
         :return: updated self.F
         """
-        df = self.F.loc(axis=1)[:, NAICS_code].copy()
-        if type(NAICS_code) == list:
-            df.columns = pd.MultiIndex.from_product([self.matching_dict, [IOIC_code] * len(NAICS_code)])
-        elif type(NAICS_code) == str:
-            df.columns = pd.MultiIndex.from_product([self.matching_dict, [IOIC_code]])
-        self.F = pd.concat([self.F, df / 2], axis=1)
-        self.F.loc(axis=1)[:, NAICS_code] /= 2
+        try:
+            df = self.F.loc(axis=1)[:, NAICS_code].copy()
+            if type(NAICS_code) == list:
+                df.columns = pd.MultiIndex.from_product([self.matching_dict, [IOIC_code] * len(NAICS_code)])
+            elif type(NAICS_code) == str:
+                df.columns = pd.MultiIndex.from_product([self.matching_dict, [IOIC_code]])
+            self.F = pd.concat([self.F, df / 2], axis=1)
+            self.F.loc(axis=1)[:, NAICS_code] /= 2
+        except KeyError:
+            pass
 
     def produce_npri_iw_concordance_file(self):
         """
