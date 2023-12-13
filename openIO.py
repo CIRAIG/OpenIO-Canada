@@ -1562,74 +1562,53 @@ class IOTables:
         Method matching water accounts to IOIC classification selected by the user
         :return: self.F and self.FY with GHG flows included
         """
+
         # load the water use data from STATCAN
-        water = pd.read_csv(pkg_resources.resource_stream(__name__, '/Data/Environmental_data/water_use.csv'))
+        water_use = pd.read_csv(pkg_resources.resource_stream(__name__, '/Data/Environmental_data/water_use.csv'))
+        water_conso = pd.read_excel(pkg_resources.resource_stream(
+            __name__, '/Data/Environmental_data/Water_consumption_values.xlsx'), None)
 
         # Only odd years from 2009 to 2017
-        if self.year == 2010:
-            year_for_water = 2011
-        elif self.year == 2012:
-            year_for_water = 2013
-        elif self.year == 2014:
-            year_for_water = 2015
-        elif self.year == 2016:
-            year_for_water = 2015
-        elif self.year == 2017:
-            year_for_water = 2017
-        elif self.year == 2018:
-            year_for_water = 2017
-        elif self.year == 2019:
-            year_for_water = 2019
-        elif self.year == 2020:
-            year_for_water = 2019
+        match_year_data = {2014: 2015, 2015: 2015, 2016: 2015, 2017: 2017, 2018: 2017, 2019: 2019, 2020: 2019}
+        year_for_water = match_year_data[self.year]
+
         # select the year of the data
-        water = water.loc[
-            [i for i in water.index if water.REF_DATE[i] == int(year_for_water)], ['Sector', 'VALUE']].fillna(0)
-
+        water_use = water_use.loc[
+            [i for i in water_use.index if water_use.REF_DATE[i] == int(year_for_water)], ['Sector', 'VALUE']].fillna(0)
         # convert into cubic meters
-        water.VALUE *= 1000
+        water_use.VALUE *= 1000
 
-        if self.level_of_detail not in ['Summary level','Link-1961 level']:
-            fd_water = water.loc[[i for i in water.index if water.Sector[i] == 'Households']]
-            water_provincial_use_distribution = self.Y.loc(axis=0)[:,
-                                                'Water delivered by water works and irrigation systems'].loc(axis=1)[:,
-                                                'Household final consumption expenditure'].sum(axis=1)
-            water_provincial_use_distribution /= water_provincial_use_distribution.sum()
-            water_provincial_use_distribution *= fd_water.VALUE.iloc[0]
-            water_provincial_use_distribution = pd.DataFrame(water_provincial_use_distribution, columns=['Water']).T
-            water_provincial_use_distribution = pd.concat([water_provincial_use_distribution] * len(self.matching_dict))
-            water_provincial_use_distribution.index = pd.MultiIndex.from_product([self.matching_dict,
-                                                                                  water_provincial_use_distribution.index,
-                                                                                  ['Water']]).drop_duplicates()
-            for province in water_provincial_use_distribution.index.levels[0]:
-                water_provincial_use_distribution.loc[
-                    province, [i for i in water_provincial_use_distribution.columns if i[0] != province]] = 0
-            water_provincial_use_distribution.columns = pd.MultiIndex.from_product([self.matching_dict,
-                                                                                    ["Household final consumption expenditure"],
-                                                                                    ["Water supply and sanitation services"]])
-            self.FY = pd.concat([self.FY, water_provincial_use_distribution.reindex(self.Y.columns, axis=1).fillna(0)])
-        else:
-            # water use from households
-            FD_water = water.loc[[i for i in water.index if water.Sector[i] == 'Households']]
-            # national water use will be distributed depending on the amount of $ spent by households in a given province
-            provincial_FD_consumption_distribution = self.Y.loc(axis=1)[:,
-                                                     'Household final consumption expenditure'].sum() / self.Y.loc(
-                axis=1)[:, 'Household final consumption expenditure'].sum().sum()
-            FD_water = provincial_FD_consumption_distribution * FD_water.VALUE.values
-            # spatializing
-            FD_water = pd.concat([FD_water] * len(FD_water.index.levels[0]), axis=1)
-            FD_water.columns = pd.MultiIndex.from_product([self.matching_dict.keys(), ['Water'], ['Water']])
-            FD_water = FD_water.T
-            for province in FD_water.index.levels[0]:
-                FD_water.loc[province, [i for i in FD_water.columns if i[0] != province]] = 0
-            FD_water = FD_water.T.reindex(self.Y.columns).T.fillna(0)
-            self.FY = pd.concat([self.FY, FD_water])
+        # -------------------------------------- Final demand ------------------------------------------------
+        fd_water = water_use.loc[water_use.Sector == 'Households']
+        fd_water = fd_water.drop(['Sector'], axis=1)
+        # distribute national water use to all provinces
+        provincial_household_water_use = (self.Y.loc[[i for i in self.Y.index if
+                                                      i[1] == 'Water delivered by water works and irrigation systems'],
+                                                     [i for i in self.Y.columns if
+                                                      i[2] == 'Water supply and sanitation services']].sum() /
+                                          self.Y.loc[[i for i in self.Y.index if
+                                                      i[1] == 'Water delivered by water works and irrigation systems'],
+                                                     [i for i in self.Y.columns if
+                                                      i[2] == 'Water supply and sanitation services']].sum().sum())
+        fd_water = provincial_household_water_use * fd_water.iloc[0, 0]
 
-        # format the names of the sector to match those used up till then
-        water = water.loc[[i for i in water.index if '[' in water.Sector[i]]]
-        water.Sector = [i.split('[')[1].split(']')[0] for i in water.Sector]
-        water.drop([i for i in water.index if re.search(r'^FC', water.Sector.loc[i])], inplace=True)
-        water.set_index('Sector', inplace=True)
+        # spatializing
+        fd_water = pd.concat([fd_water] * len(fd_water.index), axis=1)
+        fd_water.columns = pd.MultiIndex.from_product([self.matching_dict.keys(), ['Water'], ['Water']])
+
+        for province in fd_water.columns.levels[0]:
+            fd_water.loc[province, [i for i in fd_water.columns if i[0] != province]] = 0
+
+        fd_water = fd_water.reindex(self.Y.columns).T.fillna(0)
+        # transform water use into water consumption
+        fd_water *= water_conso['Households'].loc[:, 'Water consumption (%) 2013'].iloc[0] / 100
+        self.FY = pd.concat([self.FY, fd_water], axis=0)
+
+        # -----------------------------------Intermediary demand ------------------------------------------
+        water_use = water_use.loc[[i for i in water_use.index if '[' in water_use.Sector[i]]]
+        water_use.Sector = [i.split('[')[1].split(']')[0] for i in water_use.Sector]
+        water_use.drop([i for i in water_use.index if re.search(r'^FC', water_use.Sector.loc[i])], inplace=True)
+        water_use.set_index('Sector', inplace=True)
 
         # load concordances matching water use data classification to the different classifications used in OpenIO
         concordance = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Concordances/water_concordance.xlsx'),
@@ -1640,42 +1619,57 @@ class IOTables:
         concordance.drop(to_drop, inplace=True)
 
         water_flows = pd.DataFrame()
-        if self.level_of_detail in ['Link-1961 level', 'Link-1997 level', 'Detail level']:
-            for code in concordance.index:
-                # Detail level is more precise than water accounts, we use market share to distribute water flows
-                sectors_to_split = [i[1] for i in self.industries if
-                                    i[0] in concordance.loc[code].dropna().values.tolist()]
-                output_sectors_to_split = self.V.loc[:,
-                                          [i for i in self.V.columns if i[1] in sectors_to_split]].sum()
+        for code in concordance.index:
+            # Detail level is more precise than water accounts, we use market share to distribute water flows
+            sectors_to_split = [i[1] for i in self.industries if
+                                i[0] in concordance.loc[code].dropna().values.tolist()]
+            output_sectors_to_split = self.V.loc[:,
+                                      [i for i in self.V.columns if i[1] in sectors_to_split]].sum()
 
-                share_sectors_to_split = output_sectors_to_split / output_sectors_to_split.sum() * water.loc[
-                    code, 'VALUE']
-                water_flows = pd.concat([water_flows, share_sectors_to_split])
-        elif self.level_of_detail == 'Summary level':
-            water = pd.concat([water, concordance], axis=1)
-            water.set_index('IOIC', inplace=True)
-            water = water.groupby(water.index).sum()
-            water.index = [dict(self.industries)[i] for i in water.index]
-            water = water.reindex([i[1] for i in self.industries]).fillna(0)
-            water_flows = pd.DataFrame()
-            for sector in water.index:
-                water_split = self.g.sum().loc(axis=0)[:, sector] / self.g.sum().loc(axis=0)[:, sector].sum() * \
-                              water.loc[sector, 'VALUE']
-                water_flows = pd.concat([water_flows, water_split])
+            share_sectors_to_split = output_sectors_to_split / output_sectors_to_split.sum() * water_use.loc[
+                code, 'VALUE']
+            water_flows = pd.concat([water_flows, share_sectors_to_split])
 
         water_flows = water_flows.groupby(water_flows.index).sum().fillna(0)
         # multi index for the win
         water_flows.index = pd.MultiIndex.from_tuples(water_flows.index)
         water_flows.columns = ['Water']
+        # apply water consumption % for specific industries
+        relative_water_consumption_data = pd.concat([water_conso['Manufacturing Industry'],
+                                                     water_conso['Commercial and Institutionnal'],
+                                                     water_conso['Oil and Gas'],
+                                                     water_conso['Mining']])
+        relative_water_consumption_data.index = [i for i in range(0, len(relative_water_consumption_data.index))]
+        for i in relative_water_consumption_data.index:
+            relative_water_consumption_data.loc[i, 'Industry name'] = {_[0]: _[1] for _ in self.industries}[
+                relative_water_consumption_data.loc[i, 'Code sector industry Open IO']]
 
-        # spatializing water flows
+        water_flows = water_flows.reset_index().merge(relative_water_consumption_data, left_on='level_1',
+                                                      right_on='Industry name', how='left')
+        water_flows.loc[:, 'Average water consumption'] = water_flows.loc[:, [i for i in water_flows.columns if
+                                                                              'Water consumption' in i]].mean(axis=1)
+        water_flows = water_flows.set_index(['level_0', 'level_1']).loc[:, ['Water', 'Average water consumption']]
+        water_flows.index.names = None, None
+        water_flows.loc[:, 'Water'] *= water_flows.loc[:, 'Average water consumption'] / 100
+        water_flows.drop('Average water consumption', axis=1, inplace=True)
+
+        # For electricity we have absolute water consumption data (not applying a %)
+        water_conso['Electricity'] = water_conso['Electricity'][water_conso['Electricity'].Year == self.year]
+        water_conso['Electricity'].loc[:, 'Code product Open IO'] = [{i[0]: i[1] for i in self.industries}[i] for i in
+                                                                     water_conso['Electricity'].loc[:,
+                                                                     'Code product Open IO']]
+        water_flows.loc(axis=0)[:, 'Electric power generation, transmission and distribution'] = (
+        water_conso['Electricity'].set_index(
+            ['Canada Province', 'Code product Open IO']).drop(['Year'], axis=1).loc[:, 'Water Consumption (m3)'])
+        # crop and livestock water consumption data operate at the product level. For now set these values to zero.
+        water_flows = water_flows.fillna(0)
+        # spatializing
         water_flows = pd.concat([water_flows.T] * len(water_flows.index.levels[0]))
         water_flows.index = pd.MultiIndex.from_product([self.matching_dict.keys(), ['Water'], ['Water']])
         water_flows = water_flows.T.reindex(self.F.columns).T
         for province in water_flows.index.levels[0]:
             water_flows.loc[province, [i for i in water_flows.columns if i[0] != province]] = 0
 
-        # fillna(0) for cannabis industries
         self.F = pd.concat([self.F, water_flows]).fillna(0)
 
         self.emission_metadata.loc['Water', 'Unit'] = 'm3'
@@ -2261,6 +2255,7 @@ class IOTables:
         self.F = self.F.dot(self.V.dot(self.inv_g).T)
         self.F = pd.concat([self.F, self.minerals])
         self.add_hfc_emissions()
+        self.add_water_consumption_flows_for_livestock_and_crops()
         self.S = self.F.dot(self.inv_q)
         self.S = pd.concat([self.S, self.S_exio]).fillna(0)
         self.S = self.S.reindex(self.A.columns, axis=1)
@@ -2340,6 +2335,120 @@ class IOTables:
 
         if W.columns.equals(self.F.columns):
             self.F = pd.concat([self.F, W])
+
+    def add_water_consumption_flows_for_livestock_and_crops(self):
+        """
+        Method adding water consumption data from livestocks and crops, to openIO-Canada's own livestock and crop
+        commodities.
+        :return: self.F
+        """
+
+        water_conso = pd.read_excel(pkg_resources.resource_stream(
+            __name__, '/Data/Environmental_data/Water_consumption_values.xlsx'), None)
+
+        # ------------------------------------------ Livestocks ------------------------------------------------------
+        # split water consumption between provinces
+        gotta_split = water_conso['Livestock'].loc[[i for i in water_conso['Livestock'].index
+                                                    if (',' in water_conso['Livestock'].loc[i, 'Canada Province'] or
+                                                        water_conso['Livestock'].loc[
+                                                            i, 'Canada Province'] == 'Canada')]].copy('deep')
+
+        for ix in gotta_split.index:
+            if gotta_split.loc[ix, 'Canada Province'] == 'Canada':
+                # territories are excluded from water consumption data
+                provinces = ['AB', 'BC', 'MB', 'NB', 'NL', 'NS', 'PE', 'ON', 'QC', 'SK']
+            else:
+                provinces = gotta_split.loc[ix, 'Canada Province'].split(', ')
+            # select the supply of the commodity by the provinces to be split
+            df = self.V.loc[[i for i in self.V.index if (i[0].split('CA-')[1] in provinces and
+                                                         i[1] == {i[0]: i[1] for i in self.commodities}[
+                                                             gotta_split.loc[ix, 'Code product Open IO']])]].sum(1)
+            # determine share
+            df /= df.sum()
+            # apply share to water consumption
+            df *= gotta_split.loc[ix, 'Water Consumption (m3)']
+            # reformat data
+            df = df.reset_index()
+            df.columns = ['Canada Province', 'Code product Open IO', 'Water Consumption (m3)']
+            df.loc[:, 'Canada Province'] = [i.split('CA-')[1] for i in df.loc[:, 'Canada Province']]
+            df.loc[:, 'Code product Open IO'] = [{j[1]: j[0] for j in self.commodities}[i] for i in
+                                                 df.loc[:, 'Code product Open IO']]
+            df.loc[:, 'Livestock Category'] = gotta_split.loc[ix, 'Livestock Category']
+            df.loc[:, 'Year'] = gotta_split.loc[ix, 'Year']
+            # concat with original water data
+            water_conso['Livestock'] = pd.concat([water_conso['Livestock'], df])
+
+        water_conso['Livestock'].index = [i for i in range(0, len(water_conso['Livestock'].index))]
+        water_conso['Livestock'] = water_conso['Livestock'].drop(
+            [i for i in water_conso['Livestock'].index if (',' in water_conso['Livestock'].loc[i, 'Canada Province'] or
+                                                           water_conso['Livestock'].loc[i, 'Canada Province'] == 'Canada')])
+        water_conso['Livestock'].index = [i for i in range(0, len(water_conso['Livestock'].index))]
+        # for livestocks where only one year is available, copy paste for other years
+        unique_livestocks = set(water_conso['Livestock'].loc[:, 'Livestock Category'])
+
+        for livestock in unique_livestocks:
+            if len(set(water_conso['Livestock'].loc[
+                           water_conso['Livestock'].loc[:, 'Livestock Category'] == livestock, 'Year'])) == 1:
+                for year in [2014, 2015, 2016, 2017, 2018, 2019, 2020, 2022]:
+                    df = water_conso['Livestock'].loc[
+                        water_conso['Livestock'].loc[:, 'Livestock Category'] == livestock].loc[
+                        water_conso['Livestock'].loc[:, 'Year'] == 2021].copy('deep')
+                    df.Year = year
+                    water_conso['Livestock'] = pd.concat([water_conso['Livestock'], df])
+                    water_conso['Livestock'].index = [i for i in range(0, len(water_conso['Livestock'].index))]
+
+        # select the year of study
+        water_conso['Livestock'] = water_conso['Livestock'].loc[water_conso['Livestock'].Year == self.year]
+        # groupby openIO commodity
+        water_conso['Livestock'] = water_conso['Livestock'].drop(['Livestock Category', 'Year'], axis=1)
+        water_conso['Livestock'] = water_conso['Livestock'].groupby(
+            by=['Canada Province', 'Code product Open IO']).sum().reset_index()
+        # reformat data
+        water_conso['Livestock'].loc[:, 'Canada Province'] = [
+            'CA-' + i for i in water_conso['Livestock'].loc[:, 'Canada Province']]
+        water_conso['Livestock'].index = [
+            (i, 'Water', 'Water') for i in water_conso['Livestock'].loc[:, 'Canada Province']]
+        water_conso['Livestock'].loc[:, 'Code product Open IO'] = [{i[0]: i[1] for i in self.commodities}[i] for i in
+                                                                   water_conso['Livestock'].loc[
+                                                                   :, 'Code product Open IO']]
+        water_conso['Livestock'] = water_conso['Livestock'].reset_index().pivot(values='Water Consumption (m3)',
+                                                                                columns=['Canada Province',
+                                                                                         'Code product Open IO'],
+                                                                                index=['index']).fillna(0)
+        water_conso['Livestock'].index.name = None
+        water_conso['Livestock'].columns.names = [None, None]
+
+        self.F.loc[[i for i in self.F.index if i[1] == 'Water'], water_conso['Livestock'].columns] = water_conso[
+            'Livestock']
+        # fillna(0) because there is no data for water consumption of livestocks in the territories of Canada
+        self.F = self.F.fillna(0)
+
+        # ----------------------------------------------- Crops ------------------------------------------------------
+        water_conso['Crop'] = water_conso['Crop'].drop(
+            water_conso['Crop'][water_conso['Crop'].loc[:, 'Crop Category'] == 'Total'].index)
+        water_conso['Crop'] = water_conso['Crop'].drop(['Crop Category'], axis=1)
+        # select year
+        water_conso['Crop'] = water_conso['Crop'].loc[:, ['Code product Open IO'] +
+                                                        [i for i in water_conso['Crop'].columns if str(self.year) in i]]
+        water_consumption_crop = pd.DataFrame()
+
+        for comm in water_conso['Crop'].loc[:, 'Code product Open IO']:
+            df = self.V.loc(axis=0)[:, {i[0]: i[1] for i in self.commodities}[comm]].sum(1)
+            df /= df.sum()
+            df *= water_conso['Crop'].loc[
+                water_conso['Crop'].loc[:, 'Code product Open IO'] == comm, 'Water consumption (m3) ' + str(
+                    self.year)].iloc[0]
+            water_consumption_crop = pd.concat([water_consumption_crop, df])
+
+        water_consumption_crop.index = pd.MultiIndex.from_tuples(water_consumption_crop.index)
+        # spatializing
+        water_consumption_crop = pd.concat([water_consumption_crop] * len(self.matching_dict), axis=1)
+        water_consumption_crop.columns = [('CA-' + i, 'Water', 'Water') for i in self.matching_dict.keys()]
+        for province in water_consumption_crop.index.levels[0]:
+            water_consumption_crop.loc[province, [i for i in water_consumption_crop.columns if i[0] != province]] = 0
+        water_consumption_crop = water_consumption_crop.T
+        self.F.loc[
+            [i for i in self.F.index if i[1] == 'Water'], water_consumption_crop.columns] = water_consumption_crop
 
     def differentiate_biogenic_carbon_emissions(self):
         """
@@ -3232,6 +3341,129 @@ class IOTables:
         # convert from CAD to EURO
         self.link_openio_exio_technosphere /= 1.5
         self.link_openio_exio_final_demands /= 1.5
+
+    def deprecated_match_water_accounts_to_iots(self):
+        """
+        Method matching water accounts to IOIC classification selected by the user
+        :return: self.F and self.FY with GHG flows included
+        """
+        # load the water use data from STATCAN
+        water = pd.read_csv(pkg_resources.resource_stream(__name__, '/Data/Environmental_data/water_use.csv'))
+
+        # Only odd years from 2009 to 2017
+        if self.year == 2010:
+            year_for_water = 2011
+        elif self.year == 2012:
+            year_for_water = 2013
+        elif self.year == 2014:
+            year_for_water = 2015
+        elif self.year == 2016:
+            year_for_water = 2015
+        elif self.year == 2017:
+            year_for_water = 2017
+        elif self.year == 2018:
+            year_for_water = 2017
+        elif self.year == 2019:
+            year_for_water = 2019
+        elif self.year == 2020:
+            year_for_water = 2019
+        # select the year of the data
+        water = water.loc[
+            [i for i in water.index if water.REF_DATE[i] == int(year_for_water)], ['Sector', 'VALUE']].fillna(0)
+
+        # convert into cubic meters
+        water.VALUE *= 1000
+
+        if self.level_of_detail not in ['Summary level','Link-1961 level']:
+            fd_water = water.loc[[i for i in water.index if water.Sector[i] == 'Households']]
+            water_provincial_use_distribution = self.Y.loc(axis=0)[:,
+                                                'Water delivered by water works and irrigation systems'].loc(axis=1)[:,
+                                                'Household final consumption expenditure'].sum(axis=1)
+            water_provincial_use_distribution /= water_provincial_use_distribution.sum()
+            water_provincial_use_distribution *= fd_water.VALUE.iloc[0]
+            water_provincial_use_distribution = pd.DataFrame(water_provincial_use_distribution, columns=['Water']).T
+            water_provincial_use_distribution = pd.concat([water_provincial_use_distribution] * len(self.matching_dict))
+            water_provincial_use_distribution.index = pd.MultiIndex.from_product([self.matching_dict,
+                                                                                  water_provincial_use_distribution.index,
+                                                                                  ['Water']]).drop_duplicates()
+            for province in water_provincial_use_distribution.index.levels[0]:
+                water_provincial_use_distribution.loc[
+                    province, [i for i in water_provincial_use_distribution.columns if i[0] != province]] = 0
+            water_provincial_use_distribution.columns = pd.MultiIndex.from_product([self.matching_dict,
+                                                                                    ["Household final consumption expenditure"],
+                                                                                    ["Water supply and sanitation services"]])
+            self.FY = pd.concat([self.FY, water_provincial_use_distribution.reindex(self.Y.columns, axis=1).fillna(0)])
+        else:
+            # water use from households
+            FD_water = water.loc[[i for i in water.index if water.Sector[i] == 'Households']]
+            # national water use will be distributed depending on the amount of $ spent by households in a given province
+            provincial_FD_consumption_distribution = self.Y.loc(axis=1)[:,
+                                                     'Household final consumption expenditure'].sum() / self.Y.loc(
+                axis=1)[:, 'Household final consumption expenditure'].sum().sum()
+            FD_water = provincial_FD_consumption_distribution * FD_water.VALUE.values
+            # spatializing
+            FD_water = pd.concat([FD_water] * len(FD_water.index.levels[0]), axis=1)
+            FD_water.columns = pd.MultiIndex.from_product([self.matching_dict.keys(), ['Water'], ['Water']])
+            FD_water = FD_water.T
+            for province in FD_water.index.levels[0]:
+                FD_water.loc[province, [i for i in FD_water.columns if i[0] != province]] = 0
+            FD_water = FD_water.T.reindex(self.Y.columns).T.fillna(0)
+            self.FY = pd.concat([self.FY, FD_water])
+
+        # format the names of the sector to match those used up till then
+        water = water.loc[[i for i in water.index if '[' in water.Sector[i]]]
+        water.Sector = [i.split('[')[1].split(']')[0] for i in water.Sector]
+        water.drop([i for i in water.index if re.search(r'^FC', water.Sector.loc[i])], inplace=True)
+        water.set_index('Sector', inplace=True)
+
+        # load concordances matching water use data classification to the different classifications used in OpenIO
+        concordance = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Concordances/water_concordance.xlsx'),
+                                    self.level_of_detail)
+        concordance.set_index('Sector', inplace=True)
+        # dropping potential empty sectors (mostly Cannabis related)
+        to_drop = concordance.loc[concordance.loc[:, 'IOIC'].isna()].index
+        concordance.drop(to_drop, inplace=True)
+
+        water_flows = pd.DataFrame()
+        if self.level_of_detail in ['Link-1961 level', 'Link-1997 level', 'Detail level']:
+            for code in concordance.index:
+                # Detail level is more precise than water accounts, we use market share to distribute water flows
+                sectors_to_split = [i[1] for i in self.industries if
+                                    i[0] in concordance.loc[code].dropna().values.tolist()]
+                output_sectors_to_split = self.V.loc[:,
+                                          [i for i in self.V.columns if i[1] in sectors_to_split]].sum()
+
+                share_sectors_to_split = output_sectors_to_split / output_sectors_to_split.sum() * water.loc[
+                    code, 'VALUE']
+                water_flows = pd.concat([water_flows, share_sectors_to_split])
+        elif self.level_of_detail == 'Summary level':
+            water = pd.concat([water, concordance], axis=1)
+            water.set_index('IOIC', inplace=True)
+            water = water.groupby(water.index).sum()
+            water.index = [dict(self.industries)[i] for i in water.index]
+            water = water.reindex([i[1] for i in self.industries]).fillna(0)
+            water_flows = pd.DataFrame()
+            for sector in water.index:
+                water_split = self.g.sum().loc(axis=0)[:, sector] / self.g.sum().loc(axis=0)[:, sector].sum() * \
+                              water.loc[sector, 'VALUE']
+                water_flows = pd.concat([water_flows, water_split])
+
+        water_flows = water_flows.groupby(water_flows.index).sum().fillna(0)
+        # multi index for the win
+        water_flows.index = pd.MultiIndex.from_tuples(water_flows.index)
+        water_flows.columns = ['Water']
+
+        # spatializing water flows
+        water_flows = pd.concat([water_flows.T] * len(water_flows.index.levels[0]))
+        water_flows.index = pd.MultiIndex.from_product([self.matching_dict.keys(), ['Water'], ['Water']])
+        water_flows = water_flows.T.reindex(self.F.columns).T
+        for province in water_flows.index.levels[0]:
+            water_flows.loc[province, [i for i in water_flows.columns if i[0] != province]] = 0
+
+        # fillna(0) for cannabis industries
+        self.F = pd.concat([self.F, water_flows]).fillna(0)
+
+        self.emission_metadata.loc['Water', 'Unit'] = 'm3'
 
 
 def todf(data):
