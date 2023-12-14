@@ -1,11 +1,11 @@
-## _OpenIO-Canada v2.7_
+## _OpenIO-Canada v2.8_
 
 Python class creating Multi-Regional symmetric Environmentally Extended Input-Output (MREEIO) tables for Canada. OpenIO-Canada 
 operates at the provincial level (13 provinces). It can thus be used to compare the environmental impacts of value chains
 or consumption by households from any specific province.
 
 OpenIO-Canada covers 492 commodities, 33 GHGs, 310 pollutants in 3 compartments (air, water and soil), 
-67 mineral resources, water use and energy use.
+67 mineral resources, water consumption and energy use.
 
 OpenIO-Canada is connected to the Exiobase global MRIO database to model value chains happening outside Canada.
 
