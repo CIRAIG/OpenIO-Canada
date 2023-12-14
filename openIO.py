@@ -1847,7 +1847,7 @@ class IOTables:
         # Non IW characterization factors
         if self.aggregated_ghgs:
             self.C.loc[('Climate change, short term','kg CO2 eq (short)'), 'GHG emissions'] = 1
-        self.C.loc[('Water use', 'm3'), [i for i in self.C.columns if i[1] == 'Water']] = 1
+        self.C.loc[('Water consumption', 'm3'), [i for i in self.C.columns if i[1] == 'Water']] = 1
         self.C.loc[('Energy use', 'TJ'), [i for i in self.C.columns if i == 'Energy']] = 1
         self.C = self.C.fillna(0)
 
