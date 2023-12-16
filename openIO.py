@@ -1453,7 +1453,7 @@ class IOTables:
                                                               ['Methane', 'Carbon dioxide', 'Dinitrogen monoxide'],
                                                               ['Air']]).drop_duplicates()
             for province in self.matching_dict:
-                Household_GHG.loc[[i for i in self.matching_dict if i != province], province] = 0
+                Household_GHG.loc[Household_GHG.index.get_level_values(0) != province, province] = 0
 
             # create FY and update it with GHG emissions from households
             self.FY = pd.DataFrame(0, index=pd.MultiIndex.from_product(
@@ -1475,7 +1475,7 @@ class IOTables:
             self.FY.index = pd.MultiIndex.from_product(
                 [list(self.matching_dict.keys()), ['Carbon dioxide', 'Methane', 'Dinitrogen monoxide'], ['Air']])
             for province in self.FY.columns.levels[0]:
-                self.FY.loc[[i for i in self.FY.index.levels[0] if i != province], province] = 0
+                self.FY.loc[self.FY.index.get_level_values(0) != province, province] = 0
 
         # Now the emissions from production
         GHG.set_index(pd.MultiIndex.from_tuples(tuple(
@@ -1511,7 +1511,7 @@ class IOTables:
                 [self.matching_dict, ['Carbon dioxide', 'Methane', 'Dinitrogen monoxide'], ['Air']])
             # emissions takes place in the province of the trade
             for province in GHG.index.levels[0]:
-                GHG.loc[province, [i for i in GHG.index.levels[0] if i != province]] = 0
+                GHG.loc[province, GHG.columns.get_level_values(0) != province] = 0
             # add GHG emissions to other pollutants
             self.F = pd.concat([self.F, GHG.T])
             self.F.index = pd.MultiIndex.from_tuples(self.F.index)
@@ -1544,7 +1544,7 @@ class IOTables:
             ghgs.columns = pd.MultiIndex.from_product(
                 [list(self.matching_dict.keys()), list_ghgs, ['Air']])
             for province in self.matching_dict:
-                ghgs.loc[[i for i in self.matching_dict if i != province], province] = 0
+                ghgs.loc[ghgs.index.get_level_values(0) != province, province] = 0
 
             # adding GHG accounts to pollutants
             self.F = pd.concat([self.F, ghgs.T])
@@ -1597,7 +1597,7 @@ class IOTables:
         fd_water.columns = pd.MultiIndex.from_product([self.matching_dict.keys(), ['Water'], ['Water']])
 
         for province in fd_water.columns.levels[0]:
-            fd_water.loc[province, [i for i in fd_water.columns if i[0] != province]] = 0
+            fd_water.loc[province, fd_water.columns.get_level_values(0) != province] = 0
 
         fd_water = fd_water.reindex(self.Y.columns).T.fillna(0)
         # transform water use into water consumption
@@ -1668,7 +1668,7 @@ class IOTables:
         water_flows.index = pd.MultiIndex.from_product([self.matching_dict.keys(), ['Water'], ['Water']])
         water_flows = water_flows.T.reindex(self.F.columns).T
         for province in water_flows.index.levels[0]:
-            water_flows.loc[province, [i for i in water_flows.columns if i[0] != province]] = 0
+            water_flows.loc[province, water_flows.columns.get_level_values(0) != province] = 0
 
         self.F = pd.concat([self.F, water_flows]).fillna(0)
 
@@ -1846,8 +1846,7 @@ class IOTables:
 
         # Non IW characterization factors
         if self.aggregated_ghgs:
-            self.C.loc[('Climate change, short term','kg CO2 eq (short)'), 'GHG emissions'] = 1
-        self.C.loc[('Water consumption', 'm3'), [i for i in self.C.columns if i[1] == 'Water']] = 1
+            self.C.loc[('Climate change, short term', 'kg CO2 eq (short)'), 'GHG emissions'] = 1
         self.C.loc[('Energy use', 'TJ'), [i for i in self.C.columns if i == 'Energy']] = 1
         self.C = self.C.fillna(0)
 
@@ -1881,11 +1880,7 @@ class IOTables:
                      'Ionizing radiation, human health',
                      'Land occupation, biodiversity',
                      'Land transformation, biodiversity',
-                     'Thermally polluted water',
-                     'Water availability, freshwater ecosystem',
-                     'Water availability, human health',
-                     'Water availability, terrestrial ecosystem',
-                     'Water scarcity'], axis=0, level=0, inplace=True)
+                     'Thermally polluted water'], axis=0, level=0, inplace=True)
 
         if self.aggregated_ghgs:
             self.C.drop(['Climate change, ecosystem quality, long term',
@@ -1910,11 +1905,7 @@ class IOTables:
                           'Ionizing radiation, human health',
                           'Land occupation, biodiversity',
                           'Land transformation, biodiversity',
-                          'Thermally polluted water',
-                          'Water availability, freshwater ecosystem',
-                          'Water availability, human health',
-                          'Water availability, terrestrial ecosystem',
-                          'Water scarcity'], axis=0, level=0, inplace=True)
+                          'Thermally polluted water'], axis=0, level=0, inplace=True)
 
         if self.aggregated_ghgs:
             self.C_exio.drop(['Climate change, ecosystem quality, long term',
@@ -1925,13 +1916,52 @@ class IOTables:
                               'Marine acidification, short term',
                               'Marine acidification, long term'], axis=0, level=0, inplace=True)
 
-        # adding water use to exiobase flows to match with water use from STATCAN physical accounts
-        # water use in exiobase is identified through "water withdrawal" and NOT "water consumption"
-        adding_water_use = pd.DataFrame(0, index=pd.MultiIndex.from_product([['Water use'], ['m3']]),
-                                        columns=self.S_exio.index)
-        # STATCAN excluded water use due to hydroelectricity from their accounts, we keep consistency by removing them too
-        adding_water_use.loc[:, [i for i in self.S_exio.index if 'Water Withdrawal' in i and (
-                'hydro' not in i or 'tide' not in i)]] = 1
+        # dealing with water characterization factors
+        def regionalize_water_extension_exiobase(extension_matrix):
+            df_agri = pd.concat(
+                [extension_matrix.loc[[i for i in extension_matrix.index if 'Water Consumption Blue - Agriculture' in i]].sum()] * len(
+                    extension_matrix.columns.levels[0]), axis=1).T
+            df_non_agri = pd.concat([extension_matrix.loc[[i for i in extension_matrix.index if
+                                                      ('Water Consumption Blue' in i and 'Agriculture' not in i)]].sum()] *
+                                    len(extension_matrix.columns.levels[0]), axis=1).T
+            df_agri.index = pd.MultiIndex.from_tuples(list(zip([i[0] for i in extension_matrix.columns][::200],
+                                                               ['Total Water Consumption Blue - Agriculture'] * int(
+                                                                   len(extension_matrix.columns) / 200))))
+            df_non_agri.index = pd.MultiIndex.from_tuples(list(zip([i[0] for i in extension_matrix.columns][::200],
+                                                                   ['Total Water Consumption Blue - Non-agriculture'] * int(
+                                                                       len(extension_matrix.columns) / 200))))
+            for country in df_agri.index.levels[0]:
+                df_agri.loc[country, df_agri.columns.get_level_values(0) != country] = 0
+            for country in df_non_agri.index.levels[0]:
+                df_non_agri.loc[country, df_non_agri.columns.get_level_values(0) != country] = 0
+            extension_matrix = pd.concat([extension_matrix, df_agri, df_non_agri])
+            return extension_matrix
+        self.F_exio = regionalize_water_extension_exiobase(self.F_exio)
+        self.S_exio = regionalize_water_extension_exiobase(self.S_exio)
+        self.C_exio = self.C_exio.T.reindex(self.S_exio.index).T.fillna(0)
+
+        openio_water = pd.read_excel(pkg_resources.resource_stream(
+            __name__, '/Data/Characterization_factors/Regionalized_water_flows_CF_openio.xlsx'))
+        openio_water.columns = list(zip(openio_water.columns, openio_water.iloc[0]))
+        openio_water.index = openio_water.iloc[:, 0]
+        openio_water = openio_water.iloc[1:, 1:]
+        openio_water.index.name = None
+        openio_water.columns = pd.MultiIndex.from_tuples(openio_water.columns)
+        openio_water.index = [eval(i) for i in openio_water.index]
+        self.C.loc[openio_water.columns, openio_water.index] = openio_water.T.values
+
+        exio_water = pd.read_excel(pkg_resources.resource_stream(
+            __name__, '/Data/Characterization_factors/Regionalized_water_flows_CF_exiobase.xlsx'))
+        exio_water.columns = list(zip(exio_water.columns, exio_water.iloc[0]))
+        exio_water.index = exio_water.iloc[:, 0]
+        exio_water = exio_water.iloc[2:, 1:]
+        exio_water.index.name = None
+        exio_water.columns = pd.MultiIndex.from_tuples(exio_water.columns)
+        exio_water.index = [eval(i) for i in exio_water.index]
+        self.C_exio.loc[exio_water.columns, exio_water.index] = exio_water.T.values
+        # need to set to zero the other water consumption flows to not double count
+        self.C_exio.loc[('Water scarcity', 'm3 world-eq'),
+                        [i for i in self.C_exio.columns if 'Water Consumption Blue' in i]] = 0
 
         # adding energy use to exiobase flows to match with energy use from STATCAN physical accounts
         # energy use in exiobase is identified through "Energy Carrier Use: Total"
@@ -1939,7 +1969,7 @@ class IOTables:
         adding_energy_use = pd.DataFrame(0, index=pd.MultiIndex.from_product([['Energy'], ['TJ']]),
                                          columns=self.S_exio.index)
         adding_energy_use.loc[:, [i for i in self.S_exio.index if 'Energy Carrier Use: Total' in i]] = 1
-        self.C_exio = pd.concat([self.C_exio, adding_water_use, adding_energy_use])
+        self.C_exio = pd.concat([self.C_exio, adding_energy_use])
         # forcing the match with self.C (annoying parentheses for climate change long and short term)
         self.C_exio.index = self.C.index
         self.C_exio = self.C_exio.fillna(0)
@@ -2113,6 +2143,8 @@ class IOTables:
         self.V.columns = pd.MultiIndex.from_tuples(self.V.columns)
         self.V.index = [('CA-' + i[0], i[1]) for i in self.V.index]
         self.V.index = pd.MultiIndex.from_tuples(self.V.index)
+        self.C.columns = [('CA-' + i[0], i[1], i[2]) if (type(i) == tuple and 'Total Water Consumption' not in i[1])
+                          else i for i in self.C.columns]
         self.F.columns = [('CA-' + i[0], i[1]) for i in self.F.columns]
         self.F.columns = pd.MultiIndex.from_tuples(self.F.columns)
         self.F.index = [('CA-' + i[0], i[1], i[2]) if type(i) == tuple else i for i in self.F.index]
@@ -2121,7 +2153,6 @@ class IOTables:
         self.FY.columns = [('CA-' + i[0], i[1], i[2]) for i in self.FY.columns]
         self.FY.columns = pd.MultiIndex.from_tuples(self.FY.columns)
         self.FY.index = [('CA-' + i[0], i[1], i[2]) if type(i) == tuple else i for i in self.FY.index]
-        self.C.columns = [('CA-' + i[0], i[1], i[2]) if type(i) == tuple else i for i in self.C.columns]
         self.g.index = [('CA-' + i[0], i[1]) for i in self.g.index]
         self.g.columns = [('CA-' + i[0], i[1]) for i in self.g.columns]
         self.g.index = pd.MultiIndex.from_tuples(self.g.index)
@@ -2445,7 +2476,7 @@ class IOTables:
         water_consumption_crop = pd.concat([water_consumption_crop] * len(self.matching_dict), axis=1)
         water_consumption_crop.columns = [('CA-' + i, 'Water', 'Water') for i in self.matching_dict.keys()]
         for province in water_consumption_crop.index.levels[0]:
-            water_consumption_crop.loc[province, [i for i in water_consumption_crop.columns if i[0] != province]] = 0
+            water_consumption_crop.loc[province, water_consumption_crop.columns.get_level_values(0) != province] = 0
         water_consumption_crop = water_consumption_crop.T
         self.F.loc[
             [i for i in self.F.index if i[1] == 'Water'], water_consumption_crop.columns] = water_consumption_crop
@@ -2977,7 +3008,7 @@ class IOTables:
             GHG.columns = pd.MultiIndex.from_product([self.matching_dict, ['GHGs'], ['Air']])
             # emissions takes place in the province of the trade
             for province in GHG.index.levels[0]:
-                GHG.loc[province, [i for i in GHG.index.levels[0] if i != province]] = 0
+                GHG.loc[province, GHG.columns.get_level_values(0) != province] = 0
             # add GHG emissions to other pollutants
             self.F = pd.concat([self.F, GHG.T])
             self.F.index = pd.MultiIndex.from_tuples(self.F.index)
@@ -3006,7 +3037,7 @@ class IOTables:
             ghgs = pd.concat([ghgs] * len(ghgs.index.levels[0]), axis=1)
             ghgs.columns = pd.MultiIndex.from_product([self.matching_dict, ['GHGs'], ['Air']])
             for province in ghgs.columns.levels[0]:
-                ghgs.loc[[i for i in ghgs.index.levels[0] if i != province], province] = 0
+                ghgs.loc[ghgs.index.get_level_values(0) != province, province] = 0
             # adding GHG accounts to pollutants
             self.F = pd.concat([self.F, ghgs.T])
             # reindexing
@@ -3019,7 +3050,7 @@ class IOTables:
         self.FY = pd.concat([self.FY] * len(GHG.index.levels[0]))
         self.FY.index = pd.MultiIndex.from_product([self.matching_dict, ['GHGs'], ['Air']])
         for province in self.FY.columns.levels[0]:
-            self.FY.loc[[i for i in self.FY.columns.levels[0] if i != province], province] = 0
+            self.FY.loc[self.FY.columns.get_level_values(0) != province, province] = 0
 
         self.emission_metadata.loc['GHGs', 'CAS Number'] = 'N/A'
         self.emission_metadata.loc['GHGs', 'Unit'] = 'kgCO2eq'
@@ -3406,7 +3437,7 @@ class IOTables:
             FD_water.columns = pd.MultiIndex.from_product([self.matching_dict.keys(), ['Water'], ['Water']])
             FD_water = FD_water.T
             for province in FD_water.index.levels[0]:
-                FD_water.loc[province, [i for i in FD_water.columns if i[0] != province]] = 0
+                FD_water.loc[province, FD_water.columns.get_level_values(0) != province] = 0
             FD_water = FD_water.T.reindex(self.Y.columns).T.fillna(0)
             self.FY = pd.concat([self.FY, FD_water])
 
@@ -3458,7 +3489,7 @@ class IOTables:
         water_flows.index = pd.MultiIndex.from_product([self.matching_dict.keys(), ['Water'], ['Water']])
         water_flows = water_flows.T.reindex(self.F.columns).T
         for province in water_flows.index.levels[0]:
-            water_flows.loc[province, [i for i in water_flows.columns if i[0] != province]] = 0
+            water_flows.loc[province, water_flows.columns.get_level_values(0) != province] = 0
 
         # fillna(0) for cannabis industries
         self.F = pd.concat([self.F, water_flows]).fillna(0)
