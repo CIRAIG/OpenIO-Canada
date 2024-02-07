@@ -81,6 +81,8 @@ class IOTables:
         self.who_uses_int_imports_K = pd.DataFrame()
         self.who_uses_int_imports_Y = pd.DataFrame()
         self.A_exio = pd.DataFrame()
+        self.Z_exio = pd.DataFrame()
+        self.x_exio = pd.DataFrame()
         self.K_exio = pd.DataFrame()
         self.S_exio = pd.DataFrame()
         self.F_exio = pd.DataFrame()
@@ -978,12 +980,14 @@ class IOTables:
                 self.K_exio = pickle.load(f)
 
         # save the matrices from exiobase because we need them later
-        self.A_exio = io.A.copy()
-        self.S_exio = io.satellite.S.copy()
-        self.F_exio = io.satellite.F.copy()
+        self.A_exio = io.A.copy('deep')
+        self.Z_exio = io.Z.copy('deep')
+        self.x_exio = io.x.copy('deep')
+        self.S_exio = io.satellite.S.copy('deep')
+        self.F_exio = io.satellite.F.copy('deep')
         # millions euros to euros
         self.S_exio.iloc[9:] /= 1000000
-        self.unit_exio = io.satellite.unit.copy()
+        self.unit_exio = io.satellite.unit.copy('deep')
         self.unit_exio.columns = ['Unit']
 
         # loading concordances between exiobase classification and IOIC
@@ -2287,8 +2291,10 @@ class IOTables:
         self.F = pd.concat([self.F, self.minerals])
         self.add_hfc_emissions()
         self.add_water_consumption_flows_for_livestock_and_crops()
+        self.add_plastic_emissions()
         self.S = self.F.dot(self.inv_q)
         self.S = pd.concat([self.S, self.S_exio]).fillna(0)
+        self.S = self.S.groupby(self.S.index).sum()
         self.S = self.S.reindex(self.A.columns, axis=1)
         # change provinces metadata for S here
         self.S.columns = self.A.columns
@@ -2480,6 +2486,294 @@ class IOTables:
         water_consumption_crop = water_consumption_crop.T
         self.F.loc[
             [i for i in self.F.index if i[1] == 'Water'], water_consumption_crop.columns] = water_consumption_crop
+
+    def add_plastic_emissions(self):
+        """
+        Method adding plastic waste generated from producing certain commodities.
+        :return: self.F
+        """
+
+        # load data
+        plastics_data = pd.read_csv(pkg_resources.resource_stream(
+            __name__, '/Data/Environmental_data/plastic_account_by_product_category.csv'), low_memory=False)
+        with open(pkg_resources.resource_filename(__name__, "Data/Concordances/plastic_kpis.json"), 'r') as f:
+            kpis = json.load(f)
+        with open(pkg_resources.resource_filename(__name__, "Data/Concordances/plastic_mapping_ppfa_openio.json"), 'r') as f:
+            map_plastic_data_to_io = json.load(f)
+        with open(pkg_resources.resource_filename(__name__, "Data/Concordances/plastic_mapping_exio_openio.json"), 'r') as f:
+            plastic_openio_to_exio = json.load(f)
+        oecd_data = pd.read_excel(pkg_resources.resource_stream(
+            __name__, '/Data/Environmental_data/OECD_plastic_waste_management.xlsx'), None)
+        with open(pkg_resources.resource_filename(__name__, "Data/Concordances/country_mapping_exio_oecd.json"), 'r') as f:
+            map_exio_to_oecd = json.load(f)
+
+        # ---------------------------------- Data pre-treatment ---------------------------------------------
+        # select year of study
+        plastics_data = plastics_data.loc[plastics_data.REF_DATE ==
+                                          min(plastics_data.REF_DATE, key=lambda x:abs(x-self.year))]
+
+        # format province names
+        plastics_data.GEO = [
+            'CA-' + {v: k for k, v in self.matching_dict.items()}[i] if i in list(self.matching_dict.values()) else i
+            for i in plastics_data.GEO]
+
+        # pivot table to manipulate data easily
+        plastics_data = plastics_data.pivot_table(values='VALUE', index=['Product category', 'Variable'],
+                                                  columns=['GEO'])
+
+        # Some packaging items (bottles, film, ...) are only available for Canada. We estimate them for provinces.
+        packaging_distribution = (
+                    plastics_data.loc[['Bottles', 'Film', 'Non-bottle rigid', 'Other packaging products'], 'Canada'] /
+                    plastics_data.loc['Packaging', 'Canada'])
+
+        for province in ['CA-' + i for i in self.matching_dict]:
+            for packaging in ['Bottles', 'Film', 'Non-bottle rigid', 'Other packaging products']:
+                plastics_data.loc[packaging, province] = (
+                            plastics_data.loc['Packaging', province] * packaging_distribution.loc[packaging]).values
+
+        landfilled_rate = (plastics_data.loc(axis=0)[:,
+                        'Disposed plastic waste and scrap sent to landfill or incinerated without energy recovery'].loc[
+                           :, 'Canada'].droplevel(1) /
+                           plastics_data.loc(axis=0)[:, 'Total disposed plastic waste and scrap'].loc[:,
+                           'Canada'].droplevel(1))
+
+        incineration_rate = (plastics_data.loc(axis=0)[:,
+                     'Disposed plastic waste and scrap sent for incineration or gasification with energy recovery'].loc[
+                             :, 'Canada'].droplevel(1) /
+                             plastics_data.loc(axis=0)[:, 'Total disposed plastic waste and scrap'].loc[:,
+                             'Canada'].droplevel(1))
+
+        # Landfill and incineration data is only available at national level. We estimate it for provinces.
+        for province in ['CA-' + i for i in self.matching_dict]:
+            for category in plastics_data.index.levels[0]:
+                plastics_data.loc[[i for i in plastics_data.index if (
+                        i[0] == category and i[1] ==
+                        'Disposed plastic waste and scrap sent to landfill or incinerated without energy recovery')],
+                                  province] = (
+                        plastics_data.loc(axis=0)[category, 'Total disposed plastic waste and scrap'].loc[province] *
+                        landfilled_rate.loc[category])
+                plastics_data.loc[[i for i in plastics_data.index if (
+                        i[0] == category and i[1] ==
+                        'Disposed plastic waste and scrap sent for incineration or gasification with energy recovery')],
+                                  province] = (
+                        plastics_data.loc(axis=0)[category, 'Total disposed plastic waste and scrap'].loc[province] *
+                        incineration_rate.loc[category])
+
+        plastics_data = plastics_data.drop(['Canada', 'Canadian territorial enclaves abroad'], axis=1)
+
+        self.F = pd.concat([self.F, pd.DataFrame(0, index=kpis, columns=self.F.columns)])
+        self.F_exio = pd.concat([self.F_exio, pd.DataFrame(0, index=kpis, columns=self.F_exio.columns)])
+
+        # ----------------------------- Plastic physical flow account ------------------------------------------------
+        Z = self.A.loc[:, ['CA-' + i for i in self.matching_dict]] * self.q.sum(1)
+
+        for category in map_plastic_data_to_io.keys():
+            for province in self.matching_dict:
+
+                # determine in which products of the category is plastic embedded (1.5 for broad € to CAD conversion)
+                where_is_plastic = Z.loc(axis=0)[:, ['Plastic resins']].sum() + Z.loc(axis=0)[:,
+                                                                                ['Plastics, basic']].sum() * 1.5
+                if where_is_plastic.loc(axis=0)['CA-' + province, map_plastic_data_to_io[category]].sum() != 0:
+                    where_is_plastic = (
+                                where_is_plastic.loc(axis=0)['CA-' + province, map_plastic_data_to_io[category]] /
+                                where_is_plastic.loc(axis=0)['CA-' + province, map_plastic_data_to_io[category]].sum())
+                # if the province does not purchase any of the products of the category, use the national distribution
+                else:
+                    where_is_plastic = (where_is_plastic.loc(axis=0)[:, map_plastic_data_to_io[category]] /
+                                        where_is_plastic.loc(axis=0)[:, map_plastic_data_to_io[category]].sum())
+
+                for product in map_plastic_data_to_io[category]:
+                    # determine production within Canada of studied product
+                    product_from_canada = (self.U.loc(axis=0)[:, product].loc[:, 'CA-' + province].sum(1) +
+                                           self.Y.drop([i for i in self.Y.columns if "Changes in inventories" in i[1]],
+                                                       axis=1).loc(
+                                               axis=0)[:, product].loc[:, 'CA-' + province].sum(1) +
+                                           self.K.loc(axis=0)[:, product].loc[:, 'CA-' + province].sum(1))
+
+                    # determine imports of studied product
+                    product_imports = (
+                                self.merchandise_imports_scaled_U.loc(axis=0)[:, product].loc[:, province].sum(1) +
+                                self.merchandise_imports_scaled_K.loc(axis=0)[:, product].loc[:, province].sum(1) +
+                                self.merchandise_imports_scaled_Y.loc[:,
+                                [i for i in self.merchandise_imports_scaled_Y.columns if (
+                                        "Changes in inventories" not in i[1] and i[0] == province)]].loc(axis=0)[:,
+                                product].sum(1))
+
+                    # translate imports of products of openIO into products of exiobase
+                    distrib_market_imported_category = (self.A.loc[
+                        self.A_exio.index, ['CA-' + i for i in self.matching_dict]].dot(
+                        self.q.sum(1))).loc(axis=0)[:, plastic_openio_to_exio[category]]
+                    for ix in distrib_market_imported_category.index.levels[0]:
+                        distrib_market_imported_category.loc[ix] = (distrib_market_imported_category.loc[ix] /
+                                                                    distrib_market_imported_category.loc[
+                                                                        ix].sum()).values
+                    for ix in product_imports.index.levels[0]:
+                        distrib_market_imported_category.loc[(ix, plastic_openio_to_exio[category])] = (
+                                distrib_market_imported_category.loc[(ix, plastic_openio_to_exio[category])] *
+                                product_imports.loc[ix, product])
+                    distrib_market_imported_category = distrib_market_imported_category.fillna(0)
+
+                    # get final market distribution of studied product (local + imports)
+                    product_market_in_province = pd.concat([product_from_canada, distrib_market_imported_category])
+                    product_market_in_province /= product_market_in_province.sum()
+                    # if 0/0 (provinces not using any of the plastic product) fill NaN to 0s
+                    product_market_in_province = product_market_in_province.fillna(0)
+                    product_market_in_province = pd.concat([product_market_in_province] * len(kpis), axis=1)
+                    product_market_in_province.columns = pd.MultiIndex.from_product([[province], kpis])
+
+                    if where_is_plastic.loc(axis=0)['CA-' + province, map_plastic_data_to_io[category]].sum() != 0:
+                        # apply distribution to plastic emissions
+                        product_market_in_province = (product_market_in_province.loc[:, province] *
+                                                      plastics_data.loc[category].loc[kpis].loc[:, 'CA-' + province] *
+                                                      where_is_plastic.loc(axis=0)['CA-' + province, product]).fillna(0).T
+                    else:
+                        product_market_in_province = (product_market_in_province.loc[:, province] *
+                                                      plastics_data.loc[category].loc[kpis].loc[:, 'CA-' + province] *
+                                                      where_is_plastic.groupby(axis=0, level=1).sum().loc[
+                                                          product]).fillna(0).T
+
+                    # add plastic emissions to emitting production processes
+                    self.F.loc[product_market_in_province.index,
+                               [i for i in product_market_in_province.columns if 'CA-' in i[0]]] += (
+                        product_market_in_province.loc[:, [i for i in product_market_in_province.columns if 'CA-' in i[0]]])
+
+                    self.F_exio.loc[product_market_in_province.index,
+                                    [i for i in product_market_in_province.columns if  'CA-' not in i[0]]] += (
+                        product_market_in_province.loc[:, [i for i in product_market_in_province.columns if 'CA-' not in i[0]]])
+
+        del Z
+
+        # ---------------------------------------- OECD data --------------------------------------
+        def format_oecd_data(dataframe):
+            oecd_data_index = list(zip(dataframe.iloc[2:, 0].ffill(),
+                                       dataframe.iloc[2:, 1].ffill(),
+                                       dataframe.iloc[2:, 2].ffill()))
+            oecd_data_index = [(i[0], i[1].lstrip(), i[2].lstrip()) for i in oecd_data_index]
+            oecd_data_index = pd.MultiIndex.from_tuples(oecd_data_index)
+
+            oecd_data_cols = dataframe.iloc[0, 4:].astype(int).values
+
+            dataframe = dataframe.iloc[2:, 4:]
+            dataframe.index = oecd_data_index
+            dataframe.columns = oecd_data_cols
+
+            return dataframe
+
+        for tab in oecd_data:
+            oecd_data[tab] = format_oecd_data(oecd_data[tab])
+            # OECD data in millions of tonnes of plastic waste -> tonnes of plastic waste
+            oecd_data[tab] *= 1000000
+            oecd_data[tab] = oecd_data[tab].loc[:, min(oecd_data[tab].columns, key=lambda x: abs(x - self.year))]
+
+        plastic_waste_oecd = pd.DataFrame()
+        for tab in oecd_data:
+            plastic_waste_oecd = pd.concat([plastic_waste_oecd, oecd_data[tab]], axis=1)
+        plastic_waste_oecd.columns = list(oecd_data.keys())
+
+        # add mismanaged plastic waste category for waste outside of Canada (through OECD data)
+        self.F = pd.concat([self.F, pd.DataFrame(0, index=[
+            'Disposed plastic waste and scrap mismanaged (open dump, open pits, unsanitary landfills)'],
+                                                 columns=self.F.columns)])
+        self.F_exio = pd.concat([self.F_exio, pd.DataFrame(0, index=[
+            'Disposed plastic waste and scrap mismanaged (open dump, open pits, unsanitary landfills)'],
+                                                           columns=self.F_exio.columns)])
+
+        self.FY = self.FY.reindex(self.F.index).fillna(0)
+
+        for country in self.Z_exio.columns.levels[0]:
+            if country != 'CA':
+                # determine the distribution for conversion from region (e.g., OECD EU) to countries (AT, BE, etc.)
+                plastic_waste_to_incineration_in_region = self.Z_exio.loc(axis=0)[:,
+                                                          'Plastic waste for treatment: incineration'].loc[:,
+                                                          {k for k, v in map_exio_to_oecd.items() if
+                                                           v == map_exio_to_oecd[country]}].sum().groupby(axis=0,
+                                                                                                          level=0).sum()
+                plastic_waste_to_incineration_in_region /= plastic_waste_to_incineration_in_region.sum()
+                plastic_waste_to_landfill_in_region = self.Z_exio.loc(axis=0)[:,
+                                                      'Plastic waste for treatment: landfill'].loc[:,
+                                                      {k for k, v in map_exio_to_oecd.items() if
+                                                       v == map_exio_to_oecd[country]}].sum().groupby(axis=0,
+                                                                                                      level=0).sum()
+                plastic_waste_to_landfill_in_region /= plastic_waste_to_landfill_in_region.sum()
+                plastic_waste_total_in_region = self.Z_exio.loc(axis=0)[:, ['Plastic waste for treatment: incineration',
+                                                                       'Plastic waste for treatment: landfill']].loc[:,
+                                                {k for k, v in map_exio_to_oecd.items() if
+                                                 v == map_exio_to_oecd[country]}].sum().groupby(axis=0, level=0).sum()
+                plastic_waste_total_in_region /= plastic_waste_total_in_region.sum()
+
+                # determine how much of the products were bought by the country
+                diag = pd.DataFrame(np.diag(self.Z_exio.loc[:, country].sum(1)), self.Z_exio.index, self.Z_exio.index)
+
+                # translate these transactions into amount of "Plastics, basic" bought
+                distrib_country = (self.Z_exio.loc(axis=0)[:, 'Plastics, basic'].dot(diag).sum() /
+                                   self.Z_exio.loc(axis=0)[:, 'Plastics, basic'].dot(diag).sum().sum())
+
+                self.F_exio.loc[
+                    'Recycled plastic pellets and flakes ready for use in production of new products or chemicals'] += (
+                        distrib_country * plastic_waste_oecd.loc[[map_exio_to_oecd[country]], 'Recycled'].iloc[0] *
+                        plastic_waste_total_in_region.loc[country]
+                )
+                self.F_exio.loc[
+                    'Disposed plastic waste and scrap sent to landfill or incinerated without energy recovery'] += (
+                        distrib_country * plastic_waste_oecd.loc[[map_exio_to_oecd[country]], 'Landfilled'].iloc[0] *
+                        plastic_waste_to_landfill_in_region.loc[country]
+                )
+                self.F_exio.loc[
+                    'Disposed plastic waste and scrap sent for incineration or gasification with energy recovery'] += (
+                        distrib_country * plastic_waste_oecd.loc[[map_exio_to_oecd[country]], 'Incinerated'].iloc[0] *
+                        plastic_waste_to_incineration_in_region.loc[country]
+                )
+                self.F_exio.loc['Plastic leaked permanently into the environment'] += (
+                        distrib_country * plastic_waste_oecd.loc[[map_exio_to_oecd[country]], 'Littered'].iloc[0] *
+                        plastic_waste_total_in_region.loc[country]
+                )
+                self.F_exio.loc[
+                    'Disposed plastic waste and scrap mismanaged (open dump, open pits, unsanitary landfills)'] += (
+                        distrib_country * plastic_waste_oecd.loc[[map_exio_to_oecd[country]], 'Mismanaged'].iloc[0] *
+                        plastic_waste_total_in_region.loc[country]
+                )
+
+        # introduce plastic emissions to S matrix of exiobase
+        self.S_exio = pd.concat([self.S_exio,
+                                 self.F_exio.iloc[-5:] * (1/self.x_exio).replace([np.inf, -np.inf], 0).loc[:,'indout']])
+        # millions of euros (exiobase) to euros
+        self.S_exio /= 1000000
+
+        # add metadata for plastic emissions
+        self.emission_metadata = pd.concat([self.emission_metadata, pd.DataFrame(['t'] * 5, columns=['Unit'],
+            index=kpis + ['Disposed plastic waste and scrap mismanaged (open dump, open pits, unsanitary landfills)'])])
+
+        # add plastic emissions to characterization matrix
+        self.C = pd.concat([self.C, pd.DataFrame(np.eye(5), index=[
+            ('Recycled plastic pellets and flakes ready for use in production of new products or chemicals',
+             'tonnes of plastic'),
+            ('Disposed plastic waste and scrap sent to landfill or incinerated without energy recovery',
+             'tonnes of plastic'),
+            ('Disposed plastic waste and scrap sent for incineration or gasification with energy recovery',
+             'tonnes of plastic'),
+            ('Plastic leaked permanently into the environment', 'tonnes of plastic'),
+            ('Disposed plastic waste and scrap mismanaged (open dump, open pits, unsanitary landfills)',
+             'tonnes of plastic')], columns=[
+            'Recycled plastic pellets and flakes ready for use in production of new products or chemicals',
+            'Disposed plastic waste and scrap sent to landfill or incinerated without energy recovery',
+            'Disposed plastic waste and scrap sent for incineration or gasification with energy recovery',
+            'Plastic leaked permanently into the environment',
+            'Disposed plastic waste and scrap mismanaged (open dump, open pits, unsanitary landfills)'])]).fillna(0)
+        self.C_exio = pd.concat([self.C_exio, pd.DataFrame(np.eye(5), index=[
+            ('Recycled plastic pellets and flakes ready for use in production of new products or chemicals',
+             'tonnes of plastic'),
+            ('Disposed plastic waste and scrap sent to landfill or incinerated without energy recovery',
+             'tonnes of plastic'),
+            ('Disposed plastic waste and scrap sent for incineration or gasification with energy recovery',
+             'tonnes of plastic'),
+            ('Plastic leaked permanently into the environment', 'tonnes of plastic'),
+            ('Disposed plastic waste and scrap mismanaged (open dump, open pits, unsanitary landfills)',
+             'tonnes of plastic')], columns=[
+            'Recycled plastic pellets and flakes ready for use in production of new products or chemicals',
+            'Disposed plastic waste and scrap sent to landfill or incinerated without energy recovery',
+            'Disposed plastic waste and scrap sent for incineration or gasification with energy recovery',
+            'Plastic leaked permanently into the environment',
+            'Disposed plastic waste and scrap mismanaged (open dump, open pits, unsanitary landfills)'])]).fillna(0)
 
     def differentiate_biogenic_carbon_emissions(self):
         """
