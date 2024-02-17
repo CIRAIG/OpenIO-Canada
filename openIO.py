@@ -47,6 +47,9 @@ class IOTables:
         ch.setFormatter(formatter)
         logger.addHandler(ch)
         logger.propagate = False
+        # set up logging tool for country_converter
+        coco_logger = coco.logging.getLogger()
+        coco_logger.setLevel(logging.CRITICAL)
 
         logger.info('Reading all the Excel files...')
 
@@ -224,6 +227,17 @@ class IOTables:
 
         logger.info("Refining the GHG emissions for the meat sector...")
         self.refine_meat_sector()
+
+        self.convert_F_to_commodity()
+
+        logger.info("Adding HFP and PFC flows...")
+        self.add_hfc_emissions()
+
+        logger.info("Refining water consumption of livestock and crops...")
+        self.add_water_consumption_flows_for_livestock_and_crops()
+
+        logger.info("Adding plastic waste flows...")
+        self.add_plastic_emissions()
 
         logger.info("Normalizing emissions...")
         self.normalize_flows()
@@ -2281,17 +2295,20 @@ class IOTables:
                                                             'Products of meat pigs']],
                        [i for i in self.A.columns if (i[0] == province and i[1] == meat_sector)]] = 0
 
+    def convert_F_to_commodity(self):
+        """
+        Converts F to emissions x commodity format.
+        :return:
+        """
+        self.F = self.F.dot(self.V.dot(self.inv_g).T)
+        self.F = pd.concat([self.F, self.minerals])
+
     def normalize_flows(self):
         """
         Produce normalized environmental extensions
         :return: self.S and self.F with product classification if it's been selected
         """
 
-        self.F = self.F.dot(self.V.dot(self.inv_g).T)
-        self.F = pd.concat([self.F, self.minerals])
-        self.add_hfc_emissions()
-        self.add_water_consumption_flows_for_livestock_and_crops()
-        self.add_plastic_emissions()
         self.S = self.F.dot(self.inv_q)
         self.S = pd.concat([self.S, self.S_exio]).fillna(0)
         self.S = self.S.groupby(self.S.index).sum()
@@ -2678,8 +2695,6 @@ class IOTables:
             'Disposed plastic waste and scrap mismanaged (open dump, open pits, unsanitary landfills)'],
                                                            columns=self.F_exio.columns)])
 
-        self.FY = self.FY.reindex(self.F.index).fillna(0)
-
         for country in self.Z_exio.columns.levels[0]:
             if country != 'CA':
                 # determine the distribution for conversion from region (e.g., OECD EU) to countries (AT, BE, etc.)
@@ -2733,47 +2748,99 @@ class IOTables:
                         plastic_waste_total_in_region.loc[country]
                 )
 
+        # ------------------------------- Specify plastic resins ---------------------------------
+
+        resin_compo = pd.read_excel(pkg_resources.resource_stream(
+            __name__, '/Data/Environmental_data/plastic_resin_compositions.xlsx'), None)
+
+        def formatting(dff):
+            dff = dff.set_index('Unnamed: 0')
+            dff.index.name = None
+            return dff.fillna(0)
+        for sheet in resin_compo:
+            resin_compo[sheet] = formatting(resin_compo[sheet])
+
+        # create new indicators including information about resin (e.g., recycled - PET)
+        resin_indicators = []
+        for indicator in kpis + [
+            'Disposed plastic waste and scrap mismanaged (open dump, open pits, unsanitary landfills)']:
+            resin_indicators.append([indicator + ' - ' + i for i in resin_compo['Europe'].index])
+        resin_indicators = [item for sublist in resin_indicators for item in sublist]
+
+        # plastic resin composition for product categories of plastic physical flow accounts
+        with_resins_for_Canada = pd.DataFrame(0, index=resin_indicators, columns=self.F.columns)
+        for plastic_cat in map_plastic_data_to_io:
+            for indicator in kpis:
+                df = pd.concat(
+                    [self.F.loc[indicator, [i for i in self.F.columns if i[1] in map_plastic_data_to_io[plastic_cat]]]] *
+                    len(resin_compo['Canada'].index), axis=1)
+                df *= resin_compo['Canada'].loc[:, plastic_cat].values
+                df.columns = [indicator + ' - ' + i for i in resin_compo['Canada'].index]
+                with_resins_for_Canada.loc[df.columns, df.index] = df.T
+
+        # plastic resin composition overall for OECD data. Different compositions depending on regions.
+        with_resins_for_international = pd.DataFrame(0, index=resin_indicators, columns=self.F_exio.columns)
+        eu_membership = list(zip(self.F_exio.columns.levels[0], coco.convert(self.F_exio.columns.levels[0], to='EU28')))
+        for indicator in kpis + [
+            'Disposed plastic waste and scrap mismanaged (open dump, open pits, unsanitary landfills)']:
+            # For Europe
+            df = pd.concat([self.F_exio.loc[indicator, [i[0] for i in eu_membership if i[1] == 'EU28']]] *
+                           len(resin_compo['Europe'].index), axis=1)
+            df *= resin_compo['Europe'].loc[:, 'Composition'].values
+            df.columns = [indicator + ' - ' + i for i in resin_compo['Europe'].index]
+            with_resins_for_international.loc[df.columns, df.index] = df.T
+            # For the US
+            df = pd.concat([self.F_exio.loc[indicator, 'US']] * len(resin_compo['US'].index), axis=1)
+            df *= resin_compo['US'].loc[:, 'Composition'].values
+            df.columns = [indicator + ' - ' + i for i in resin_compo['US'].index]
+            df = pd.concat([df], keys=['US'])
+            with_resins_for_international.loc[df.columns, df.index] = df.T
+            # For China
+            df = pd.concat([self.F_exio.loc[indicator, 'CN']] * len(resin_compo['China'].index), axis=1)
+            df *= resin_compo['China'].loc[:, 'Composition'].values
+            df.columns = [indicator + ' - ' + i for i in resin_compo['China'].index]
+            df = pd.concat([df], keys=['CN'])
+            with_resins_for_international.loc[df.columns, df.index] = df.T
+            # For India
+            df = pd.concat([self.F_exio.loc[indicator, 'IN']] * len(resin_compo['India'].index), axis=1)
+            df *= resin_compo['India'].loc[:, 'Composition'].values
+            df.columns = [indicator + ' - ' + i for i in resin_compo['India'].index]
+            df = pd.concat([df], keys=['IN'])
+            with_resins_for_international.loc[df.columns, df.index] = df.T
+            # For other countries
+            df = pd.concat([self.F_exio.loc[indicator, [i[0] for i in eu_membership if
+                                                   (i[1] != 'EU28' and i[0] not in ['US', 'CN', 'IN'])]]] *
+                           len(resin_compo['Global'].index), axis=1)
+            df *= resin_compo['Global'].loc[:, 'Composition'].values
+            df.columns = [indicator + ' - ' + i for i in resin_compo['Global'].index]
+            with_resins_for_international.loc[df.columns, df.index] = df.T
+
+        # replace plastic waste information without resin, by information with resin
+        self.F = pd.concat([self.F, with_resins_for_Canada]).drop(
+            kpis + ['Disposed plastic waste and scrap mismanaged (open dump, open pits, unsanitary landfills)'])
+        self.F_exio = pd.concat([self.F_exio, with_resins_for_international]).drop(
+            kpis + ['Disposed plastic waste and scrap mismanaged (open dump, open pits, unsanitary landfills)'])
+
+        # ----------------------------- Adapting the rest of the system -------------------------------
+        self.FY = self.FY.reindex(self.F.index).fillna(0)
+
         # introduce plastic emissions to S matrix of exiobase
-        self.S_exio = pd.concat([self.S_exio,
-                                 self.F_exio.iloc[-5:] * (1/self.x_exio).replace([np.inf, -np.inf], 0).loc[:,'indout']])
+        self.S_exio = pd.concat([self.S_exio, self.F_exio.loc[resin_indicators] *
+                                 (1/self.x_exio).replace([np.inf, -np.inf], 0).loc[:, 'indout']])
         # millions of euros (exiobase) to euros
         self.S_exio /= 1000000
 
         # add metadata for plastic emissions
-        self.emission_metadata = pd.concat([self.emission_metadata, pd.DataFrame(['t'] * 5, columns=['Unit'],
-            index=kpis + ['Disposed plastic waste and scrap mismanaged (open dump, open pits, unsanitary landfills)'])])
+        self.emission_metadata = pd.concat([self.emission_metadata,
+                                            pd.DataFrame('t', columns=['Unit'], index=resin_indicators)])
 
         # add plastic emissions to characterization matrix
-        self.C = pd.concat([self.C, pd.DataFrame(np.eye(5), index=[
-            ('Recycled plastic pellets and flakes ready for use in production of new products or chemicals',
-             'tonnes of plastic'),
-            ('Disposed plastic waste and scrap sent to landfill or incinerated without energy recovery',
-             'tonnes of plastic'),
-            ('Disposed plastic waste and scrap sent for incineration or gasification with energy recovery',
-             'tonnes of plastic'),
-            ('Plastic leaked permanently into the environment', 'tonnes of plastic'),
-            ('Disposed plastic waste and scrap mismanaged (open dump, open pits, unsanitary landfills)',
-             'tonnes of plastic')], columns=[
-            'Recycled plastic pellets and flakes ready for use in production of new products or chemicals',
-            'Disposed plastic waste and scrap sent to landfill or incinerated without energy recovery',
-            'Disposed plastic waste and scrap sent for incineration or gasification with energy recovery',
-            'Plastic leaked permanently into the environment',
-            'Disposed plastic waste and scrap mismanaged (open dump, open pits, unsanitary landfills)'])]).fillna(0)
-        self.C_exio = pd.concat([self.C_exio, pd.DataFrame(np.eye(5), index=[
-            ('Recycled plastic pellets and flakes ready for use in production of new products or chemicals',
-             'tonnes of plastic'),
-            ('Disposed plastic waste and scrap sent to landfill or incinerated without energy recovery',
-             'tonnes of plastic'),
-            ('Disposed plastic waste and scrap sent for incineration or gasification with energy recovery',
-             'tonnes of plastic'),
-            ('Plastic leaked permanently into the environment', 'tonnes of plastic'),
-            ('Disposed plastic waste and scrap mismanaged (open dump, open pits, unsanitary landfills)',
-             'tonnes of plastic')], columns=[
-            'Recycled plastic pellets and flakes ready for use in production of new products or chemicals',
-            'Disposed plastic waste and scrap sent to landfill or incinerated without energy recovery',
-            'Disposed plastic waste and scrap sent for incineration or gasification with energy recovery',
-            'Plastic leaked permanently into the environment',
-            'Disposed plastic waste and scrap mismanaged (open dump, open pits, unsanitary landfills)'])]).fillna(0)
+        self.C = pd.concat([self.C, pd.DataFrame(np.eye(len(resin_indicators)),
+                                                 index=pd.MultiIndex.from_product([resin_indicators, ['tonnes of plastics']]),
+                                                 columns=resin_indicators)]).fillna(0)
+        self.C_exio = pd.concat([self.C_exio, pd.DataFrame(np.eye(len(resin_indicators)),
+                                                 index=pd.MultiIndex.from_product([resin_indicators, ['tonnes of plastics']]),
+                                                 columns=resin_indicators)]).fillna(0)
 
     def differentiate_biogenic_carbon_emissions(self):
         """
