@@ -597,6 +597,7 @@ class IOTables:
                 i[1] in ['Gross fixed capital formation, Construction',
                          'Gross fixed capital formation, Machinery and equipment',
                          'Gross fixed capital formation, Intellectual property products'])], axis=1)
+        self.Y.columns = pd.MultiIndex.from_tuples(self.Y.columns)
 
         assert np.isclose((self.U.sum(1) + self.K.sum(1) + self.Y.sum(1) - self.INT_imports.sum(1)).sum(),
                           self.q.sum(1).sum())
@@ -867,9 +868,9 @@ class IOTables:
         # only keep useful information
         merchandise_database = merchandise_database.loc[:, ['IOIC', 'Country', 'Value']]
 
-        # remove HS sectors that cant be matched to IOIC (identified with "None")
-        merchandise_database = merchandise_database.drop(
-            [i for i in merchandise_database.index if merchandise_database.loc[i, 'IOIC'] == 'None'])
+        # remove HS sectors that cannot be matched to IOIC
+        merchandise_database = merchandise_database.drop([i for i in merchandise_database.index
+                                              if merchandise_database.loc[i, 'IOIC'] == 'None']).dropna(subset=['IOIC'])
 
         # change IOIC codes to sector names
         code_to_name = {j[0]: j[1] for j in self.commodities}
@@ -1276,8 +1277,13 @@ class IOTables:
 
         self.F = pd.pivot_table(data=emissions, index=['Province', 'Substance Name'],
                                 columns=['Province', 'NAICS 6 Code'], aggfunc=np.sum).fillna(0)
+        try:
+            self.F = self.F.drop(['CAS Number', 'Units'], axis=1)
+        except KeyError:
+            pass
         # renaming compartments
-        self.F.columns.set_levels(['Air', 'Water', 'Soil'], level=0, inplace=True)
+        self.F = self.F.rename(columns={'Emissions to air': 'Air', 'Emissions to soil': 'Soil',
+                                        'Emissions to water': 'Water'}, level=0)
         # renaming the names of the columns indexes
         self.F.columns = self.F.columns.rename(['compartment', 'Province', 'NAICS'])
         # reorder multi index to have province as first level
@@ -2376,7 +2382,7 @@ class IOTables:
 
         idx = pd.MultiIndex.from_tuples(R.index, names=['province', 'category'])
         R = R.reset_index(drop=True).set_index(idx)
-
+        R.columns = R.columns.values
         # combine economic and environmental values (left outer join)
         W = hfcs.join(R)
         W.loc[:, W.columns != 'numberValue'] = W.loc[:, W.columns != 'numberValue'].mul(W['numberValue'], 0)
@@ -2620,6 +2626,8 @@ class IOTables:
                     distrib_market_imported_category = (self.A.loc[
                         self.A_exio.index, ['CA-' + i for i in self.matching_dict]].dot(
                         self.q.sum(1))).loc(axis=0)[:, plastic_openio_to_exio[category]]
+                    distrib_market_imported_category.index = pd.MultiIndex.from_tuples(
+                        distrib_market_imported_category.index)
                     for ix in distrib_market_imported_category.index.levels[0]:
                         distrib_market_imported_category.loc[ix] = (distrib_market_imported_category.loc[ix] /
                                                                     distrib_market_imported_category.loc[
@@ -2733,10 +2741,17 @@ class IOTables:
                         distrib_country * plastic_waste_oecd.loc[[map_exio_to_oecd[country]], 'Landfilled'].iloc[0] *
                         plastic_waste_to_landfill_in_region.loc[country]
                 )
+                # incineration in OECD is not specifying energy recovery or not -> assume 50/50 split in first version
+                split_incineration_with_or_without_energy_recovery = 0.5
+                self.F_exio.loc[
+                    'Disposed plastic waste and scrap sent to landfill or incinerated without energy recovery'] += (
+                        distrib_country * plastic_waste_oecd.loc[[map_exio_to_oecd[country]], 'Incinerated'].iloc[0] *
+                        plastic_waste_to_incineration_in_region.loc[country] * split_incineration_with_or_without_energy_recovery
+                )
                 self.F_exio.loc[
                     'Disposed plastic waste and scrap sent for incineration or gasification with energy recovery'] += (
                         distrib_country * plastic_waste_oecd.loc[[map_exio_to_oecd[country]], 'Incinerated'].iloc[0] *
-                        plastic_waste_to_incineration_in_region.loc[country]
+                        plastic_waste_to_incineration_in_region.loc[country] * split_incineration_with_or_without_energy_recovery
                 )
                 self.F_exio.loc['Plastic leaked permanently into the environment'] += (
                         distrib_country * plastic_waste_oecd.loc[[map_exio_to_oecd[country]], 'Littered'].iloc[0] *
@@ -2850,52 +2865,52 @@ class IOTables:
         ratio_ocean = 0.15
         # assume a microfibers shape (most common) and a 10um size (most common), also convert kg to tonnes
         plastic_cfs.loc[('Physical effects on biota', 'PDF.m2.yr'),
-                        'Plastic leaked permanently into the environment - Polyethylene terephthalate (PET) resins'] = 0.0112489079604336 * ratio_ocean * 1000
+                        'Plastic leaked permanently into the environment - Polyethylene terephthalate (PET) resins'] = 0.0117891847201787 * ratio_ocean * 1000
         plastic_cfs.loc[('Physical effects on biota', 'PDF.m2.yr'),
-                        'Plastic leaked permanently into the environment - Other thermoplastic polyester resins'] = 0.0112489079604336 * ratio_ocean * 1000
+                        'Plastic leaked permanently into the environment - Other thermoplastic polyester resins'] = 0.0117891847201787 * ratio_ocean * 1000
         plastic_cfs.loc[('Physical effects on biota', 'PDF.m2.yr'),
-                        'Plastic leaked permanently into the environment - Low-density polyethylene (LDPE) resins'] = 1.63568326975865 * ratio_ocean * 1000
+                        'Plastic leaked permanently into the environment - Low-density polyethylene (LDPE) resins'] = 14.2015621983309 * ratio_ocean * 1000
         plastic_cfs.loc[('Physical effects on biota', 'PDF.m2.yr'),
-                        'Plastic leaked permanently into the environment - Linear low-density polyethylene (LLDPE) resins'] = 1.63568326975865 * ratio_ocean * 1000
+                        'Plastic leaked permanently into the environment - Linear low-density polyethylene (LLDPE) resins'] = 14.2015621983309 * ratio_ocean * 1000
         plastic_cfs.loc[('Physical effects on biota', 'PDF.m2.yr'),
-                        'Plastic leaked permanently into the environment - High-density polyethylene (HDPE) resins'] = 2.61419143317955 * ratio_ocean * 1000
+                        'Plastic leaked permanently into the environment - High-density polyethylene (HDPE) resins'] = 14.5208111050616 * ratio_ocean * 1000
         plastic_cfs.loc[('Physical effects on biota', 'PDF.m2.yr'),
-                        'Plastic leaked permanently into the environment - Other polyethylene resins'] = (2.61419143317955 + 1.63568326975865) / 2 * ratio_ocean * 1000
+                        'Plastic leaked permanently into the environment - Other polyethylene resins'] = (14.5208111050616 + 14.2015621983309) / 2 * ratio_ocean * 1000
         plastic_cfs.loc[('Physical effects on biota', 'PDF.m2.yr'),
-                        'Plastic leaked permanently into the environment - Polystyrene (PS) resins'] = 6.04511837710934 * ratio_ocean * 1000
+                        'Plastic leaked permanently into the environment - Polystyrene (PS) resins'] = 14.7359173605865 * ratio_ocean * 1000
         # proxy = PS, based on density
         plastic_cfs.loc[('Physical effects on biota', 'PDF.m2.yr'),
-                        'Plastic leaked permanently into the environment - Acrylonitrile-butadiene-styrene (ABS) resins'] = 6.04511837710934 * ratio_ocean * 1000
+                        'Plastic leaked permanently into the environment - Acrylonitrile-butadiene-styrene (ABS) resins'] = 14.7359173605865 * ratio_ocean * 1000
         plastic_cfs.loc[('Physical effects on biota', 'PDF.m2.yr'),
-                        'Plastic leaked permanently into the environment - Polyvinyl chloride (PVC) resins'] = 0.0115963263627876 * ratio_ocean * 1000
+                        'Plastic leaked permanently into the environment - Polyvinyl chloride (PVC) resins'] = 0.011600652123176* ratio_ocean * 1000
         plastic_cfs.loc[('Physical effects on biota', 'PDF.m2.yr'),
-                        'Plastic leaked permanently into the environment - Polypropylene (PP) resins'] = 0.350125800556431 * ratio_ocean * 1000
+                        'Plastic leaked permanently into the environment - Polypropylene (PP) resins'] = 13.5454167946045 * ratio_ocean * 1000
         # proxy = PLA, based on density
         plastic_cfs.loc[('Physical effects on biota', 'PDF.m2.yr'),
-                        'Plastic leaked permanently into the environment - Thermoplastic polyurethane (PU) resins'] = 0.0117372743851767 * ratio_ocean * 1000
+                        'Plastic leaked permanently into the environment - Thermoplastic polyurethane (PU) resins'] = 0.0118266839558158 * ratio_ocean * 1000
         plastic_cfs.loc[('Physical effects on biota', 'PDF.m2.yr'),
-                        'Plastic leaked permanently into the environment - Polyamide (nylon) resins'] = 0.00977641603154819 * ratio_ocean * 1000
+                        'Plastic leaked permanently into the environment - Polyamide (nylon) resins'] = 0.0118081147968369 * ratio_ocean * 1000
         # proxy = PLA
         plastic_cfs.loc[('Physical effects on biota', 'PDF.m2.yr'),
-                        'Plastic leaked permanently into the environment - All other thermoplastic resins'] = 0.0117372743851767 * ratio_ocean * 1000
+                        'Plastic leaked permanently into the environment - All other thermoplastic resins'] = 0.0118266839558158 * ratio_ocean * 1000
         # proxy = PLA, based on density
         plastic_cfs.loc[('Physical effects on biota', 'PDF.m2.yr'),
-                        'Plastic leaked permanently into the environment - Phenolic (PF) resins'] = 0.0117372743851767 * ratio_ocean * 1000
+                        'Plastic leaked permanently into the environment - Phenolic (PF) resins'] = 0.0118266839558158 * ratio_ocean * 1000
         # proxy = PLA, based on density
         plastic_cfs.loc[('Physical effects on biota', 'PDF.m2.yr'),
-                        'Plastic leaked permanently into the environment - Urea formaldehyde (UF) resins'] = 0.0117372743851767 * ratio_ocean * 1000
+                        'Plastic leaked permanently into the environment - Urea formaldehyde (UF) resins'] = 0.0118266839558158 * ratio_ocean * 1000
         # copy urea formaldehyde
         plastic_cfs.loc[('Physical effects on biota', 'PDF.m2.yr'),
-                        'Plastic leaked permanently into the environment - All other formaldehyde based resins'] = 0.0117372743851767 * ratio_ocean * 1000
+                        'Plastic leaked permanently into the environment - All other formaldehyde based resins'] = 0.0118266839558158 * ratio_ocean * 1000
         # proxy = PLA, based on density
         plastic_cfs.loc[('Physical effects on biota', 'PDF.m2.yr'),
-                        'Plastic leaked permanently into the environment - Unsaturated polyester (thermosetting) resins'] = 0.0117372743851767 * ratio_ocean * 1000
+                        'Plastic leaked permanently into the environment - Unsaturated polyester (thermosetting) resins'] = 0.0118266839558158 * ratio_ocean * 1000
         # proxy = PLA, based on density
         plastic_cfs.loc[('Physical effects on biota', 'PDF.m2.yr'),
-                        'Plastic leaked permanently into the environment - Thermosetting polyurethane resins'] = 0.0117372743851767 * ratio_ocean * 1000
+                        'Plastic leaked permanently into the environment - Thermosetting polyurethane resins'] = 0.0118266839558158 * ratio_ocean * 1000
         # copy polyurethane/polyester thermoset
         plastic_cfs.loc[('Physical effects on biota', 'PDF.m2.yr'),
-                        'Plastic leaked permanently into the environment - Other thermosetting resins'] = 0.0117372743851767 * ratio_ocean * 1000
+                        'Plastic leaked permanently into the environment - Other thermosetting resins'] = 0.0118266839558158 * ratio_ocean * 1000
 
         self.C = pd.concat([self.C.drop([i for i in self.C.index if 'leak' in i[0]]), plastic_cfs]).fillna(0)
         self.C_exio = pd.concat(
