@@ -53,7 +53,7 @@ class IOTables:
 
         logger.info('Reading all the Excel files...')
 
-        self.level_of_detail = [i for i in folder_path.split('/') if 'level' in i][0]
+        self.level_of_detail = [i for i in os.path.normpath(folder_path).split(os.sep) if 'level' in i][-1]
         self.exiobase_folder = exiobase_folder
         self.endogenizing = endogenizing_capitals
         self.aggregated_ghgs = aggregated_ghgs
@@ -139,8 +139,8 @@ class IOTables:
 
         logger.info("Formatting the Supply and Use tables...")
         for province_data in files:
-            supply = pd.read_excel(folder_path+province_data, 'Supply')
-            use = pd.read_excel(folder_path+province_data, 'Use_Basic')
+            supply = pd.read_excel(os.path.join(folder_path, province_data), 'Supply')
+            use = pd.read_excel(os.path.join(folder_path, province_data), 'Use_Basic')
             region = province_data[:2]
             self.format_tables(supply, use, region)
 
@@ -173,7 +173,7 @@ class IOTables:
         logger.info("Balancing inter-provincial trade...")
         self.province_import_export(
             pd.read_excel(
-                folder_path+[i for i in [j for j in os.walk(folder_path)][0][2] if 'Provincial_trade_flow' in i][0],
+                os.path.join(folder_path, [i for i in [j for j in os.walk(folder_path)][0][2] if 'Provincial_trade_flow' in i][0]),
                 'Data'))
 
         if self.exiobase_folder:
