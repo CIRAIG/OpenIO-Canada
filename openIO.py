@@ -2607,16 +2607,31 @@ class IOTables:
 
                 for product in map_plastic_data_to_io[category]:
                     # determine production within Canada of studied product
-                    product_from_canada = (self.U.loc(axis=0)[:, product].loc[:, 'CA-' + province].sum(1) +
-                                           self.Y.drop([i for i in self.Y.columns if "Changes in inventories" in i[1]],
-                                                       axis=1).loc(
-                                               axis=0)[:, product].loc[:, 'CA-' + province].sum(1) +
-                                           self.K.loc(axis=0)[:, product].loc[:, 'CA-' + province].sum(1))
+                    if self.endogenizing:
+                        product_from_canada = (self.U.loc(axis=0)[:, product].loc[:, 'CA-' + province].sum(1) +
+                                               self.Y.drop([i for i in self.Y.columns if "Changes in inventories" in i[1]],
+                                                           axis=1).loc(
+                                                   axis=0)[:, product].loc[:, 'CA-' + province].sum(1) +
+                                               self.K.loc(axis=0)[:, product].loc[:, 'CA-' + province].sum(1))
 
-                    # determine imports of studied product
-                    product_imports = (
+                        # determine imports of studied product
+                        product_imports = (
+                                    self.merchandise_imports_scaled_U.loc(axis=0)[:, product].loc[:, province].sum(1) +
+                                    self.merchandise_imports_scaled_K.loc(axis=0)[:, product].loc[:, province].sum(1) +
+                                    self.merchandise_imports_scaled_Y.loc[:,
+                                    [i for i in self.merchandise_imports_scaled_Y.columns if (
+                                            "Changes in inventories" not in i[1] and i[0] == province)]].loc(axis=0)[:,
+                                    product].sum(1))
+                    else:
+                        product_from_canada = (self.U.loc(axis=0)[:, product].loc[:, 'CA-' + province].sum(1) +
+                                               self.Y.drop(
+                                                   [i for i in self.Y.columns if "Changes in inventories" in i[1]],
+                                                   axis=1).loc(
+                                                   axis=0)[:, product].loc[:, 'CA-' + province].sum(1))
+
+                        # determine imports of studied product
+                        product_imports = (
                                 self.merchandise_imports_scaled_U.loc(axis=0)[:, product].loc[:, province].sum(1) +
-                                self.merchandise_imports_scaled_K.loc(axis=0)[:, product].loc[:, province].sum(1) +
                                 self.merchandise_imports_scaled_Y.loc[:,
                                 [i for i in self.merchandise_imports_scaled_Y.columns if (
                                         "Changes in inventories" not in i[1] and i[0] == province)]].loc(axis=0)[:,
