@@ -316,12 +316,8 @@ class IOTables:
         use_table = df
 
         # fill with zeros
-        supply_table.replace('.', 0, inplace=True)
-        use_table.replace('.', 0, inplace=True)
-
-        # get strings as floats
-        supply_table = supply_table.astype('float64')
-        use_table = use_table.astype('float64')
+        supply_table = supply_table.astype(str).replace(to_replace=['.'], value='0').astype(float)
+        use_table = use_table.astype(str).replace(to_replace=['.'], value='0').astype(float)
 
         if self.level_of_detail == 'Detail level':
             # tables from k$ to $
@@ -543,7 +539,7 @@ class IOTables:
 
         endo = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Concordances/Endogenizing.xlsx'))
 
-        self.K = pd.DataFrame(0, self.U.index, self.U.columns)
+        self.K = pd.DataFrame(0, self.U.index, self.U.columns, float)
 
         for province in self.matching_dict.keys():
             for capital_type in ['Gross fixed capital formation, Construction',
@@ -578,7 +574,7 @@ class IOTables:
         df = self.Y.loc(axis=1)[:, :, ['Used cars and equipment and scrap (private)',
                                        'Used cars and equipment and scrap (public)',
                                        'Used cars and equipment and scrap (non-profit)']].copy('deep')
-        df = df.groupby(axis=1, level=0).sum()
+        df = df.T.groupby(level=0).sum().T
         df.columns = pd.MultiIndex.from_product([self.matching_dict.keys(), ['Changes in inventories'],
                                                  ['Changes in inventories, used cars and equipment and scrap']])
         self.Y = pd.concat([self.Y, df], axis=1)
@@ -642,15 +638,13 @@ class IOTables:
         for province in province_trade.index:
             province_trade.loc[province, province] = 0
 
-        import_markets = pd.DataFrame(0, province_trade.index, province_trade.columns)
+        import_markets = pd.DataFrame(0, province_trade.index, province_trade.columns, float)
         for importing_province in province_trade.index:
             for exported_product in province_trade.columns.levels[1]:
-                import_markets.loc[
-                    importing_province, [i for i in import_markets.columns if i[1] == exported_product]] = (
-                        province_trade.loc[
-                            importing_province, [i for i in province_trade.columns if i[1] == exported_product]] /
-                        province_trade.loc[importing_province, [i for i in province_trade.columns if
-                                                                i[1] == exported_product]].sum()).values
+                exported_products = [i for i in import_markets.columns if i[1] == exported_product]
+                import_markets.loc[importing_province, exported_products] = (
+                            province_trade.loc[importing_province, exported_products] /
+                            province_trade.loc[importing_province, exported_products].sum()).values
 
         before_distribution_U = self.U.copy('deep')
         before_distribution_K = self.K.copy('deep')
@@ -660,7 +654,7 @@ class IOTables:
             for importing_province in province_trade.index:
                 total_use = pd.concat([self.U.loc[importing_province, importing_province],
                                        self.Y.loc[importing_province, importing_province]], axis=1)
-                total_imports = province_trade.groupby(level=1, axis=1).sum().loc[importing_province]
+                total_imports = province_trade.T.groupby(level=1).sum().T.loc[importing_province]
                 index_commodity = [i[1] for i in self.commodities]
                 total_imports = total_imports.reindex(index_commodity).fillna(0)
 
@@ -721,7 +715,7 @@ class IOTables:
                 total_use = pd.concat([self.U.loc[importing_province, importing_province] +
                                        self.K.loc[importing_province, importing_province],
                                        self.Y.loc[importing_province, importing_province]], axis=1)
-                total_imports = province_trade.groupby(level=1, axis=1).sum().loc[importing_province]
+                total_imports = province_trade.T.groupby(level=1).sum().T.loc[importing_province]
                 index_commodity = [i[1] for i in self.commodities]
                 total_imports = total_imports.reindex(index_commodity).fillna(0)
 
@@ -800,7 +794,7 @@ class IOTables:
         """
 
         # aggregating international imports in 1 column
-        self.INT_imports = self.INT_imports.groupby(axis=1, level=1).sum()
+        self.INT_imports = self.INT_imports.T.groupby(level=1).sum().T
         # save total values to check if distribution was done properly later
         before_distribution_U = self.U.sum().sum()
         before_distribution_K = self.K.sum().sum()
@@ -843,7 +837,7 @@ class IOTables:
         assert not self.K[self.K < 0].any().any()
         # remove negative artefacts
         self.Y = pd.concat([self.Y[self.Y >= 0].fillna(0), self.Y[self.Y < -1].fillna(0)], axis=1)
-        self.Y = self.Y.groupby(by=self.Y.columns, axis=1).sum()
+        self.Y = self.Y.T.groupby(by=self.Y.columns).sum().T
         self.Y.columns = pd.MultiIndex.from_tuples(self.Y.columns)
 
     def load_merchandise_international_trade_database(self):
@@ -920,7 +914,7 @@ class IOTables:
         self.merchandise_imports = self.merchandise_imports.fillna(0)
 
         def scale_international_imports(who_uses_int_imports, matrix):
-            df = who_uses_int_imports.groupby(axis=0, level=1).sum()
+            df = who_uses_int_imports.groupby(level=1).sum()
             df = pd.concat([df] * len(self.merchandise_imports.index.levels[0]))
             df.index = pd.MultiIndex.from_product([self.merchandise_imports.index.levels[0],
                                                    who_uses_int_imports.index.levels[1]])
@@ -1008,7 +1002,8 @@ class IOTables:
         # loading concordances between exiobase classification and IOIC
         ioic_exio = pd.read_excel(pkg_resources.resource_stream(__name__, '/Data/Concordances/IOIC_EXIOBASE.xlsx'),
                                   'commodities')
-        ioic_exio = ioic_exio[2:].drop('IOIC Detail level - EXIOBASE', axis=1).set_index('Unnamed: 1').fillna(0)
+        ioic_exio = ioic_exio[2:].drop('IOIC Detail level - EXIOBASE', axis=1).set_index(
+            'Unnamed: 1').infer_objects(copy=False).fillna(0)
         ioic_exio.index.name = None
         ioic_exio.index = [{j[0]: j[1] for j in self.commodities}[i] for i in ioic_exio.index]
 
@@ -1040,7 +1035,7 @@ class IOTables:
 
             for merchandise in merchandise_imports_scaled.index.levels[1]:
                 # check if there is trading happening for the uncovered commodity or not
-                if who_uses_int_imports.groupby(axis=0, level=1).sum().loc[merchandise].sum() != 0:
+                if who_uses_int_imports.groupby(level=1).sum().loc[merchandise].sum() != 0:
                     # 1 for 1 with exiobase -> easy
                     if ioic_exio.loc[merchandise].sum() == 1:
                         exio_sector = ioic_exio.loc[merchandise][ioic_exio.loc[merchandise] == 1].index[0]
@@ -1083,14 +1078,14 @@ class IOTables:
 
             service_imports = pd.DataFrame()
 
-            df = who_uses_int_imports.groupby(axis=0, level=1).sum()
+            df = who_uses_int_imports.groupby(level=1).sum()
             df = pd.concat([df] * len(merchandise_imports_scaled.index.levels[0]))
             df.index = pd.MultiIndex.from_product([merchandise_imports_scaled.index.levels[0],
                                                    who_uses_int_imports.index.levels[1]])
 
             for sector in uncovered:
                 # check if there is trading happening for the uncovered commodity or not
-                if who_uses_int_imports.groupby(axis=0, level=1).sum().loc[sector].sum() != 0:
+                if who_uses_int_imports.groupby(level=1).sum().loc[sector].sum() != 0:
                     # 1 for 1 with exiobase -> easy
                     if ioic_exio.loc[sector].sum() == 1:
                         exio_sector = ioic_exio.loc[sector][ioic_exio.loc[sector] == 1].index[0]
@@ -1153,10 +1148,25 @@ class IOTables:
                         self.link_openio_exio_A.sum() + self.link_openio_exio_K.sum()) < 0.935].sum() == 0
         else:
             assert (self.A.sum() + self.R.sum() + self.link_openio_exio_A.sum())[
-                       (self.A.sum() + self.R.sum() + self.link_openio_exio_A.sum()) < 0.95].sum() == 0
+                       (self.A.sum() + self.R.sum() + self.link_openio_exio_A.sum()) < 0.935].sum() == 0
 
         # convert from CAD to EURO (https://www.bankofcanada.ca/rates/exchange/annual-average-exchange-rates/)
-        if self.year == 2017:
+        if self.year == 2014:
+            self.link_openio_exio_A /= 1.4671
+            self.link_openio_exio_Y /= 1.4671
+            if self.endogenizing:
+                self.link_openio_exio_K /= 1.4671
+        elif self.year == 2015:
+            self.link_openio_exio_A /= 1.4182
+            self.link_openio_exio_Y /= 1.4182
+            if self.endogenizing:
+                self.link_openio_exio_K /= 1.4182
+        elif self.year == 2016:
+            self.link_openio_exio_A /= 1.466
+            self.link_openio_exio_Y /= 1.466
+            if self.endogenizing:
+                self.link_openio_exio_K /= 1.466
+        elif self.year == 2017:
             self.link_openio_exio_A /= 1.465
             self.link_openio_exio_Y /= 1.465
             if self.endogenizing:
@@ -1186,36 +1196,36 @@ class IOTables:
         :return:
         """
 
-        self.V = self.V.drop('CE', axis=0)
-        self.V = self.V.drop('CE', axis=1)
-        self.U = self.U.drop('CE', axis=0)
+        self.V = self.V.drop('CE', axis=0, level=0)
+        self.V = self.V.drop('CE', axis=1, level=0)
+        self.U = self.U.drop('CE', axis=0, level=0)
         self.U = self.U.drop([i for i in self.U.columns if i[0] == 'CE'], axis=1)
-        self.g = self.g.drop('CE', axis=0)
-        self.g = self.g.drop('CE', axis=1)
-        self.q = self.q.drop('CE', axis=0)
-        self.q = self.q.drop('CE', axis=1)
-        self.inv_g = self.inv_g.drop('CE', axis=0)
-        self.inv_g = self.inv_g.drop('CE', axis=1)
-        self.inv_q = self.inv_q.drop('CE', axis=0)
-        self.inv_q = self.inv_q.drop('CE', axis=1)
-        self.A = self.A.drop('CE', axis=0)
-        self.A = self.A.drop('CE', axis=1)
-        self.Y = self.Y.drop('CE', axis=0)
-        self.Y = self.Y.drop('CE', axis=1)
-        self.W = self.W.drop('CE', axis=0)
-        self.W = self.W.drop('CE', axis=1)
-        self.WY = self.WY.drop('CE', axis=0)
-        self.WY = self.WY.drop('CE', axis=1)
-        self.R = self.R.drop('CE', axis=0)
-        self.R = self.R.drop('CE', axis=1)
-        self.link_openio_exio_A = self.link_openio_exio_A.drop('CE', axis=1)
-        self.link_openio_exio_Y = self.link_openio_exio_Y.drop('CE', axis=1)
+        self.g = self.g.drop('CE', axis=0, level=0)
+        self.g = self.g.drop('CE', axis=1, level=0)
+        self.q = self.q.drop('CE', axis=0, level=0)
+        self.q = self.q.drop('CE', axis=1, level=0)
+        self.inv_g = self.inv_g.drop('CE', axis=0, level=0)
+        self.inv_g = self.inv_g.drop('CE', axis=1, level=0)
+        self.inv_q = self.inv_q.drop('CE', axis=0, level=0)
+        self.inv_q = self.inv_q.drop('CE', axis=1, level=0)
+        self.A = self.A.drop('CE', axis=0, level=0)
+        self.A = self.A.drop('CE', axis=1, level=0)
+        self.Y = self.Y.drop('CE', axis=0, level=0)
+        self.Y = self.Y.drop('CE', axis=1, level=0)
+        self.W = self.W.drop('CE', axis=0, level=0)
+        self.W = self.W.drop('CE', axis=1, level=0)
+        self.WY = self.WY.drop('CE', axis=0, level=0)
+        self.WY = self.WY.drop('CE', axis=1, level=0)
+        self.R = self.R.drop('CE', axis=0, level=0)
+        self.R = self.R.drop('CE', axis=1, level=0)
+        self.link_openio_exio_A = self.link_openio_exio_A.drop('CE', axis=1, level=0)
+        self.link_openio_exio_Y = self.link_openio_exio_Y.drop('CE', axis=1, level=0)
         del self.matching_dict['CE']
 
         if self.endogenizing:
-            self.K = self.K.drop('CE', axis=0)
-            self.K = self.K.drop('CE', axis=1)
-            self.link_openio_exio_K = self.link_openio_exio_K.drop('CE', axis=1)
+            self.K = self.K.drop('CE', axis=0,level=0)
+            self.K = self.K.drop('CE', axis=1,level=0)
+            self.link_openio_exio_K = self.link_openio_exio_K.drop('CE', axis=1, level=0)
 
     def concatenate_matrices(self):
         """
@@ -1252,7 +1262,7 @@ class IOTables:
                                        ['NAICS 6 Code', 'CAS Number', 'Substance Name (English)', 'Units', 'Province']
                                        or 'Total' in i[1] and 'Air' in i[0]
                                        or 'Total' in i[1] and 'Water' in i[0]
-                                       or 'Total' in i[1] and 'Land' in i[0])]].fillna(0)
+                                       or 'Total' in i[1] and 'Land' in i[0])]].infer_objects(copy=False).fillna(0)
         # renaming the columns
         emissions.columns = ['Province', 'NAICS 6 Code', 'CAS Number', 'Substance Name', 'Units', 'Emissions to air',
                              'Emissions to water', 'Emissions to land']
@@ -1276,7 +1286,7 @@ class IOTables:
         del temp_df
 
         self.F = pd.pivot_table(data=emissions, index=['Province', 'Substance Name'],
-                                columns=['Province', 'NAICS 6 Code'], aggfunc=np.sum).fillna(0)
+                                columns=['Province', 'NAICS 6 Code'], aggfunc="sum").fillna(0)
         try:
             self.F = self.F.drop(['CAS Number', 'Units'], axis=1)
         except KeyError:
@@ -1342,7 +1352,7 @@ class IOTables:
         self.F.columns = pd.MultiIndex.from_tuples(IOIC_index)
 
         # adding emissions from same sectors together (summary level is more aggregated than NAICS 6 Code)
-        self.F = self.F.groupby(self.F.columns, axis=1).sum()
+        self.F = self.F.T.groupby(self.F.columns).sum().T
         # reordering columns
         self.F = self.F.T.reindex(
             pd.MultiIndex.from_product([self.matching_dict, [i[0] for i in self.industries]])).T.fillna(0)
@@ -1416,7 +1426,7 @@ class IOTables:
             output_sectors_to_split = self.V.loc[:,
                                       [i for i in self.V.columns if i[1] in sectors_to_split]].sum()
             share_sectors_to_split = pd.DataFrame(0, output_sectors_to_split.index,
-                                                  ['GHG emissions'])
+                                                  ['GHG emissions'], float)
             for province in self.matching_dict:
                 df = (output_sectors_to_split.loc[province] / output_sectors_to_split.loc[province].sum()).fillna(0)
                 share_sectors_to_split.loc[province, 'GHG emissions'] = (
@@ -1437,75 +1447,54 @@ class IOTables:
         :return: self.F and self.FY with GHG flows included
         """
 
-        if self.year in [2017, 2018]:
-            GHG = pd.read_excel(
-                pkg_resources.resource_stream(__name__, '/Data/Environmental_data/GHG_emissions_by_gas_RY2017-RY2018.xlsx'),
-                'L61 ghg emissions by gas')
-            GHG = GHG.loc[
-                [i for i in GHG.index if GHG.loc[i, 'Reference Year'] == self.year and GHG.Geography[i] != 'Canada']]
-        elif self.year in [2019, 2020]:
-            GHG = pd.read_excel(
-                pkg_resources.resource_stream(__name__, '/Data/Environmental_data/GHG_emissions_by_gas_RY2019.xlsx'),
-                'L61 ghg emissions by gas')
-            GHG = GHG.loc[[i for i in GHG.index if GHG.Geography[i] != 'Canada']]
-        else:
-            GHG = pd.read_excel(
-                pkg_resources.resource_stream(__name__, '/Data/Environmental_data/GHG_emissions_by_gas_RY2017-RY2018.xlsx'),
-                'L61 ghg emissions by gas')
-            GHG = GHG.loc[
-                [i for i in GHG.index if GHG.loc[i, 'Reference Year'] == 2017 and GHG.Geography[i] != 'Canada']]
+        GHG = pd.read_excel(pkg_resources.resource_stream(
+            __name__, '/Data/Environmental_data/GHG_by_gas_2018-2021.xlsx'), 'Data_Données')
+        GHG = GHG.loc[[i for i in GHG.index if GHG.loc[i, 'Reference period/Période de référence'] == self.year and
+                       GHG.GEO_E[i] != 'Canada']]
 
         # kilotonnes to kgs
-        GHG.loc[:, ['CO2', 'CH4', 'N2O']] *= 1000000
+        GHG.loc[:, ['CO2', 'CH4 (CO2 eq)', 'N2O (CO2 eq)']] *= 1000000
+        GHG.loc[:, 'CH4'] = GHG.loc[:, 'CH4 (CO2 eq)'] / 25
+        GHG.loc[:, 'N2O'] = GHG.loc[:, 'N2O (CO2 eq)'] / 298
 
-        if self.level_of_detail not in ['Summary level', 'Link-1961 level']:
-            # start with the households emissions
-            Household_GHG = GHG.loc[[i for i in GHG.index if 'PEH' in GHG.loc[i, 'IOIC']]]
-            Household_GHG.drop(['Reference Year', 'Description', 'F_Description'], axis=1, inplace=True)
-            # assume all direct emissions from home appliances come from "Other fuels"
-            Household_GHG.IOIC = ['Other fuels' if i == 'PEH1' else 'Fuels and lubricants' for i in Household_GHG.IOIC]
-            Household_GHG.Geography = [{v: k for k, v in self.matching_dict.items()}[i] for i in
-                                       Household_GHG.Geography]
-            Household_GHG = pd.pivot_table(data=Household_GHG, values=['CO2', 'CH4', 'N2O'],
-                                           columns=['Geography', 'IOIC'])
-            Household_GHG.columns = [(i[0], "Household final consumption expenditure", i[1]) for i in
-                                     Household_GHG.columns]
-            Household_GHG = Household_GHG.reindex(self.Y.columns, axis=1).fillna(0)
-            # spatialization
-            Household_GHG = pd.concat([Household_GHG] * len(self.matching_dict))
-            Household_GHG.index = pd.MultiIndex.from_product([self.matching_dict,
-                                                              ['Methane', 'Carbon dioxide', 'Dinitrogen monoxide'],
-                                                              ['Air']]).drop_duplicates()
-            for province in self.matching_dict:
-                Household_GHG.loc[Household_GHG.index.get_level_values(0) != province, province] = 0
+        Household_GHG = GHG.loc[[i for i in GHG.index if 'PEH' in GHG.loc[i, 'IOIC_L61']]]
 
-            # create FY and update it with GHG emissions from households
-            self.FY = pd.DataFrame(0, index=pd.MultiIndex.from_product(
-                [self.matching_dict, ['Carbon dioxide', 'Methane', 'Dinitrogen monoxide'], ['Air']]).drop_duplicates(),
-                                   columns=self.Y.columns)
-            self.FY.update(Household_GHG)
-        else:
-            # start with the households emissions
-            Household_GHG = GHG.loc[[i for i in GHG.index if 'PEH' in GHG.loc[i, 'IOIC']]]
-            Household_GHG = Household_GHG.groupby('Geography').sum().drop('Reference Year', axis=1).T
-            Household_GHG.index = ['Carbon dioxide', 'Methane', 'Dinitrogen monoxide']
-            Household_GHG.columns = [{v: k for k, v in self.matching_dict.items()}[i] for i in Household_GHG.columns]
-            Household_GHG.columns = pd.MultiIndex.from_product(
-                [Household_GHG.columns, ['Household final consumption expenditure']])
-            self.FY = pd.DataFrame(0, Household_GHG.index, self.Y.columns).merge(Household_GHG, 'right').fillna(0)
-            self.FY.index = pd.MultiIndex.from_product([Household_GHG.index.tolist(), ['Air']])
-            # spatialization
-            self.FY = pd.concat([self.FY] * len(self.FY.columns.levels[0]), axis=0)
-            self.FY.index = pd.MultiIndex.from_product(
-                [list(self.matching_dict.keys()), ['Carbon dioxide', 'Methane', 'Dinitrogen monoxide'], ['Air']])
-            for province in self.FY.columns.levels[0]:
-                self.FY.loc[self.FY.index.get_level_values(0) != province, province] = 0
+        Household_GHG = Household_GHG.drop(['Reference period/Période de référence', 'GEO_F', 'DescE_L61', 'DescF_L61',
+                                            'Unit of measure/Unité de mesure', 'Total (CO2 eq)', 'CH4 (CO2 eq)',
+                                            'N2O (CO2 eq)'], axis=1)
+        # assume all direct emissions from home appliances come from "Other fuels"
+        Household_GHG.IOIC_L61 = ['Other fuels' if i == 'PEH1' else 'Fuels and lubricants' for i in
+                                  Household_GHG.IOIC_L61]
+        Household_GHG.loc[Household_GHG.GEO_E == 'Québec', 'GEO_E'] = 'Quebec'
+        Household_GHG.GEO_E = [{v: k for k, v in self.matching_dict.items()}[i] for i in Household_GHG.GEO_E]
+        Household_GHG = pd.pivot_table(data=Household_GHG, values=['CO2', 'CH4', 'N2O'],
+                                       columns=['GEO_E', 'IOIC_L61'])
+        Household_GHG.columns = [(i[0], "Household final consumption expenditure", i[1]) for i in
+                                 Household_GHG.columns]
+        Household_GHG = Household_GHG.reindex(self.Y.columns, axis=1).fillna(0)
+
+        # spatialization
+        Household_GHG = pd.concat([Household_GHG] * len(self.matching_dict))
+        Household_GHG.index = pd.MultiIndex.from_product([self.matching_dict,
+                                                          ['Methane', 'Carbon dioxide', 'Dinitrogen monoxide'],
+                                                          ['Air']]).drop_duplicates()
+        for province in self.matching_dict:
+            Household_GHG.loc[Household_GHG.index.get_level_values(0) != province, province] = 0
+
+        # create FY and update it with GHG emissions from households
+        self.FY = pd.DataFrame(0, index=pd.MultiIndex.from_product(
+            [self.matching_dict, ['Carbon dioxide', 'Methane', 'Dinitrogen monoxide'], ['Air']]).drop_duplicates(),
+                               columns=self.Y.columns, dtype=object)
+        self.FY.update(Household_GHG)
 
         # Now the emissions from production
+        GHG.loc[GHG.GEO_E == 'Québec', 'GEO_E'] = 'Quebec'
         GHG.set_index(pd.MultiIndex.from_tuples(tuple(
-            list(zip([{v: k for k, v in self.matching_dict.items()}[i] for i in GHG.Geography], GHG.IOIC.tolist())))),
-                      inplace=True)
-        GHG.drop(['IOIC', 'Reference Year', 'Geography', 'Description', 'F_Description'], axis=1, inplace=True)
+            list(zip([{v: k for k, v in self.matching_dict.items()}[i] for i in GHG.GEO_E], GHG.IOIC_L61.tolist())))),
+            inplace=True)
+        GHG.drop(['IOIC_L61', 'Reference period/Période de référence', 'GEO_E', 'GEO_F', 'DescE_L61', 'DescF_L61',
+                  'Unit of measure/Unité de mesure', 'Total (CO2 eq)', 'CH4 (CO2 eq)', 'N2O (CO2 eq)'], axis=1,
+                 inplace=True)
         GHG.drop([i for i in GHG.index if re.search(r'^FC', i[1])
                   or re.search(r'^PEH', i[1])
                   or re.search(r'^Total', i[1])], inplace=True)
@@ -1515,66 +1504,40 @@ class IOTables:
                                     self.level_of_detail)
         concordance.set_index('GHG codes', inplace=True)
 
-        if self.level_of_detail in ['Summary level', 'Link-1961 level']:
-            # transform GHG accounts sectors to IOIC sectors
-            GHG.index = pd.MultiIndex.from_tuples([(i[0], concordance.loc[i[1], 'IOIC']) for i in GHG.index])
-            # some sectors are not linked to IOIC (specifically weird Canabis sectors), drop them
-            if len([i for i in GHG.index if type(i[1]) == float]) != 0:
-                GHG.drop([i for i in GHG.index if type(i[1]) == float], inplace=True)
-            # grouping emissions from same sectors
-            GHG = GHG.groupby(GHG.index).sum()
-            GHG.index = pd.MultiIndex.from_tuples(GHG.index)
-            # reindex to make sure dataframe is ordered as in dictionary
-            GHG = GHG.reindex(pd.MultiIndex.from_product([self.matching_dict, [i[0] for i in self.industries]]))
-            # switching codes for readable names
-            GHG.index = pd.MultiIndex.from_product([self.matching_dict, [i[1] for i in self.industries]])
-
-            # spatializing GHG emissions in case we later regionalize impacts (even though it's useless for climate change)
-            GHG = pd.concat([GHG] * len(GHG.index.levels[0]), axis=1)
-            GHG.columns = pd.MultiIndex.from_product(
-                [self.matching_dict, ['Carbon dioxide', 'Methane', 'Dinitrogen monoxide'], ['Air']])
-            # emissions takes place in the province of the trade
-            for province in GHG.index.levels[0]:
-                GHG.loc[province, GHG.columns.get_level_values(0) != province] = 0
-            # add GHG emissions to other pollutants
-            self.F = pd.concat([self.F, GHG.T])
-            self.F.index = pd.MultiIndex.from_tuples(self.F.index)
-
-        elif self.level_of_detail in ['Link-1997 level', 'Detail level']:
-            # dropping empty sectors (mostly Cannabis related)
-            to_drop = concordance.loc[concordance.loc[:, 'IOIC'].isna()].index
-            concordance.drop(to_drop, inplace=True)
-            ghgs = pd.DataFrame()
-            for code in concordance.index:
-                # L97 and D levels are more precise than GHG accounts, we use market share to distribute GHGs
-                sectors_to_split = [i[1] for i in self.industries if
-                                    i[0] in concordance.loc[code].dropna().values.tolist()]
-                output_sectors_to_split = self.V.loc[:,
-                                          [i for i in self.V.columns if i[1] in sectors_to_split]].sum()
-                share_sectors_to_split = pd.DataFrame(0, output_sectors_to_split.index,
-                                                      ['Carbon dioxide', 'Methane', 'Dinitrogen monoxide'])
-                for province in self.matching_dict:
-                    df = ((output_sectors_to_split.loc[province] /
-                           output_sectors_to_split.loc[province].sum()).fillna(0).values)
-                    # hardcoded 3 because 3 GHGs: CO2, CH4, N2O
-                    share_sectors_to_split.loc[province] = (pd.DataFrame(
-                        [df] * 3,  index=['Carbon dioxide', 'Methane', 'Dinitrogen monoxide'],
-                        columns=sectors_to_split).T * GHG.loc(axis=0)[:, code].loc[province].values).values
-                ghgs = pd.concat([ghgs, share_sectors_to_split])
-
-            # spatializing GHG emissions
-            list_ghgs = ghgs.columns.tolist()
-            ghgs = pd.concat([ghgs] * len(ghgs.index.levels[0]), axis=1)
-            ghgs.columns = pd.MultiIndex.from_product(
-                [list(self.matching_dict.keys()), list_ghgs, ['Air']])
+        # dropping empty sectors (mostly Cannabis related)
+        to_drop = concordance.loc[concordance.loc[:, 'IOIC'].isna()].index
+        concordance.drop(to_drop, inplace=True)
+        ghgs = pd.DataFrame()
+        for code in concordance.index:
+            # L97 and D levels are more precise than GHG accounts, we use market share to distribute GHGs
+            sectors_to_split = [i[1] for i in self.industries if
+                                i[0] in concordance.loc[code].dropna().values.tolist()]
+            output_sectors_to_split = self.V.loc[:,
+                                      [i for i in self.V.columns if i[1] in sectors_to_split]].sum()
+            share_sectors_to_split = pd.DataFrame(0, output_sectors_to_split.index,
+                                                  ['Carbon dioxide', 'Methane', 'Dinitrogen monoxide'], dtype=object)
             for province in self.matching_dict:
-                ghgs.loc[ghgs.index.get_level_values(0) != province, province] = 0
+                df = ((output_sectors_to_split.loc[province] /
+                       output_sectors_to_split.loc[province].sum()).fillna(0).values)
+                # hardcoded 3 because 3 GHGs: CO2, CH4, N2O
+                share_sectors_to_split.loc[province] = (pd.DataFrame(
+                    [df] * 3,  index=['Carbon dioxide', 'Methane', 'Dinitrogen monoxide'],
+                    columns=sectors_to_split).T * GHG.loc(axis=0)[:, code].loc[province].values).values
+            ghgs = pd.concat([ghgs, share_sectors_to_split])
 
-            # adding GHG accounts to pollutants
-            self.F = pd.concat([self.F, ghgs.T])
+        # spatializing GHG emissions
+        list_ghgs = ghgs.columns.tolist()
+        ghgs = pd.concat([ghgs] * len(self.matching_dict), axis=1)
+        ghgs.columns = pd.MultiIndex.from_product(
+            [list(self.matching_dict.keys()), list_ghgs, ['Air']])
+        for province in self.matching_dict:
+            ghgs.loc[ghgs.index.get_level_values(0) != province, province] = 0
 
-            # reindexing
-            self.F = self.F.reindex(self.U.columns, axis=1)
+        # adding GHG accounts to pollutants
+        self.F = pd.concat([self.F, ghgs.T])
+
+        # reindexing
+        self.F = self.F.reindex(self.U.columns, axis=1)
 
         self.emission_metadata.loc['Carbon dioxide', 'CAS Number'] = '124-38-9'
         self.emission_metadata.loc['Methane', 'CAS Number'] = '74-82-8'
@@ -1694,7 +1657,7 @@ class IOTables:
         for province in water_flows.index.levels[0]:
             water_flows.loc[province, water_flows.columns.get_level_values(0) != province] = 0
 
-        self.F = pd.concat([self.F, water_flows]).fillna(0)
+        self.F = pd.concat([self.F, water_flows]).infer_objects(copy=False).fillna(0)
 
         self.emission_metadata.loc['Water', 'Unit'] = 'm3'
 
@@ -1741,7 +1704,7 @@ class IOTables:
 
         # distributing national energy use to provinces based on market shares
         nrg_provincial = pd.DataFrame(0, index=pd.MultiIndex.from_product([self.matching_dict, nrg.index]),
-                                      columns=['Energy'])
+                                      columns=['Energy'], dtype=object)
 
         for sector in nrg.index:
             share_province = self.g.loc(axis=1)[:, sector].sum(0) / self.g.loc(axis=1)[:, sector].sum(1).sum() * \
@@ -1751,7 +1714,7 @@ class IOTables:
         # adding to self.F
         self.F = pd.concat([self.F, nrg_provincial.reindex(self.F.columns).T])
         # cannabis stores are NaN values, we change that to zero values
-        self.F = self.F.fillna(0)
+        self.F = self.F.infer_objects(copy=False).fillna(0)
 
         # ------------- Final demand -------------
 
@@ -1763,7 +1726,8 @@ class IOTables:
 
         # distributing national final demand energy use to provinces based on market shares
         nrg_fd_provincial = pd.DataFrame(0, index=pd.MultiIndex.from_product(
-            [self.matching_dict, ['Household final consumption expenditure'], NRG_FD.index]), columns=['Energy'])
+            [self.matching_dict, ['Household final consumption expenditure'], NRG_FD.index]), columns=['Energy'],
+                                         dtype=object)
 
         for fd_sector in NRG_FD.index:
             share_province = self.Y.loc(axis=1)[:, :, fd_sector].sum() / self.Y.loc(axis=1)[:, :,
@@ -1772,9 +1736,9 @@ class IOTables:
             nrg_fd_provincial.loc[share_province.index] = pd.DataFrame(share_province, columns=['Energy'])
 
         # adding to self.FY
-        self.FY = pd.concat([self.FY, nrg_fd_provincial.reindex(self.Y.columns).fillna(0).T])
+        self.FY = pd.concat([self.FY, nrg_fd_provincial.reindex(self.Y.columns).infer_objects(copy=False).fillna(0).T])
         # cannabis stores are NaN values, we change that to zero values
-        self.FY = self.FY.fillna(0)
+        self.FY = self.FY.infer_objects(copy=False).fillna(0)
 
         self.emission_metadata.loc['Energy', 'Unit'] = 'TJ'
 
@@ -1798,7 +1762,7 @@ class IOTables:
 
         distrib_minerals.index = pd.MultiIndex.from_tuples(distrib_minerals.index)
 
-        self.minerals = pd.DataFrame(0, index=dict_data, columns=self.q.index)
+        self.minerals = pd.DataFrame(0, index=dict_data, columns=self.q.index, dtype=float)
 
         for mineral in dict_data:
             # check if data for year is available
@@ -1828,7 +1792,7 @@ class IOTables:
         IW = pd.read_excel(pkg_resources.resource_stream(
             __name__, '/Data/Characterization_factors/impact_world_plus_2.0.1_dev.xlsx'))
 
-        pivoting = pd.pivot_table(IW, values='CF value', index=('Impact category', 'CF unit'),
+        IW = pd.pivot_table(IW, values='CF value', index=('Impact category', 'CF unit'),
                                   columns=['Elem flow name', 'Compartment', 'Sub-compartment']).fillna(0)
 
         try:
@@ -1849,22 +1813,22 @@ class IOTables:
         hfcs_idx = pd.MultiIndex.from_product(
             [hfcs, [i for i in self.matching_dict.keys()], ['Air']]).swaplevel(0, 1)
 
-        self.C = pd.DataFrame(0, pivoting.index, self.F.index.tolist() + self.minerals.index.tolist() + hfcs_idx.tolist())
+        self.C = pd.DataFrame(0, IW.index, self.F.index.tolist() + self.minerals.index.tolist() +
+                              hfcs_idx.tolist(), dtype=float)
         for flow in self.C.columns:
             if type(flow) == tuple:
                 try:
                     if concordance.loc[flow[1], 'IMPACT World+ flows'] is not None:
-                        self.C.loc[:, [flow]] = pivoting.loc[:,
-                                                [(concordance.loc[flow[1], 'IMPACT World+ flows'], flow[2],
-                                                  '(unspecified)')]].values
+                        self.C.loc[:, [flow]] = IW.loc[:, [(concordance.loc[flow[1], 'IMPACT World+ flows'], flow[2],
+                                                            '(unspecified)')]].values
                 except KeyError:
                     pass
             # if type == str -> we are looking at the minerals extension -> hardcode Raw/in ground comp/subcomp
             elif type(flow) == str:
                 try:
                     if concordance.loc[flow, 'IMPACT World+ flows'] is not None:
-                        self.C.loc[:, [flow]] = pivoting.loc[:, [(concordance.loc[flow, 'IMPACT World+ flows'],
-                                                                  'Raw', 'in ground')]].values
+                        self.C.loc[:, [flow]] = IW.loc[:, [(concordance.loc[flow, 'IMPACT World+ flows'],
+                                                            'Raw', 'in ground')]].values
                 except KeyError:
                     pass
 
@@ -1872,7 +1836,7 @@ class IOTables:
         if self.aggregated_ghgs:
             self.C.loc[('Climate change, short term', 'kg CO2 eq (short)'), 'GHG emissions'] = 1
         self.C.loc[('Energy use', 'TJ'), [i for i in self.C.columns if i == 'Energy']] = 1
-        self.C = self.C.fillna(0)
+        self.C = self.C.infer_objects(copy=False).fillna(0)
 
         self.emission_metadata.loc['CF4', 'CAS Number'] = '75-73-0'
         self.emission_metadata.loc['C2F6', 'CAS Number'] = '76-16-4'
@@ -1942,24 +1906,25 @@ class IOTables:
 
         # dealing with water characterization factors
         def regionalize_water_extension_exiobase(extension_matrix):
-            df_agri = pd.concat(
-                [extension_matrix.loc[[i for i in extension_matrix.index if 'Water Consumption Blue - Agriculture' in i]].sum()] * len(
-                    extension_matrix.columns.levels[0]), axis=1).T
-            df_non_agri = pd.concat([extension_matrix.loc[[i for i in extension_matrix.index if
-                                                      ('Water Consumption Blue' in i and 'Agriculture' not in i)]].sum()] *
-                                    len(extension_matrix.columns.levels[0]), axis=1).T
-            df_agri.index = pd.MultiIndex.from_tuples(list(zip([i[0] for i in extension_matrix.columns][::200],
-                                                               ['Total Water Consumption Blue - Agriculture'] * int(
-                                                                   len(extension_matrix.columns) / 200))))
-            df_non_agri.index = pd.MultiIndex.from_tuples(list(zip([i[0] for i in extension_matrix.columns][::200],
-                                                                   ['Total Water Consumption Blue - Non-agriculture'] * int(
-                                                                       len(extension_matrix.columns) / 200))))
-            for country in df_agri.index.levels[0]:
-                df_agri.loc[country, df_agri.columns.get_level_values(0) != country] = 0
-            for country in df_non_agri.index.levels[0]:
-                df_non_agri.loc[country, df_non_agri.columns.get_level_values(0) != country] = 0
-            extension_matrix = pd.concat([extension_matrix, df_agri, df_non_agri])
-            return extension_matrix
+
+            for country in extension_matrix.columns.levels[0]:
+                df_agri = pd.DataFrame(
+                    extension_matrix.loc[[i for i in extension_matrix.index if
+                                          'Water Consumption Blue - Agriculture' in i], country].sum())
+                df_agri.columns = pd.MultiIndex.from_product(
+                    [[country], ['Total Water Consumption Blue - Agriculture']])
+                df_agri = pd.concat([df_agri], keys=[country])
+
+                df_non_agri = pd.DataFrame(extension_matrix.loc[[i for i in extension_matrix.index if (
+                            'Water Consumption Blue' in i and 'Agriculture' not in i)], country].sum())
+                df_non_agri.columns = pd.MultiIndex.from_product(
+                    [[country], ['Total Water Consumption Blue - Non-agriculture']])
+                df_non_agri = pd.concat([df_non_agri], keys=[country])
+
+                extension_matrix = pd.concat([extension_matrix, df_agri.T, df_non_agri.T])
+
+            return extension_matrix.fillna(0)
+
         self.F_exio = regionalize_water_extension_exiobase(self.F_exio)
         self.S_exio = regionalize_water_extension_exiobase(self.S_exio)
         self.C_exio = self.C_exio.T.reindex(self.S_exio.index).T.fillna(0)
@@ -2063,17 +2028,17 @@ class IOTables:
             N2O = [i for i in self.F_exio.index if 'N2O' in i]
             # isolate GHG emissions from crop production in Exiobase
             crops_emissions = pd.concat(
-                [self.F_exio.loc(axis=1)[:, crops_exio].groupby(axis=1, level=0).sum().loc[CO2].sum(),
-                 self.F_exio.loc(axis=1)[:, crops_exio].groupby(axis=1, level=0).sum().loc[CH4].sum(),
-                 self.F_exio.loc(axis=1)[:, crops_exio].groupby(axis=1, level=0).sum().loc[N2O].sum()],
+                [self.F_exio.loc(axis=1)[:, crops_exio].T.groupby(level=0).sum().T.loc[CO2].sum(),
+                 self.F_exio.loc(axis=1)[:, crops_exio].T.groupby(level=0).sum().T.loc[CH4].sum(),
+                 self.F_exio.loc(axis=1)[:, crops_exio].T.groupby(level=0).sum().T.loc[N2O].sum()],
                 axis=1)
             crops_emissions.columns = ['Carbon dioxide', 'Methane', 'Dinitrogen monoxide']
             crops_emissions = crops_emissions.loc['CA']
             # isolate GHG emissions from meat production in Exiobase
             meat_emissions = pd.concat(
-                [self.F_exio.loc(axis=1)[:, animals_exio].groupby(axis=1, level=0).sum().loc[CO2].sum(),
-                 self.F_exio.loc(axis=1)[:, animals_exio].groupby(axis=1, level=0).sum().loc[CH4].sum(),
-                 self.F_exio.loc(axis=1)[:, animals_exio].groupby(axis=1, level=0).sum().loc[N2O].sum()], axis=1)
+                [self.F_exio.loc(axis=1)[:, animals_exio].T.groupby(level=0).sum().T.loc[CO2].sum(),
+                 self.F_exio.loc(axis=1)[:, animals_exio].T.groupby(level=0).sum().T.loc[CH4].sum(),
+                 self.F_exio.loc(axis=1)[:, animals_exio].T.groupby(level=0).sum().T.loc[N2O].sum()], axis=1)
             meat_emissions.columns = ['Carbon dioxide', 'Methane', 'Dinitrogen monoxide']
             meat_emissions = meat_emissions.loc['CA']
             # get the totals per GHG
@@ -2098,7 +2063,7 @@ class IOTables:
                 tot = self.F.loc[[i for i in self.F.index if i[1] == ghg], [i for i in self.F.columns if i[1] in [
                     'Crop production (except cannabis, greenhouse, nursery and floriculture production)',
                     'Greenhouse, nursery and floriculture production (except cannabis)',
-                    'Animal production (except aquaculture)', 'Aquaculture']]].groupby(axis=1, level=0).sum()
+                    'Animal production (except aquaculture)', 'Aquaculture']]].T.groupby(level=0).sum().T
 
                 crops = self.F.loc[[i for i in self.F.index if i[1] == ghg], [i for i in self.F.columns if i[1] in [
                     'Crop production (except cannabis, greenhouse, nursery and floriculture production)',
@@ -2314,7 +2279,7 @@ class IOTables:
         Produce normalized environmental extensions
         :return: self.S and self.F with product classification if it's been selected
         """
-
+        self.F = self.F.astype(float)
         self.S = self.F.dot(self.inv_q)
         self.S = pd.concat([self.S, self.S_exio]).fillna(0)
         self.S = self.S.groupby(self.S.index).sum()
@@ -2366,7 +2331,7 @@ class IOTables:
         hfcs.rename_axis(['gas', 'category'])
 
         # economic values
-        V = self.V.groupby(axis='columns', level=0).sum()
+        V = self.V.T.groupby(level=0).sum().T
 
         R = pd.DataFrame(columns=V.index)
 
@@ -2515,6 +2480,7 @@ class IOTables:
         Method adding plastic waste generated from producing certain commodities.
         :return: self.F
         """
+        import time
 
         # load data
         plastics_data = pd.read_csv(pkg_resources.resource_stream(
@@ -2533,7 +2499,7 @@ class IOTables:
         # ---------------------------------- Data pre-treatment ---------------------------------------------
         # select year of study
         plastics_data = plastics_data.loc[plastics_data.REF_DATE ==
-                                          min(plastics_data.REF_DATE, key=lambda x:abs(x-self.year))]
+                                          min(plastics_data.REF_DATE, key=lambda x:abs(x-self.year))].copy('deep')
 
         # format province names
         plastics_data.GEO = [
@@ -2542,7 +2508,7 @@ class IOTables:
 
         # pivot table to manipulate data easily
         plastics_data = plastics_data.pivot_table(values='VALUE', index=['Product category', 'Variable'],
-                                                  columns=['GEO'])
+                                                  columns=['GEO'], dropna=False, fill_value=0)
 
         # Some packaging items (bottles, film, ...) are only available for Canada. We estimate them for provinces.
         packaging_distribution = (
@@ -2554,34 +2520,23 @@ class IOTables:
                 plastics_data.loc[packaging, province] = (
                             plastics_data.loc['Packaging', province] * packaging_distribution.loc[packaging]).values
 
-        landfilled_rate = (plastics_data.loc(axis=0)[:,
-                        'Disposed plastic waste and scrap sent to landfill or incinerated without energy recovery'].loc[
-                           :, 'Canada'].droplevel(1) /
-                           plastics_data.loc(axis=0)[:, 'Total disposed plastic waste and scrap'].loc[:,
-                           'Canada'].droplevel(1))
+        landfill_rate = (plastics_data.loc(axis=0)['Total, all product categories',
+             'Disposed plastic waste and scrap sent to landfill or incinerated without energy recovery'].loc['Canada'] /
+                         plastics_data.loc(axis=0)['Total, all product categories',
+                                                   'Total disposed plastic waste and scrap'].loc['Canada'])
 
-        incineration_rate = (plastics_data.loc(axis=0)[:,
-                     'Disposed plastic waste and scrap sent for incineration or gasification with energy recovery'].loc[
-                             :, 'Canada'].droplevel(1) /
-                             plastics_data.loc(axis=0)[:, 'Total disposed plastic waste and scrap'].loc[:,
-                             'Canada'].droplevel(1))
+        incineration_rate = (plastics_data.loc(axis=0)['Total, all product categories',
+           'Disposed plastic waste and scrap sent for incineration or gasification with energy recovery'].loc['Canada'] /
+                             plastics_data.loc(axis=0)['Total, all product categories',
+                                                       'Total disposed plastic waste and scrap'].loc['Canada'])
 
-        # Landfill and incineration data is only available at national level. We estimate it for provinces.
-        for province in ['CA-' + i for i in self.matching_dict]:
-            for category in plastics_data.index.levels[0]:
-                plastics_data.loc[[i for i in plastics_data.index if (
-                        i[0] == category and i[1] ==
-                        'Disposed plastic waste and scrap sent to landfill or incinerated without energy recovery')],
-                                  province] = (
-                        plastics_data.loc(axis=0)[category, 'Total disposed plastic waste and scrap'].loc[province] *
-                        landfilled_rate.loc[category])
-                plastics_data.loc[[i for i in plastics_data.index if (
-                        i[0] == category and i[1] ==
-                        'Disposed plastic waste and scrap sent for incineration or gasification with energy recovery')],
-                                  province] = (
-                        plastics_data.loc(axis=0)[category, 'Total disposed plastic waste and scrap'].loc[province] *
-                        incineration_rate.loc[category])
+        plastics_data.loc(axis=0)[:,
+        'Disposed plastic waste and scrap sent to landfill or incinerated without energy recovery'] = (
+                plastics_data.loc(axis=0)[:, 'Total disposed plastic waste and scrap'] * landfill_rate).values
 
+        plastics_data.loc(axis=0)[:,
+        'Disposed plastic waste and scrap sent for incineration or gasification with energy recovery'] = (
+                plastics_data.loc(axis=0)[:, 'Total disposed plastic waste and scrap'] * incineration_rate).values
         plastics_data = plastics_data.drop(['Canada', 'Canadian territorial enclaves abroad'], axis=1)
 
         self.F = pd.concat([self.F, pd.DataFrame(0, index=kpis, columns=self.F.columns)])
@@ -2610,8 +2565,7 @@ class IOTables:
                     if self.endogenizing:
                         product_from_canada = (self.U.loc(axis=0)[:, product].loc[:, 'CA-' + province].sum(1) +
                                                self.Y.drop([i for i in self.Y.columns if "Changes in inventories" in i[1]],
-                                                           axis=1).loc(
-                                                   axis=0)[:, product].loc[:, 'CA-' + province].sum(1) +
+                                                           axis=1).loc(axis=0)[:, product].loc[:, 'CA-' + province].sum(1) +
                                                self.K.loc(axis=0)[:, product].loc[:, 'CA-' + province].sum(1))
 
                         # determine imports of studied product
@@ -2624,10 +2578,8 @@ class IOTables:
                                     product].sum(1))
                     else:
                         product_from_canada = (self.U.loc(axis=0)[:, product].loc[:, 'CA-' + province].sum(1) +
-                                               self.Y.drop(
-                                                   [i for i in self.Y.columns if "Changes in inventories" in i[1]],
-                                                   axis=1).loc(
-                                                   axis=0)[:, product].loc[:, 'CA-' + province].sum(1))
+                                               self.Y.drop([i for i in self.Y.columns if "Changes in inventories" in i[1]],
+                                                   axis=1).loc(axis=0)[:, product].loc[:, 'CA-' + province].sum(1))
 
                         # determine imports of studied product
                         product_imports = (
@@ -2723,20 +2675,18 @@ class IOTables:
                 # determine the distribution for conversion from region (e.g., OECD EU) to countries (AT, BE, etc.)
                 plastic_waste_to_incineration_in_region = self.Z_exio.loc(axis=0)[:,
                                                           'Plastic waste for treatment: incineration'].loc[:,
-                                                          {k for k, v in map_exio_to_oecd.items() if
-                                                           v == map_exio_to_oecd[country]}].sum().groupby(axis=0,
-                                                                                                          level=0).sum()
+                                                         list({k for k, v in map_exio_to_oecd.items() if
+                                                           v == map_exio_to_oecd[country]})].sum().groupby(level=0).sum()
                 plastic_waste_to_incineration_in_region /= plastic_waste_to_incineration_in_region.sum()
                 plastic_waste_to_landfill_in_region = self.Z_exio.loc(axis=0)[:,
                                                       'Plastic waste for treatment: landfill'].loc[:,
-                                                      {k for k, v in map_exio_to_oecd.items() if
-                                                       v == map_exio_to_oecd[country]}].sum().groupby(axis=0,
-                                                                                                      level=0).sum()
+                                                      list({k for k, v in map_exio_to_oecd.items() if
+                                                       v == map_exio_to_oecd[country]})].sum().groupby(level=0).sum()
                 plastic_waste_to_landfill_in_region /= plastic_waste_to_landfill_in_region.sum()
                 plastic_waste_total_in_region = self.Z_exio.loc(axis=0)[:, ['Plastic waste for treatment: incineration',
                                                                        'Plastic waste for treatment: landfill']].loc[:,
-                                                {k for k, v in map_exio_to_oecd.items() if
-                                                 v == map_exio_to_oecd[country]}].sum().groupby(axis=0, level=0).sum()
+                                                list({k for k, v in map_exio_to_oecd.items() if
+                                                 v == map_exio_to_oecd[country]})].sum().groupby(level=0).sum()
                 plastic_waste_total_in_region /= plastic_waste_total_in_region.sum()
 
                 # determine how much of the products were bought by the country
@@ -2746,37 +2696,51 @@ class IOTables:
                 distrib_country = (self.Z_exio.loc(axis=0)[:, 'Plastics, basic'].dot(diag).sum() /
                                    self.Z_exio.loc(axis=0)[:, 'Plastics, basic'].dot(diag).sum().sum())
 
-                self.F_exio.loc[
-                    'Recycled plastic pellets and flakes ready for use in production of new products or chemicals'] += (
-                        distrib_country * plastic_waste_oecd.loc[[map_exio_to_oecd[country]], 'Recycled'].iloc[0] *
-                        plastic_waste_total_in_region.loc[country]
-                )
-                self.F_exio.loc[
-                    'Disposed plastic waste and scrap sent to landfill or incinerated without energy recovery'] += (
-                        distrib_country * plastic_waste_oecd.loc[[map_exio_to_oecd[country]], 'Landfilled'].iloc[0] *
-                        plastic_waste_to_landfill_in_region.loc[country]
-                )
+                indicator = 'Recycled plastic pellets and flakes ready for use in production of new products'
+                df = pd.DataFrame(self.F_exio.loc[indicator] + (
+                            distrib_country * plastic_waste_oecd.loc[[map_exio_to_oecd[country]], 'Recycled'].iloc[0] *
+                            plastic_waste_total_in_region.loc[country]), columns=[indicator])
+                self.F_exio = self.F_exio.drop(indicator)
+                self.F_exio = pd.concat([self.F_exio, df.T])
+
+                indicator = 'Disposed plastic waste and scrap sent to landfill or incinerated without energy recovery'
+                df = pd.DataFrame(self.F_exio.loc[indicator] + (
+                            distrib_country * plastic_waste_oecd.loc[[map_exio_to_oecd[country]], 'Landfilled'].iloc[0] *
+                            plastic_waste_to_landfill_in_region.loc[country]), columns=[indicator])
+                self.F_exio = self.F_exio.drop(indicator)
+                self.F_exio = pd.concat([self.F_exio, df.T])
+
                 # incineration in OECD is not specifying energy recovery or not -> assume 50/50 split in first version
                 split_incineration_with_or_without_energy_recovery = 0.5
-                self.F_exio.loc[
-                    'Disposed plastic waste and scrap sent to landfill or incinerated without energy recovery'] += (
-                        distrib_country * plastic_waste_oecd.loc[[map_exio_to_oecd[country]], 'Incinerated'].iloc[0] *
-                        plastic_waste_to_incineration_in_region.loc[country] * split_incineration_with_or_without_energy_recovery
-                )
-                self.F_exio.loc[
-                    'Disposed plastic waste and scrap sent for incineration or gasification with energy recovery'] += (
-                        distrib_country * plastic_waste_oecd.loc[[map_exio_to_oecd[country]], 'Incinerated'].iloc[0] *
-                        plastic_waste_to_incineration_in_region.loc[country] * split_incineration_with_or_without_energy_recovery
-                )
-                self.F_exio.loc['Plastic leaked permanently into the environment'] += (
-                        distrib_country * plastic_waste_oecd.loc[[map_exio_to_oecd[country]], 'Littered'].iloc[0] *
-                        plastic_waste_total_in_region.loc[country]
-                )
-                self.F_exio.loc[
-                    'Disposed plastic waste and scrap mismanaged (open dump, open pits, unsanitary landfills)'] += (
-                        distrib_country * plastic_waste_oecd.loc[[map_exio_to_oecd[country]], 'Mismanaged'].iloc[0] *
-                        plastic_waste_total_in_region.loc[country]
-                )
+
+                indicator = 'Disposed plastic waste and scrap sent to landfill or incinerated without energy recovery'
+                df = pd.DataFrame(self.F_exio.loc[indicator] + (
+                            distrib_country * plastic_waste_oecd.loc[[map_exio_to_oecd[country]], 'Incinerated'].iloc[0] *
+                            plastic_waste_to_incineration_in_region.loc[country] *
+                            split_incineration_with_or_without_energy_recovery), columns=[indicator])
+                self.F_exio = self.F_exio.drop(indicator)
+                self.F_exio = pd.concat([self.F_exio, df.T])
+                indicator = 'Disposed plastic waste and scrap sent for incineration or gasification with energy recovery'
+                df = pd.DataFrame(self.F_exio.loc[indicator] + (
+                            distrib_country * plastic_waste_oecd.loc[[map_exio_to_oecd[country]], 'Incinerated'].iloc[0] *
+                            plastic_waste_to_incineration_in_region.loc[country] *
+                            split_incineration_with_or_without_energy_recovery), columns=[indicator])
+                self.F_exio = self.F_exio.drop(indicator)
+                self.F_exio = pd.concat([self.F_exio, df.T])
+
+                indicator = 'Plastic leaked permanently into the environment'
+                df = pd.DataFrame(self.F_exio.loc[indicator] + (
+                            distrib_country * plastic_waste_oecd.loc[[map_exio_to_oecd[country]], 'Littered'].iloc[0] *
+                            plastic_waste_total_in_region.loc[country]), columns=[indicator])
+                self.F_exio = self.F_exio.drop(indicator)
+                self.F_exio = pd.concat([self.F_exio, df.T])
+
+                indicator = 'Disposed plastic waste and scrap mismanaged (open dump, open pits, unsanitary landfills)'
+                df = pd.DataFrame(self.F_exio.loc[indicator] + (
+                            distrib_country * plastic_waste_oecd.loc[[map_exio_to_oecd[country]], 'Mismanaged'].iloc[0] *
+                            plastic_waste_total_in_region.loc[country]), columns=[indicator])
+                self.F_exio = self.F_exio.drop(indicator)
+                self.F_exio = pd.concat([self.F_exio, df.T])
 
         # ------------------------------- Specify plastic resins ---------------------------------
 
@@ -2787,6 +2751,7 @@ class IOTables:
             dff = dff.set_index('Unnamed: 0')
             dff.index.name = None
             return dff.fillna(0)
+
         for sheet in resin_compo:
             resin_compo[sheet] = formatting(resin_compo[sheet])
 
@@ -2798,7 +2763,7 @@ class IOTables:
         resin_indicators = [item for sublist in resin_indicators for item in sublist]
 
         # plastic resin composition for product categories of plastic physical flow accounts
-        with_resins_for_Canada = pd.DataFrame(0, index=resin_indicators, columns=self.F.columns)
+        with_resins_for_Canada = pd.DataFrame(0, index=resin_indicators, columns=self.F.columns, dtype=object)
         for plastic_cat in map_plastic_data_to_io:
             for indicator in kpis:
                 df = pd.concat(
@@ -2809,7 +2774,7 @@ class IOTables:
                 with_resins_for_Canada.loc[df.columns, df.index] = df.T
 
         # plastic resin composition overall for OECD data. Different compositions depending on regions.
-        with_resins_for_international = pd.DataFrame(0, index=resin_indicators, columns=self.F_exio.columns)
+        with_resins_for_international = pd.DataFrame(0, index=resin_indicators, columns=self.F_exio.columns, dtype=object)
         eu_membership = list(zip(self.F_exio.columns.levels[0], coco.convert(self.F_exio.columns.levels[0], to='EU28')))
         for indicator in kpis + [
             'Disposed plastic waste and scrap mismanaged (open dump, open pits, unsanitary landfills)']:
@@ -2873,7 +2838,7 @@ class IOTables:
                                                  columns=resin_indicators)]).fillna(0)
 
         plastic_cfs = pd.DataFrame(0, index=pd.MultiIndex.from_tuples([('Physical effects on biota', 'PDF.m2.yr')]),
-                                   columns=[i for i in self.C.columns if 'leak' in i])
+                                   columns=[i for i in self.C.columns if 'leak' in i], dtype=float)
         # note all emitted plastic particles will end up in the ocean!
         # source = Macroplastic: Leakage from waste export - https://www.plasticfootprint.earth/assessment-methodology/
         # from released rates to ocean and land, take medium size plastic particle x medium residual value
@@ -2972,9 +2937,10 @@ class IOTables:
             CO2 = [i for i in self.F_exio.index if 'CO2' in i]
 
             # apply the distribution of biogenic CO2 from Exiobase to openIO sectors
-            bio = self.F_exio.loc[CO2_bio, 'CA'].dot(ioic_exio.T).sum() / self.F_exio.loc[CO2, 'CA'].dot(
-                ioic_exio.T).sum()
-            bio = bio.fillna(0)
+            total = self.F_exio.loc[CO2, 'CA'].dot(ioic_exio.T).sum()[
+                self.F_exio.loc[CO2, 'CA'].dot(ioic_exio.T).sum() != 0]
+            bio = self.F_exio.loc[CO2_bio, 'CA'].dot(ioic_exio.T).sum().loc[total.index] / total
+            bio = bio.reindex([i[1] for i in self.commodities]).fillna(0)
             bio = pd.DataFrame(pd.concat([bio] * len([i for i in self.S.columns.levels[0] if 'CA-' in i])), columns=[
                 'Carbon dioxide - biogenic'])
             bio.index = [i for i in self.S.columns if 'CA-' in i[0]]
@@ -2984,9 +2950,10 @@ class IOTables:
             bio_openio.index = [(i[0], 'Carbon dioxide - biogenic', i[2]) for i in bio_openio.index]
 
             # apply the distribution of fossil CO2 from Exiobase to openIO sectors
-            fossil = self.F_exio.loc[CO2_fossil, 'CA'].dot(ioic_exio.T).sum() / self.F_exio.loc[CO2, 'CA'].dot(
-                ioic_exio.T).sum()
-            fossil = fossil.fillna(0)
+            total = self.F_exio.loc[CO2, 'CA'].dot(ioic_exio.T).sum()[
+                self.F_exio.loc[CO2, 'CA'].dot(ioic_exio.T).sum() != 0]
+            fossil = self.F_exio.loc[CO2_fossil, 'CA'].dot(ioic_exio.T).sum().loc[total.index] / total
+            fossil = fossil.reindex([i[1] for i in self.commodities]).fillna(0)
             fossil = pd.DataFrame(pd.concat([fossil] * len([i for i in self.S.columns.levels[0] if 'CA-' in i])), columns=[
                 'Carbon dioxide - fossil'])
             fossil.index = [i for i in self.S.columns if 'CA-' in i[0]]
@@ -3040,7 +3007,7 @@ class IOTables:
         Method to calculate the Leontief inverse and get total impacts
         :return: self.L (total requirements), self.E (total emissions), self.D (total impacts)
         """
-        I = pd.DataFrame(np.eye(len(self.A)), self.A.index, self.A.columns)
+        I = pd.DataFrame(np.eye(len(self.A)), self.A.index, self.A.columns, dtype=float)
 
         if self.endogenizing:
             self.L = pd.DataFrame(np.linalg.solve(I - (self.A + self.K), I), self.A.index, I.columns)
