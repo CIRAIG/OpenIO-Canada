@@ -2480,7 +2480,6 @@ class IOTables:
         Method adding plastic waste generated from producing certain commodities.
         :return: self.F
         """
-        import time
 
         # load data
         plastics_data = pd.read_csv(pkg_resources.resource_stream(

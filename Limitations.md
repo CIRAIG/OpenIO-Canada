@@ -20,5 +20,3 @@ currently be underestimated.
 - There is a non-negligible amount of emissions from the NPRI that could not be matched to the IMPACT World+ impact 
 assessment methodology, hence having a null impact.
 - For the Canadian part of openIO-Canada, the capital formation (and not the consumption of capital) was endogenized.
-- While the 2.8 version of openIO-Canada now covers water consumption instead of water use, the regionalization
-of the associated impacts is not yet implemented.
