@@ -23,7 +23,7 @@ import math
 
 
 class IOTables:
-    def __init__(self, folder_path, exiobase_folder, endogenizing_capitals=False, aggregated_ghgs=True):
+    def __init__(self, folder_path, exiobase_folder, endogenizing_capitals=False):
         """
         :param folder_path: [string] the path to the folder with the economic data (e.g. /../Detail level/)
         :param exiobase_folder: [string] path to exiobase folder for international imports (optional)
@@ -56,7 +56,6 @@ class IOTables:
         self.level_of_detail = [i for i in os.path.normpath(folder_path).split(os.sep) if 'level' in i][-1]
         self.exiobase_folder = exiobase_folder
         self.endogenizing = endogenizing_capitals
-        self.aggregated_ghgs = aggregated_ghgs
 
         # values
         self.V = pd.DataFrame()
@@ -127,15 +126,20 @@ class IOTables:
         files.sort()
         self.year = int(files[0].split('SUT_C')[1].split('_')[0])
 
+        if self.year in [2018, 2019, 2020]:
+            self.aggregated_ghgs = False
+        else:
+            self.aggregated_ghgs = True
+
         try:
             self.NPRI = pd.read_excel(pkg_resources.resource_stream(
                 __name__, '/Data/Environmental_data/NPRI-INRP_DataDonnées_' + str(self.year) + '.xlsx'), None)
             self.NPRI_file_year = self.year
-        # 2016 by default (for older years)
+        # 2018 by default (for older years)
         except FileNotFoundError:
             self.NPRI = pd.read_excel(pkg_resources.resource_stream(
-                __name__, '/Data/Environmental_data/NPRI-INRP_DataDonnées_2016.xlsx'), None)
-            self.NPRI_file_year = 2016
+                __name__, '/Data/Environmental_data/NPRI-INRP_DataDonnées_2018.xlsx'), None)
+            self.NPRI_file_year = 2018
 
         logger.info("Formatting the Supply and Use tables...")
         for province_data in files:
@@ -1270,9 +1274,13 @@ class IOTables:
         # somehow the NPRI manages to have entries without NAICS codes... Remove them
         no_naics_code_entries = emissions.loc[:, 'NAICS 6 Code'][emissions.loc[:, 'NAICS 6 Code'] == 0].index
         emissions.drop(no_naics_code_entries, inplace=True)
+        # same for Provinces
+        no_province_code_entries = emissions.loc[:, 'Province'][emissions.loc[:, 'Province'] == 0].index
+        emissions.drop(no_province_code_entries, inplace=True)
 
-        # NAICS codes as strings and not integers
+        # NAICS codes as strings and not floats
         emissions.loc[:, 'NAICS 6 Code'] = emissions.loc[:, 'NAICS 6 Code'].astype('str')
+        emissions.loc[:, 'NAICS 6 Code'] = [i.split('.0')[0] for i in emissions.loc[:, 'NAICS 6 Code']]
 
         # extracting metadata for substances
         temp_df = emissions.copy()
@@ -1800,15 +1808,12 @@ class IOTables:
                 __name__, '/Data/Concordances/openIO_IW_concordance.xlsx'), str(self.NPRI_file_year))
         except ValueError:
             concordance = pd.read_excel(pkg_resources.resource_stream(
-                __name__, '/Data/Concordances/openIO_IW_concordance.xlsx'), '2016')
+                __name__, '/Data/Concordances/openIO_IW_concordance.xlsx'), '2018')
         concordance.set_index('OpenIO flows', inplace=True)
 
         # applying concordance
         hfcs = ['CF4', 'C2F6', 'SF6', 'NF3', 'c-C4F8', 'C3F8', 'HFC-125', 'HFC-134a', 'HFC-143', 'HFC-143a', 'HFC-152a',
                 'HFC-227ea', 'HFC-23', 'HFC-32', 'HFC-41', 'HFC-134', 'HFC-245fa', 'HFC-43-10mee', 'HFC-365mfc', 'HFC-236fa']
-        if self.year in [2016, 2017]:
-            hfcs.append('C5F12')
-            self.emission_metadata.loc['C5F12', 'CAS Number'] = '678-26-2'
 
         hfcs_idx = pd.MultiIndex.from_product(
             [hfcs, [i for i in self.matching_dict.keys()], ['Air']]).swaplevel(0, 1)
@@ -2916,10 +2921,10 @@ class IOTables:
             # identify biogenic in Exiobase
             CO2_bio = [i for i in self.F_exio.index if 'CO2' in i and 'biogenic' in i or 'peat decay' in i]
             # determine the share of fossil emissions impact
-            share_fossil = 1 - (self.F_exio.loc[CO2_bio, 'CA'].dot(ioic_exio.T).sum() /
-                                self.C_exio.dot(self.F_exio).loc[
-                                    ('Climate change, short term', 'kg CO2 eq (short)'), 'CA'].dot(
-                                    ioic_exio.T)).fillna(0)
+            total = self.C_exio.dot(self.F_exio).loc[
+                ('Climate change, short term', 'kg CO2 eq (short)'), 'CA'].dot(ioic_exio.T)
+            total = total[total != 0]
+            share_fossil = 1 - (self.F_exio.loc[CO2_bio, 'CA'].dot(ioic_exio.T).sum() / total).fillna(0)
             share_fossil = pd.DataFrame(
                 pd.concat([share_fossil] * len([i for i in self.S.columns.levels[0] if 'CA-' in i])),
                 columns=['GHG emissions'])
@@ -3043,7 +3048,7 @@ class IOTables:
         # adjust characterization matrix too
         self.C = self.C.drop([i for i in self.C.columns if i[1] in rest_of_voc], axis=1)
 
-        if self.year >= 2018:
+        if self.NPRI_file_year >= 2018:
             # PMs, only take highest value flow as suggested by the NPRI team:
             # [https://www.canada.ca/en/environment-climate-change/services/national-pollutant-release-inventory/using-interpreting-data.html]
             for sector in F_multiindex.columns:
@@ -3102,10 +3107,7 @@ class IOTables:
         """
         try:
             df = self.F.loc(axis=1)[:, NAICS_code].copy()
-            if type(NAICS_code) == list:
-                df.columns = pd.MultiIndex.from_product([self.matching_dict, [IOIC_code] * len(NAICS_code)])
-            elif type(NAICS_code) == str:
-                df.columns = pd.MultiIndex.from_product([self.matching_dict, [IOIC_code]])
+            df.columns = pd.MultiIndex.from_product([self.matching_dict, [IOIC_code]])
             self.F = pd.concat([self.F, df / 2], axis=1)
             self.F.loc(axis=1)[:, NAICS_code] /= 2
         except KeyError:
