@@ -23,7 +23,7 @@ import math
 
 
 class IOTables:
-    def __init__(self, folder_path, exiobase_folder, endogenizing_capitals=False):
+    def __init__(self, folder_path, exiobase_folder, endogenizing_capitals=True):
         """
         :param folder_path: [string] the path to the folder with the economic data (e.g. /../Detail level/)
         :param exiobase_folder: [string] path to exiobase folder for international imports (optional)
@@ -56,6 +56,7 @@ class IOTables:
         self.level_of_detail = [i for i in os.path.normpath(folder_path).split(os.sep) if 'level' in i][-1]
         self.exiobase_folder = exiobase_folder
         self.endogenizing = endogenizing_capitals
+        self.folder_path = folder_path
 
         # values
         self.V = pd.DataFrame()
@@ -97,6 +98,8 @@ class IOTables:
         self.merchandise_imports_scaled_K = pd.DataFrame()
         self.merchandise_imports_scaled_Y = pd.DataFrame()
         self.minerals = pd.DataFrame()
+        self.emission_factors_basic_price = pd.DataFrame()
+        self.emission_factors_purchaser_price = pd.DataFrame()
 
         # metadata
         self.emission_metadata = pd.DataFrame()
@@ -126,7 +129,7 @@ class IOTables:
         files.sort()
         self.year = int(files[0].split('SUT_C')[1].split('_')[0])
 
-        if self.year in [2018, 2019, 2020]:
+        if self.year in [2018, 2019, 2020, 2021]:
             self.aggregated_ghgs = False
         else:
             self.aggregated_ghgs = True
@@ -269,7 +272,7 @@ class IOTables:
             # starting_line_values is the line in which the first value appears
             starting_line_values = 16
 
-        elif self.year in [2018, 2019, 2020]:
+        elif self.year in [2018, 2019, 2020, 2021]:
             # starting_line is the line in which the Supply table starts (the first green row)
             starting_line = 3
             # starting_line_values is the line in which the first value appears
@@ -305,23 +308,19 @@ class IOTables:
 
         final_demand = [i for i in final_demand if i not in self.industries and i[1] != 'Total']
 
-        df = supply_table.iloc[starting_line_values-2:, 2:]
-        df.index = list(zip(supply_table.iloc[starting_line_values-2:, 0].tolist(),
-                            supply_table.iloc[starting_line_values-2:, 1].tolist()))
-        df.columns = list(zip(supply_table.iloc[starting_line+1, 2:].tolist(),
-                              supply_table.iloc[starting_line, 2:].tolist()))
-        supply_table = df
+        tables = [supply_table, use_table]
 
-        df = use_table.iloc[starting_line_values-2:, 2:]
-        df.index = list(zip(use_table.iloc[starting_line_values-2:, 0].tolist(),
-                            use_table.iloc[starting_line_values-2:, 1].tolist()))
-        df.columns = list(zip(use_table.iloc[starting_line+1, 2:].tolist(),
-                              use_table.iloc[starting_line, 2:].tolist()))
-        use_table = df
+        for i, table in enumerate(tables):
+            df = table.iloc[starting_line_values - 2:, 2:]
+            df.index = list(zip(table.iloc[starting_line_values - 2:, 0].tolist(),
+                                table.iloc[starting_line_values - 2:, 1].tolist()))
+            df.columns = list(zip(table.iloc[starting_line + 1, 2:].tolist(),
+                                  table.iloc[starting_line, 2:].tolist()))
+            df = df.astype(str).replace(to_replace=['.'], value='0').astype(float)
+            tables[i] = df  # Update the corresponding table in the list
 
-        # fill with zeros
-        supply_table = supply_table.astype(str).replace(to_replace=['.'], value='0').astype(float)
-        use_table = use_table.astype(str).replace(to_replace=['.'], value='0').astype(float)
+        # Unpack the tables back into their original variables
+        supply_table, use_table = tables
 
         if self.level_of_detail == 'Detail level':
             # tables from k$ to $
@@ -1190,6 +1189,11 @@ class IOTables:
             self.link_openio_exio_Y /= 1.5298
             if self.endogenizing:
                 self.link_openio_exio_K /= 1.5298
+        elif self.year == 2021:
+            self.link_openio_exio_A /= 1.4828
+            self.link_openio_exio_Y /= 1.4828
+            if self.endogenizing:
+                self.link_openio_exio_K /= 1.4828
 
     def remove_abroad_enclaves(self):
         """
@@ -1564,7 +1568,7 @@ class IOTables:
             __name__, '/Data/Environmental_data/Water_consumption_values.xlsx'), None)
 
         # Only odd years from 2009 to 2017
-        match_year_data = {2014: 2015, 2015: 2015, 2016: 2015, 2017: 2017, 2018: 2017, 2019: 2019, 2020: 2019}
+        match_year_data = {2014: 2015, 2015: 2015, 2016: 2015, 2017: 2017, 2018: 2017, 2019: 2019, 2020: 2019, 2021: 2021}
         year_for_water = match_year_data[self.year]
 
         # select the year of the data
@@ -1801,7 +1805,7 @@ class IOTables:
             __name__, '/Data/Characterization_factors/impact_world_plus_2.0.1_dev.xlsx'))
 
         IW = pd.pivot_table(IW, values='CF value', index=('Impact category', 'CF unit'),
-                                  columns=['Elem flow name', 'Compartment', 'Sub-compartment']).fillna(0)
+                            columns=['Elem flow name', 'Compartment', 'Sub-compartment']).fillna(0)
 
         try:
             concordance = pd.read_excel(pkg_resources.resource_stream(
@@ -3021,6 +3025,156 @@ class IOTables:
         self.E = self.S.dot(self.L).dot(self.Y) + self.FY
 
         self.D = self.C.dot(self.E)
+
+    def get_emission_factors_basic_price(self):
+        """
+        Function returns the emission factors at basic price, i.e., purchaser price without trade margins/downstream
+        transportation margins/taxes paid by purchaser
+        :return: self.emission_factors_basic_price
+        """
+
+        if self.L.empty:
+            self.calc()
+
+        self.emission_factors_basic_price = self.C.dot(self.S).dot(self.L)
+
+        return self.emission_factors_basic_price
+
+    def get_emission_factors_purchaser_price(self):
+        """
+        Function returns the emission factors at purchaser price, i.e., the price directly paid by the purchaser
+        (including trade margins, downstream transportation margins and taxes)
+        :return: self.emission_factors_purchaser_price
+        """
+
+        if self.L.empty:
+            self.calc()
+
+        # if user didn't get emission factors with basic price yet
+        if self.emission_factors_basic_price.empty:
+            self.emission_factors_basic_price = self.C.dot(self.S).dot(self.L)
+
+        # quick function to format the trade, transportation and taxes tables
+        def formatting(table):
+            if self.year in [2014, 2015, 2016, 2017]:
+                starting_line = 11
+                starting_line_values = 16
+
+            elif self.year in [2018, 2019, 2020, 2021]:
+                starting_line = 3
+                starting_line_values = 7
+
+            df = table.iloc[starting_line_values - 2:, 2:]
+            df.index = list(zip(table.iloc[starting_line_values - 2:, 0].tolist(),
+                                table.iloc[starting_line_values - 2:, 1].tolist()))
+            df.columns = list(zip(table.iloc[starting_line + 1, 2:].tolist(),
+                                  table.iloc[starting_line, 2:].tolist()))
+
+            return df
+
+        # go through the files
+        files = [i for i in os.walk(self.folder_path)]
+        files = [i for i in files[0][2] if i[:2] in self.matching_dict.keys() and 'SUT' in i]
+        files.sort()
+
+        # iterate through each province files
+        for province_data in files:
+            sut = pd.read_excel(os.path.join(self.folder_path, province_data), None)
+            province = province_data[:2]
+
+            with pd.option_context('future.no_silent_downcasting', True):
+                total = formatting(sut['Use_Purchaser']).loc[:, [('TOTUSE', 'Total use')]][
+                    formatting(sut['Use_Purchaser']).loc[:, [('TOTUSE', 'Total use')]] != 0].fillna(0)
+            # calculate share of trade, transport and tax
+            trade = formatting(sut['Use_Trade']).loc[total.index, [('TOTUSE', 'Total use')]]
+            # drop negative values (from retail and wholesale)
+            with pd.option_context('future.no_silent_downcasting', True):
+                trade = trade[trade >= 0].fillna(0)
+            trade = trade.where(total != 0, 0) / total.where(total != 0, 1)
+            transport = formatting(sut['Use_Transport']).loc[total.index, [('TOTUSE', 'Total use')]]
+            # drop negative values (from distribution margins)
+            with pd.option_context('future.no_silent_downcasting', True):
+                transport = transport[transport >= 0].fillna(0)
+            transport = transport.where(total != 0, 0) / total.where(total != 0, 1)
+            tax = formatting(sut['Use_Tax']).loc[total.index, [('TOTUSE', 'Total use')]]
+            # drop negative values (from value added)
+            with pd.option_context('future.no_silent_downcasting', True):
+                tax = tax[tax >= 0].fillna(0)
+            tax = tax.where(total != 0, 0) / total.where(total != 0, 1)
+            basic = formatting(sut['Use_Basic']).loc[:, [('TOTUSE', 'Total use')]]
+
+            # format
+            trade.index = pd.MultiIndex.from_tuples(trade.index)
+            transport.index = pd.MultiIndex.from_tuples(transport.index)
+            tax.index = pd.MultiIndex.from_tuples(tax.index)
+            basic.index = pd.MultiIndex.from_tuples(basic.index)
+
+            # drop useless index level
+            trade = trade.droplevel(0)
+            transport = transport.droplevel(0)
+            tax = tax.droplevel(0)
+            basic = basic.droplevel(0)
+
+            # calculate the average impact of trade
+            average_trade_impact = (
+                    self.emission_factors_basic_price.loc(axis=1)[
+                        'CA-' + province, [i for i in self.emission_factors_basic_price.columns.levels[1] if
+                                           'Retail margins' in i or 'Wholesale margins' in i]].droplevel(0, axis=1) *
+                    (basic.loc[[i for i in self.emission_factors_basic_price.columns.levels[1] if
+                                'Retail margins' in i or 'Wholesale margins' in i]] /
+                     basic.loc[[i for i in self.emission_factors_basic_price.columns.levels[1] if
+                                'Retail margins' in i or 'Wholesale margins' in i]].sum()).iloc[:, 0]
+            ).sum(axis=1)
+            # calculate the average impact of downstream transport
+            transport_sectors = ['Air freight transportation services', 'Rail freight transportation services',
+                                 'Water freight transportation services',
+                                 'Road transportation services for general freight',
+                                 'Road transportation services for specialized freight',
+                                 'Transportation of natural gas by pipeline',
+                                 'Transportation of crude oil and other commodities by pipeline',
+                                 'Water transportation support, maintenance and repair services',
+                                 'Road transportation support services',
+                                 'Freight transportation arrangement and customs brokering services',
+                                 'Other transportation support services', 'Grain storage', 'Natural gas distribution']
+            average_transport_impact = (
+                    self.emission_factors_basic_price.loc(axis=1)['CA-' + province, transport_sectors].droplevel(0,
+                                                                                                                 axis=1) *
+                    (basic.loc[transport_sectors] / basic.loc[transport_sectors].sum()).iloc[:, 0]).sum(axis=1)
+
+            # reformat tables
+            trade_reformatted = pd.concat(
+                [trade.reindex(self.emission_factors_basic_price.loc[:, 'CA-' + province].columns).iloc[:, 0]] * len(
+                    average_trade_impact), axis=1).T
+            trade_reformatted.index = average_trade_impact.index
+
+            average_trade_impact_reformatted = pd.concat([average_trade_impact] * len(trade_reformatted.columns), axis=1)
+            average_trade_impact_reformatted.columns = trade_reformatted.columns
+
+            transport_reformatted = pd.concat(
+                [transport.reindex(self.emission_factors_basic_price.loc[:, 'CA-' + province].columns).iloc[:, 0]] * len(
+                    average_transport_impact), axis=1).T
+            transport_reformatted.index = average_transport_impact.index
+
+            average_transport_impact_reformatted = pd.concat(
+                [average_transport_impact] * len(transport_reformatted.columns), axis=1)
+            average_transport_impact_reformatted.columns = transport_reformatted.columns
+
+            tax_reformatted = pd.concat(
+                [tax.reindex(self.emission_factors_basic_price.loc[:, 'CA-' + province].columns).iloc[:, 0]] * len(
+                    average_transport_impact), axis=1).T
+            tax_reformatted.index = average_transport_impact.index
+
+            # calculate the purchaser price emission factors
+            df = ((self.emission_factors_basic_price.loc[:, 'CA-' + province] +
+                   trade_reformatted * average_trade_impact_reformatted +
+                   transport_reformatted * average_transport_impact_reformatted) /
+                  (1 + trade_reformatted + transport_reformatted + tax_reformatted))
+
+            # concat with master df to egt all provinces in same dataframe
+            self.emission_factors_purchaser_price = pd.concat(
+                [self.emission_factors_purchaser_price, pd.concat([df], keys=['CA-' + province], axis=1)], axis=1)
+
+        return self.emission_factors_purchaser_price
 
 # -------------------------------------------------- SUPPORT ----------------------------------------------------------
 
