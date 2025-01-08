@@ -1802,7 +1802,7 @@ class IOTables:
         """
 
         IW = pd.read_excel(pkg_resources.resource_stream(
-            __name__, '/Data/Characterization_factors/impact_world_plus_2.0.1_dev.xlsx'))
+            __name__, '/Data/Characterization_factors/impact_world_plus_2.1_dev.xlsx'))
 
         IW = pd.pivot_table(IW, values='CF value', index=('Impact category', 'CF unit'),
                             columns=['Elem flow name', 'Compartment', 'Sub-compartment']).fillna(0)
@@ -1873,8 +1873,8 @@ class IOTables:
         # some methods of IMPACT World+ do not make sense in our context, remove them
         self.C.drop(['Fossil and nuclear energy use',
                      'Ionizing radiations',
-                     'Ionizing radiation, ecosystem quality',
-                     'Ionizing radiation, human health',
+                     'Ionizing radiations, ecosystem quality',
+                     'Ionizing radiations, human health',
                      'Land occupation, biodiversity',
                      'Land transformation, biodiversity',
                      'Thermally polluted water'], axis=0, level=0, inplace=True)
@@ -1890,7 +1890,7 @@ class IOTables:
 
         # importing characterization matrix IMPACT World+/exiobase
         self.C_exio = pd.read_excel(pkg_resources.resource_stream(
-            __name__, '/Data/Characterization_factors/impact_world_plus_2.0.1_expert_version_exiobase.xlsx'),
+            __name__, '/Data/Characterization_factors/impact_world_plus_2.1_expert_version_exiobase.xlsx'),
             index_col='Unnamed: 0')
         self.C_exio.index = pd.MultiIndex.from_tuples(list(zip(
             [i.split(' (')[0] for i in self.C_exio.index],
@@ -1898,8 +1898,8 @@ class IOTables:
 
         self.C_exio.drop(['Fossil and nuclear energy use',
                           'Ionizing radiations',
-                          'Ionizing radiation, ecosystem quality',
-                          'Ionizing radiation, human health',
+                          'Ionizing radiations, ecosystem quality',
+                          'Ionizing radiations, human health',
                           'Land occupation, biodiversity',
                           'Land transformation, biodiversity',
                           'Thermally polluted water'], axis=0, level=0, inplace=True)
