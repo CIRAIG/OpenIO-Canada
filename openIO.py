@@ -3070,6 +3070,10 @@ class IOTables:
             df.columns = list(zip(table.iloc[starting_line + 1, 2:].tolist(),
                                   table.iloc[starting_line, 2:].tolist()))
 
+            # some file versions register zeros as '.' instead of '0'
+            with pd.option_context('future.no_silent_downcasting', True):
+                df = df.replace('.', 0)
+
             return df
 
         # go through the files
