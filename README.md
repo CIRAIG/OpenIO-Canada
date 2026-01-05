@@ -23,8 +23,8 @@ Go to the doc folder and start with the Running_openIO-Canada.ipynb file to gene
 how to use openIO-Canada with the other notebooks.
 
 ### Carbon footprint per capita estimates
-Using openIO-Canada v2.11 and population estimates from StatCan, we can derive carbon footprints per capita for all 13
-provinces of Canada, and Canada as a whole, from 2014 to 2022, following a consumption approach.
+Using openIO-Canada v2.11 (with capitals endogenized) and population estimates from StatCan, we can derive carbon 
+footprints per capita for all 13 provinces of Canada, and Canada as a whole, from 2014 to 2022, following a consumption approach.
 
 <img src="images/consumption_footprints.png" width="600"/>
 
@@ -90,10 +90,10 @@ somehow you have access to this breakdown, using the basic price emission factor
 maxime.agez@polymtl.ca
 
 ### Citation
-https://doi.org/10.5281/zenodo.10971810
+https://doi.org/10.5281/zenodo.8200655
 
 ### Scientific studies using openIO-Canada
-- Anne de Bortoli, Maxime Agez, Environmentally-extended input-output analyses efficiently sketch large-scale environmental transition plans: Illustration by Canada's road industry,
-Journal of Cleaner Production, Volume 388, 2023, 136039, ISSN 0959-6526, https://doi.org/10.1016/j.jclepro.2023.136039.
+- Santiago Zuluaga, Shoshanna Saxe (2025), Leveraging building permit data for large-scale embodied carbon and circularity assessment of residential building construction, Environ. Res.: Infrastruct. Sustain. 5 035015. https://doi.org/10.1088/2634-4505/adfc95
 - Wambersie, L., & Ouellet-Plamondon, C. (2024). Developing a comprehensive account of embodied emissions within the Canadian construction sector. Journal of Industrial Ecology, 1–14. https://doi.org/10.1111/jiec.13548
 - Yoffe, H., et al. (2024). Mapping construction sector greenhouse gas emissions: a crucial step in sustainability meeting increasing housing demands. Environmental research - Infrastructure and sustainability. https://doi.org/10.1088/2634-4505/ad546a
+- Anne de Bortoli, Maxime Agez (2023), Environmentally-extended input-output analyses efficiently sketch large-scale environmental transition plans: Illustration by Canada's road industry, Journal of Cleaner Production, Volume 388, 2023, 136039, ISSN 0959-6526, https://doi.org/10.1016/j.jclepro.2023.136039.
