@@ -2,7 +2,7 @@ This document outlines the methodology for the openIO-Canada model (updated for 
 a comprehensive view of the Canadian economy and its environmental impacts by integrating national economic data with 
 global trade and environmental accounts.
 
-##1. Economic Modeling
+## 1. Economic Modeling
 
 The core of openIO-Canada is built upon Supply and Use tables (SUTs) sourced directly from Statistics Canada 
 (https://www150.statcan.gc.ca/n1/en/catalogue/15-602-X).
@@ -151,7 +151,7 @@ For instance, we get a total symmetric technology matrix A including the technol
 exiobase and also including the connection matrix between the two systems, representing by the international imports. 
 Similar concatenated matrices were created for final demand (Y) and capital flow matrix (K).
 
-##2. Environmental Modeling
+## 2. Environmental Modeling
 
 #### Main GHGs (CO2, CH4, N2O)
 The three main GHGs emission come from the GHG physical accounts of Statistics Canada. These accounts follow the System 
