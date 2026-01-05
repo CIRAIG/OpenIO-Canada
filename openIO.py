@@ -1,10 +1,6 @@
 """
-Class that creates symmetric Input-Output tables based on the Supply and Use economic tables provided by Statistic
-Canada, available here: https://www150.statcan.gc.ca/n1/en/catalogue/15-602-X
-Multiple transformation models are available (industry technology assumption, fixed industry sales structure, etc.) and
-the type of classification (productxproduct, or industryxindustry) can be selected as well.
-Also produces environmental extensions for the symmetric tables generated based on data from the NPRI found here:
-https://open.canada.ca/data/en/dataset/1fb7d8d4-7713-4ec6-b957-4a882a84fed3
+Class that creates symmetric Input-Output tables for Canada and its provinces
+author: maxime.agez@polymtl.ca
 """
 
 import pandas as pd
@@ -3577,93 +3573,6 @@ class IOTables:
         except KeyError:
             pass
 
-    def produce_npri_iw_concordance_file(self):
-        """
-        Method to obtain the NPRI_IW_concordance.xlsx file (for reproducibility)
-        :return: the NPRI_IW_concordance.xlsx file
-        """
-
-        IW = pd.read_excel(
-            pkg_resources.resource_stream(
-                __name__, '/Data/IW+ 1_48 EP_1_30 MP_as DB_rules_compliance_with_manually_added_CF.xlsx'))
-
-        df = IW.set_index('CAS number')
-        df.index = [str(i) for i in df.index]
-        df = df.groupby(df.index).head(n=1)
-
-        concordance_IW = dict.fromkeys(self.F.index.levels[0])
-
-        # match pollutants using CAS numbers
-        for pollutant in concordance_IW:
-            match_CAS = ''
-            try:
-                if len(self.emission_metadata.loc[(pollutant, 'Air'), 'CAS Number'].split('-')[0]) == 2:
-                    match_CAS = '0000' + self.emission_metadata.loc[(pollutant, 'Air'), 'CAS Number']
-                elif len(self.emission_metadata.loc[(pollutant, 'Air'), 'CAS Number'].split('-')[0]) == 3:
-                    match_CAS = '000' + self.emission_metadata.loc[(pollutant, 'Air'), 'CAS Number']
-                elif len(self.emission_metadata.loc[(pollutant, 'Air'), 'CAS Number'].split('-')[0]) == 4:
-                    match_CAS = '00' + self.emission_metadata.loc[(pollutant, 'Air'), 'CAS Number']
-                elif len(self.emission_metadata.loc[(pollutant, 'Air'), 'CAS Number'].split('-')[0]) == 5:
-                    match_CAS = '0' + self.emission_metadata.loc[(pollutant, 'Air'), 'CAS Number']
-                elif len(self.emission_metadata.loc[(pollutant, 'Air'), 'CAS Number'].split('-')[0]) == 6:
-                    match_CAS = self.emission_metadata.loc[(pollutant, 'Air'), 'CAS Number']
-                try:
-                    concordance_IW[pollutant] = [df.loc[i, 'Elem flow name'] for i in df.index if i == match_CAS][0]
-
-                except IndexError:
-                    pass
-            except KeyError:
-                pass
-
-        # hardcoding what could not be matched using CAS number
-        concordance_IW['Ammonia (total)'] = 'Ammonia'
-        concordance_IW['Fluorine'] = 'Fluorine'
-        concordance_IW['PM10 - Particulate matter <=10 microns'] = 'Particulates, < 10 um'
-        concordance_IW['PM2.5 - Particulate matter <=2.5 microns'] = 'Particulates, < 2.5 um'
-        concordance_IW['Total particulate matter'] = 'Particulates, unspecified'
-        concordance_IW['Speciated VOC - Cycloheptane'] = 'Cycloheptane'
-        concordance_IW['Speciated VOC - Cyclohexene'] = 'Cyclohexene'
-        concordance_IW['Speciated VOC - Cyclooctane'] = 'Cyclooctane'
-        concordance_IW['Speciated VOC - Hexane'] = 'Hexane'
-        concordance_IW[
-            'Volatile organic compounds'] = 'NMVOC, non-methane volatile organic compounds, unspecified origin'
-
-        # proxies, NOT A 1 FOR 1 MATCH but better than no characterization factor
-        concordance_IW['HCFC-123 (all isomers)'] = 'Ethane, 2-chloro-1,1,1,2-tetrafluoro-, HCFC-123'
-        concordance_IW['HCFC-124 (all isomers)'] = 'Ethane, 2,2-dichloro-1,1,1-trifluoro-, HCFC-124'
-        concordance_IW['Nonylphenol and its ethoxylates'] = 'Nonylphenol'
-        concordance_IW['Phosphorus (yellow or white only)'] = 'Phosphorus'
-        concordance_IW['Phosphorus (total)'] = 'Phosphorus'
-        concordance_IW['PAHs, total unspeciated'] = 'Hydrocarbons, aromatic'
-        concordance_IW['Aluminum oxide (fibrous forms only)'] = 'Aluminium'
-        concordance_IW['Antimony (and its compounds)'] = 'Antimony'
-        concordance_IW['Arsenic (and its compounds)'] = 'Arsenic'
-        concordance_IW['Cadmium (and its compounds)'] = 'Cadmium'
-        concordance_IW['Chromium (and its compounds)'] = 'Chromium'
-        concordance_IW['Hexavalent chromium (and its compounds)'] = 'Chromium VI'
-        concordance_IW['Cobalt (and its compounds)'] = 'Cobalt'
-        concordance_IW['Copper (and its compounds)'] = 'Copper'
-        concordance_IW['Lead (and its compounds)'] = 'Lead'
-        concordance_IW['Nickel (and its compounds)'] = 'Nickel'
-        concordance_IW['Mercury (and its compounds)'] = 'Mercury'
-        concordance_IW['Manganese (and its compounds)'] = 'Manganese'
-        concordance_IW['Selenium (and its compounds)'] = 'Selenium'
-        concordance_IW['Silver (and its compounds)'] = 'Silver'
-        concordance_IW['Thallium (and its compounds)'] = 'Thallium'
-        concordance_IW['Zinc (and its compounds)'] = 'Zinc'
-        concordance_IW['Speciated VOC - Butane  (all isomers)'] = 'Butane'
-        concordance_IW['Speciated VOC - Butene  (all isomers)'] = '1-Butene'
-        concordance_IW['Speciated VOC - Anthraquinone (all isomers)'] = 'Anthraquinone'
-        concordance_IW['Speciated VOC - Decane  (all isomers)'] = 'Decane'
-        concordance_IW['Speciated VOC - Dodecane  (all isomers)'] = 'Dodecane'
-        concordance_IW['Speciated VOC - Heptane  (all isomers)'] = 'Heptane'
-        concordance_IW['Speciated VOC - Nonane  (all isomers)'] = 'Nonane'
-        concordance_IW['Speciated VOC - Octane  (all isomers)'] = 'N-octane'
-        concordance_IW['Speciated VOC - Pentane (all isomers)'] = 'Pentane'
-        concordance_IW['Speciated VOC - Pentene (all isomers)'] = '1-Pentene'
-
-        return pd.DataFrame.from_dict(concordance_IW, orient='index')
-
     def assert_order(self, exporting_province, importing_province, scaled_imports_U, scaled_imports_Y,
                      scaled_imports_K=None):
         """
@@ -3743,19 +3652,6 @@ class IOTables:
             print('Format requested not implemented yet.')
 
 
-def todf(data):
-    """ Simple function to inspect pyomo element as Pandas DataFrame"""
-    try:
-        out = pd.Series(data.get_values())
-    except AttributeError:
-        # probably already is a dataframe
-        out = data
-
-    if out.index.nlevels > 1:
-        out = out.unstack()
-    return out
-
-
 def treatment_import_data(original_file_path):
     """Function used to treat the merchandise imports trade database file. FIle is way too big to be provided to
     users through Github, so we treat the data to only keep what is relevant."""
@@ -3784,4 +3680,3 @@ def treatment_import_data(original_file_path):
     merchandise_database.index = pd.MultiIndex.from_tuples(merchandise_database.index)
 
     return merchandise_database
-
