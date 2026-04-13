@@ -81,7 +81,7 @@ final price paid by the consumer. The figure below illustrates the difference in
 While the price of the manufactured t-shirt is 4$, the final consumer pays that t-shirt 10$ because the retailer/wholesaler
 makes a profit on the sale. Then, said retailers also had to transport the t-shirt to its warehouse or directly to the 
 retail shop, and these costs are passed down to the final consumer. The final cost of the t-shirt could also simply 
-include a delivery to the consumer. Finally taxes are being paid on the t-shirt. <br>
+include a delivery to the consumer. Finally, taxes are being paid on the t-shirt. <br>
 In most cases, users of openIO-Canada will not have access to the breakdown between basic price/retail margins/downstream 
 transportation margins/taxes, and so in the majority of cases, the purchaser price emission factors should be used. If 
 somehow you have access to this breakdown, using the basic price emission factors will allow for a more accurate assessment.
@@ -92,8 +92,23 @@ maxime.agez@polymtl.ca
 ### Citation
 https://doi.org/10.5281/zenodo.8200655
 
-### Scientific studies using openIO-Canada
+### Scientific articles using openIO-Canada
 - Santiago Zuluaga, Shoshanna Saxe (2025), Leveraging building permit data for large-scale embodied carbon and circularity assessment of residential building construction, Environ. Res.: Infrastruct. Sustain. 5 035015. https://doi.org/10.1088/2634-4505/adfc95
 - Wambersie, L., & Ouellet-Plamondon, C. (2024). Developing a comprehensive account of embodied emissions within the Canadian construction sector. Journal of Industrial Ecology, 1–14. https://doi.org/10.1111/jiec.13548
 - Yoffe, H., et al. (2024). Mapping construction sector greenhouse gas emissions: a crucial step in sustainability meeting increasing housing demands. Environmental research - Infrastructure and sustainability. https://doi.org/10.1088/2634-4505/ad546a
 - Anne de Bortoli, Maxime Agez (2023), Environmentally-extended input-output analyses efficiently sketch large-scale environmental transition plans: Illustration by Canada's road industry, Journal of Cleaner Production, Volume 388, 2023, 136039, ISSN 0959-6526, https://doi.org/10.1016/j.jclepro.2023.136039.
+
+## 📊 Community & Industry Adoption
+
+The openIO-Canada database is utilized by public and private organizations for carbon accounting and environmental modeling.
+
+| Entity                                     | Use Case                      | Source                                                                                                                                                                                                                          |
+|:-------------------------------------------|:------------------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Shared Services Canada**                 | Procurement Footprinting      | [Official Report](https://ciraig.org/wp-content/uploads/CIRAIG_SSC_EnvFootprint_Procurements_Final_report_30-11-2020-1.pdf)                                                                                                     |
+| **RECYC-QUÉBEC**                           | Circular Economy Modeling     | [2025 Study](https://www.recyc-quebec.gouv.qc.ca/sites/default/files/documents/etude-reemploi-aviseo.pdf) / [2025 Report](https://www.recyc-quebec.gouv.qc.ca/sites/default/files/documents/rapport-indice-circularite2025.pdf) |
+| **Ville de Montréal**                      | Community Footprint Esimating | [Official Report](https://portail-m4s.s3.montreal.ca/pdf/ciraig_vdm_inventaire_ges_conso_2017.pdf)                                                                                                                              |
+| **Public Services and Procurement Canada** | Procurement Footprinting      | [Official Report](https://canadacommons.ca/artifacts/21670110/carbon-footprint-of-procurements-by-public-services-and-procurement-canada/22570299/)                                                                             |
+
+
+
+

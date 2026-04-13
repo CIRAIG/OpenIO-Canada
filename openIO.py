@@ -3411,7 +3411,7 @@ class IOTables:
                                 'Retail margins' in i or 'Wholesale margins' in i]].sum()).iloc[:, 0]
             ).sum(axis=1)
             # calculate the average impact of downstream transport
-            transport_sectors = ['Air freight transportation services', 'Rail freight transportation services',
+            transport_sectors_2017 = ['Air freight transportation services', 'Rail freight transportation services',
                                  'Water freight transportation services',
                                  'Road transportation services for general freight',
                                  'Road transportation services for specialized freight',
@@ -3421,10 +3421,26 @@ class IOTables:
                                  'Road transportation support services',
                                  'Freight transportation arrangement and customs brokering services',
                                  'Other transportation support services', 'Grain storage', 'Natural gas distribution']
-            average_transport_impact = (
-                    self.emission_factors_basic_price.loc(axis=1)['CA-' + province, transport_sectors].droplevel(0,
-                                                                                                                 axis=1) *
-                    (basic.loc[transport_sectors] / basic.loc[transport_sectors].sum()).iloc[:, 0]).sum(axis=1)
+            transport_sectors_2014 = ['Air freight transportation services', 'Rail freight transportation services',
+                                 'Water freight transportation services',
+                                 'Truck transportation services for general freight',
+                                 'Truck transportation services for specialized freight',
+                                 'Transportation of natural gas by pipeline',
+                                 'Transportation of crude oil and other commodities by pipeline',
+                                 'Water transportation support, maintenance and repair services',
+                                 'Road transportation support services',
+                                 'Freight transportation arrangement and customs brokering services',
+                                 'Other transportation support services', 'Grain storage', 'Natural gas distribution']
+            if self.year > 2017:
+                average_transport_impact = (
+                        self.emission_factors_basic_price.loc(axis=1)['CA-' + province,
+                                                                      transport_sectors_2017].droplevel(0, axis=1) *
+                        (basic.loc[transport_sectors_2017] / basic.loc[transport_sectors_2017].sum()).iloc[:, 0]).sum(axis=1)
+            elif self.year in [2014, 2015, 2016]:
+                average_transport_impact = (
+                        self.emission_factors_basic_price.loc(axis=1)['CA-' + province,
+                                                                      transport_sectors_2014].droplevel(0, axis=1) *
+                        (basic.loc[transport_sectors_2014] / basic.loc[transport_sectors_2014].sum()).iloc[:, 0]).sum(axis=1)
 
             # reformat tables
             trade_reformatted = pd.concat(
