@@ -16,6 +16,7 @@ import warnings
 import gzip
 import pickle
 import math
+import scipy
 
 
 class IOTables:
@@ -1013,10 +1014,21 @@ class IOTables:
         io.calc_all()
 
         if self.endogenizing:
-            with gzip.open(pkg_resources.resource_stream(
-                    __name__, '/Data/Capitals_endogenization/K_cfc_pxp_exio3.8.2_' +
-                              str(self.year) + '.gz.pickle'), 'rb') as f:
-                self.K_exio = pickle.load(f)
+            mat = scipy.io.loadmat(pkg_resources.resource_stream(
+                    __name__, 'Data/Capitals_endogenization/Kbar_exio_v3_8_2_2020_cfc_pxp.mat'))
+            K = pd.DataFrame(mat['Kbar'].toarray(), index=pd.MultiIndex.from_tuples(io.A.index),
+                             columns=pd.MultiIndex.from_tuples(io.A.index))
+            # Extract total output from your MRIO object
+            x_series = io.x.iloc[:, 0]
+            # Define an economic threshold (e.g., 0.01 Million Euros = 10,000 Euros)
+            # Sectors with output below this are treated as inactive/noise
+            threshold = 100
+            x_safe = x_series.copy()
+            x_safe[x_safe < threshold] = 0
+            # Perform the normalization
+            # Dividing by 0 will create inf/nan values, which we immediately wipe out
+            self.K_exio = K.div(x_safe, axis='columns')
+            self.K_exio = self.K_exio.replace([np.inf, -np.inf], 0).fillna(0)
 
         # save the matrices from exiobase because we need them later
         self.A_exio = io.A.copy('deep')
