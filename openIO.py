@@ -763,7 +763,17 @@ class IOTables:
                                                  ['Changes in inventories, used cars and equipment and scrap']])
         self.Y = pd.concat([self.Y, df], axis=1)
 
-        # drop the share of the GFCF that was endogenized, the redisual represents investments of that year
+        # move Residential structures to household consumption, this is not endogenized
+        df = self.Y.loc(axis=1)[:, :, 'Residential structures'].copy('deep')
+
+        df.columns = pd.MultiIndex.from_product(
+            [self.matching_dict.keys(), ['Household final consumption expenditure'], ['Residential structures']])
+
+        self.Y = pd.concat([self.Y, df], axis=1)
+        self.Y = self.Y.drop([j for j in self.Y.columns if j[1] == 'Gross fixed capital formation, Construction' and j[
+            2] == 'Residential structures'], axis=1)
+
+        # drop the share of the GFCF that was endogenized, the residual represents investments of that year
         # first we need to retranslate the endogenized capitals (i.e., go back to the COICOP classification)
         endogenized_capitals = self.K.copy()
         endogenized_capitals.columns = pd.MultiIndex.from_tuples(
@@ -1015,20 +1025,17 @@ class IOTables:
 
         if self.endogenizing:
             mat = scipy.io.loadmat(pkg_resources.resource_stream(
-                    __name__, 'Data/Capitals_endogenization/Kbar_exio_v3_8_2_2020_cfc_pxp.mat'))
+                    __name__, 'Data/Capitals_endogenization/Kbar_exio_v3_8_2_'+str(self.year)+'_cfc_pxp.mat'))
             K = pd.DataFrame(mat['Kbar'].toarray(), index=pd.MultiIndex.from_tuples(io.A.index),
                              columns=pd.MultiIndex.from_tuples(io.A.index))
-            # Extract total output from your MRIO object
-            x_series = io.x.iloc[:, 0]
-            # Define an economic threshold (e.g., 0.01 Million Euros = 10,000 Euros)
-            # Sectors with output below this are treated as inactive/noise
-            threshold = 100
-            x_safe = x_series.copy()
-            x_safe[x_safe < threshold] = 0
-            # Perform the normalization
-            # Dividing by 0 will create inf/nan values, which we immediately wipe out
-            self.K_exio = K.div(x_safe, axis='columns')
+            # normalize K
+            self.K_exio = K.div(io.x.iloc[:, 0], axis='columns')
             self.K_exio = self.K_exio.replace([np.inf, -np.inf], 0).fillna(0)
+            # the capital matrix of exiobase does not normalize well with x (I don't know the data is not good)
+            # so we remove capitals for which the sum on the column is superior to 1, which makes no sense
+            bad_capitals = self.K_exio.sum()[self.K_exio.sum() > 1].index
+            self.K_exio.loc[:, bad_capitals] = 0
+            # in the end, it's about ~0.5% of the total values of capitals that is removed that way
 
         # save the matrices from exiobase because we need them later
         self.A_exio = io.A.copy('deep')
