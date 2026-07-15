@@ -1,4 +1,4 @@
-## _OpenIO-Canada v2.11_
+## _OpenIO-Canada v2.11.1_
 
 Python class creating Multi-Regional symmetric Environmentally Extended Input-Output (MREEIO) tables for Canada. OpenIO-Canada 
 operates at the provincial level (13 provinces). It can thus be used to compare the environmental impacts of value chains
@@ -11,9 +11,9 @@ OpenIO-Canada covers 492 commodities, 33 GHGs, around 300 pollutants in 3 compar
 
 OpenIO-Canada is connected to the Exiobase global MRIO database to model value chains happening outside Canada.
 
-**_IMPORTANT_** While openIO-Canada v2.11 CAN operate with Exiobase versions 3.9.4, 3.9.5 and 3.9.6, we do NOT recommend 
+**_IMPORTANT_** While openIO-Canada v2.11.1 CAN operate with Exiobase versions 3.9.4, 3.9.5, 3.9.6, 3.10.1, 3.10.2 we do NOT recommend 
 using these versions of Exiobase, as there are significant mistakes in the modeling of the mining sector. This triggers
-a drastic overestimation of Canada's own footprint, through its imports of minerals (notably the American imports).
+a drastic overestimation of Canada's own footprint, through its imports of minerals (notably through the American imports).
 
 ### Getting started
 
@@ -23,26 +23,26 @@ Go to the doc folder and start with the Running_openIO-Canada.ipynb file to gene
 how to use openIO-Canada with the other notebooks.
 
 ### Carbon footprint per capita estimates
-Using openIO-Canada v2.11 (with capitals endogenized) and population estimates from StatCan, we can derive carbon 
+Using openIO-Canada v2.11.1 (with capitals endogenized) and population estimates from StatCan, we can derive carbon 
 footprints per capita for all 13 provinces of Canada, and Canada as a whole, from 2014 to 2022, following a consumption approach.
 
 <img src="images/consumption_footprints.png" width="600"/>
 
-We can see that the national carbon footprint per capita is around 20tCO2eq, even though it slightly decreased during the
+We can see that the national carbon footprint per capita is around 19tCO2eq, even though it slightly decreased during the
 COVID years (2019, 2020 & 2021). We can also note that there was virtually no progress nationally from 2014 to 2022. 
-Per province, it follows a similar trend of virtually no progress. Two provinces stand out. Alberta significantly reduced
-its enormous carbon footprint per capita to 25tCO2eq, even though it is still one of the worst in Canada. Québec in 2022, on the other hand
-had the worst carbon footprint in over 8 years, even though it stays the best performing province.
+Per province, it follows a similar trend of virtually no progress. Three provinces stand out. Alberta significantly reduced
+its enormous carbon footprint per capita from 34tCO2eq to 24tCO2eq, even though it is still one of the worst in Canada. 
+On the other hand, both Québec and British Columbia in 2022 had their worst carbon footprint by far in over 8 years.
 
 We can also look at the same results, but through a territorial approach.
 
 <img src="images/territorial_footprints.png" width="600"/>
 
 The national carbon footprint following a territorial approach is also around 20tCO2eq. This time however, we can see a small
-decrease of that footprint in time. This could be explained by a greening of the operations throughout Canada, although 
+decrease of that footprint over time. This could be explained by a greening of the operations throughout Canada, although 
 such a greening procedure would have most likely triggered a decrease of the consumption footprint as well. This thus 
 rather seems to indicate that Canada delocalized a part of its production, instead relying on imports. <br>
-Regarding provinces, we can see that the worst of the national production happens in Alberta and Saskatchewan.
+Regarding provinces, we can see that the worst of the national production exclusively happens in Alberta and Saskatchewan.
 
 
 ### Classification detail
