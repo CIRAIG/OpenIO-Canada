@@ -3431,35 +3431,41 @@ class IOTables:
             ).sum(axis=1)
             # calculate the average impact of downstream transport
             transport_sectors_2017 = ['Air freight transportation services', 'Rail freight transportation services',
-                                 'Water freight transportation services',
-                                 'Road transportation services for general freight',
-                                 'Road transportation services for specialized freight',
-                                 'Transportation of natural gas by pipeline',
-                                 'Transportation of crude oil and other commodities by pipeline',
-                                 'Water transportation support, maintenance and repair services',
-                                 'Road transportation support services',
-                                 'Freight transportation arrangement and customs brokering services',
-                                 'Other transportation support services', 'Grain storage', 'Natural gas distribution']
+                                      'Water freight transportation services',
+                                      'Road transportation services for general freight',
+                                      'Road transportation services for specialized freight',
+                                      'Water transportation support, maintenance and repair services',
+                                      'Road transportation support services',
+                                      'Freight transportation arrangement and customs brokering services',
+                                      'Other transportation support services', 'Grain storage']
             transport_sectors_2014 = ['Air freight transportation services', 'Rail freight transportation services',
-                                 'Water freight transportation services',
-                                 'Truck transportation services for general freight',
-                                 'Truck transportation services for specialized freight',
-                                 'Transportation of natural gas by pipeline',
-                                 'Transportation of crude oil and other commodities by pipeline',
-                                 'Water transportation support, maintenance and repair services',
-                                 'Road transportation support services',
-                                 'Freight transportation arrangement and customs brokering services',
-                                 'Other transportation support services', 'Grain storage', 'Natural gas distribution']
+                                      'Water freight transportation services',
+                                      'Truck transportation services for general freight',
+                                      'Truck transportation services for specialized freight',
+                                      'Water transportation support, maintenance and repair services',
+                                      'Road transportation support services',
+                                      'Freight transportation arrangement and customs brokering services',
+                                      'Other transportation support services', 'Grain storage']
+            transport_pipeline = ['Transportation of natural gas by pipeline',
+                                  'Transportation of crude oil and other commodities by pipeline',
+                                  'Natural gas distribution']
             if self.year > 2017:
                 average_transport_impact = (
-                        self.emission_factors_basic_price.loc(axis=1)['CA-' + province,
-                                                                      transport_sectors_2017].droplevel(0, axis=1) *
+                        self.emission_factors_basic_price.loc(axis=1)[
+                            'CA-' + province, transport_sectors_2017].droplevel(0, axis=1) *
                         (basic.loc[transport_sectors_2017] / basic.loc[transport_sectors_2017].sum()).iloc[:, 0]).sum(axis=1)
             elif self.year in [2014, 2015, 2016]:
                 average_transport_impact = (
-                        self.emission_factors_basic_price.loc(axis=1)['CA-' + province,
-                                                                      transport_sectors_2014].droplevel(0, axis=1) *
+                        self.emission_factors_basic_price.loc(axis=1)[
+                            'CA-' + province, transport_sectors_2014].droplevel(0, axis=1) *
                         (basic.loc[transport_sectors_2014] / basic.loc[transport_sectors_2014].sum()).iloc[:, 0]).sum(axis=1)
+            try:
+                average_transport_pipeline = (
+                        self.emission_factors_basic_price.loc(axis=1)[
+                            'CA-' + province, transport_pipeline].droplevel(0, axis=1) *
+                        (basic.loc[transport_pipeline] / basic.loc[transport_pipeline].sum()).iloc[:, 0]).sum(axis=1)
+            except ZeroDivisionError:
+                average_transport_pipeline = pd.Series(0, self.C.index)
 
             # reformat tables
             trade_reformatted = pd.concat(
@@ -3479,6 +3485,15 @@ class IOTables:
                 [average_transport_impact] * len(transport_reformatted.columns), axis=1)
             average_transport_impact_reformatted.columns = transport_reformatted.columns
 
+            transport_pipeline_reformatted = pd.concat(
+                [transport.reindex(self.emission_factors_basic_price.loc[:, 'CA-' + province].columns).iloc[:,0]] * len(
+                    average_transport_pipeline), axis=1).T
+            transport_pipeline_reformatted.index = average_transport_pipeline.index
+
+            average_transport_pipeline_impact_reformatted = pd.concat(
+                [average_transport_pipeline] * len(transport_pipeline_reformatted.columns), axis=1)
+            average_transport_pipeline_impact_reformatted.columns = transport_pipeline_reformatted.columns
+
             tax_reformatted = pd.concat(
                 [tax.reindex(self.emission_factors_basic_price.loc[:, 'CA-' + province].columns).iloc[:, 0]] * len(
                     average_transport_impact), axis=1).T
@@ -3487,10 +3502,11 @@ class IOTables:
             # calculate the purchaser price emission factors
             df = ((self.emission_factors_basic_price.loc[:, 'CA-' + province] +
                    trade_reformatted * average_trade_impact_reformatted +
-                   transport_reformatted * average_transport_impact_reformatted) /
-                  (1 + trade_reformatted + transport_reformatted + tax_reformatted))
+                   transport_reformatted * average_transport_impact_reformatted +
+                   transport_pipeline_reformatted * average_transport_pipeline_impact_reformatted) /
+                  (1 + trade_reformatted + transport_reformatted + transport_pipeline_reformatted + tax_reformatted))
 
-            # concat with master df to egt all provinces in same dataframe
+            # concat with master df to get all provinces in same dataframe
             self.emission_factors_purchaser_price = pd.concat(
                 [self.emission_factors_purchaser_price, pd.concat([df], keys=['CA-' + province], axis=1)], axis=1)
 
