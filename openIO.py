@@ -1787,13 +1787,24 @@ class IOTables:
         # dropping empty sectors (mostly Cannabis related)
         to_drop = concordance.loc[concordance.loc[:, 'IOIC'].isna()].index
         concordance = concordance.drop(to_drop)
+
+        # to distribute emissions from GHG accounts to industries, how do you wanna split
+        split_with_economic_value = False
+        split_with_fuel_purchase = True
         ghgs = pd.DataFrame()
         for code in concordance.index:
-            # L97 and D levels are more precise than GHG accounts, we use market share to distribute GHGs
+            # L97 and D levels are more precise than GHG accounts, we split following previous selected boolean
             sectors_to_split = [i[1] for i in self.industries if
                                 i[0] in concordance.loc[code].dropna().values.tolist()]
-            output_sectors_to_split = self.V.loc[:,
-                                      [i for i in self.V.columns if i[1] in sectors_to_split]].sum()
+            if split_with_economic_value:
+                output_sectors_to_split = self.V.loc[:,
+                                          [i for i in self.V.columns if i[1] in sectors_to_split]].sum()
+            elif split_with_fuel_purchase:
+                fuel_commodities = ['Natural gas', 'Motor gasoline', 'Diesel and biodiesel fuels', 'Light fuel oils',
+                                    'Aviation fuel', 'Heavy fuel oils', 'Solid fuel products, n.e.c.']
+                output_sectors_to_split = self.U.loc[[i for i in self.U.index if i[1] in fuel_commodities],
+                                                     [i for i in self.U.columns if i[1] in sectors_to_split]].sum()
+                output_sectors_to_split.index = pd.MultiIndex.from_tuples(output_sectors_to_split.index)
             share_sectors_to_split = pd.DataFrame(0, output_sectors_to_split.index,
                                                   ['Carbon dioxide', 'Methane', 'Dinitrogen monoxide'], dtype=object)
             for province in self.matching_dict:
