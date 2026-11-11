@@ -2148,7 +2148,7 @@ class IOTables:
         :return: self.C, self.methods_metadata
         """
 
-        data_file = files(__name__).joinpath('Data', 'Characterization_factors', 'impact_world_plus_2.1_dev.xlsx')
+        data_file = files(__name__).joinpath('Data', 'Characterization_factors', 'impact_world_plus_2.2.1_dev.xlsx')
         with data_file.open('rb') as f:
             IW = pd.read_excel(f)
 
@@ -2229,7 +2229,7 @@ class IOTables:
 
         # importing characterization matrix IMPACT World+/exiobase
         data_file = files(__name__).joinpath('Data', 'Characterization_factors',
-                                             'impact_world_plus_2.1_expert_version_exiobase.xlsx')
+                                             'impact_world_plus_2.2.1_expert_version_exiobase_3.11.xlsx')
         with data_file.open('rb') as f:
             self.C_exio = pd.read_excel(f, index_col='Unnamed: 0')
         self.C_exio.index = pd.MultiIndex.from_tuples(list(zip(
