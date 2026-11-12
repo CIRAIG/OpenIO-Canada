@@ -262,7 +262,7 @@ class IOTables:
             # starting_line_values is the line in which the first value appears
             starting_line_values = 16
 
-        elif self.year in [2018, 2019, 2020, 2021, 2022]:
+        elif self.year in [2018, 2019, 2020, 2021, 2022, 2023]:
             # starting_line is the line in which the Supply table starts (the first green row)
             starting_line = 3
             # starting_line_values is the line in which the first value appears
@@ -549,7 +549,7 @@ class IOTables:
         hist_gfcf.index = pd.MultiIndex.from_tuples([eval(i) for i in hist_gfcf.index])
         hist_gfcf.columns = pd.MultiIndex.from_tuples([eval(i) for i in hist_gfcf.columns])
         # change of classification requires some adjustments in the historical gfcf values
-        if self.year == 2022:
+        if self.year in [2022, 2023]:
             hist_gfcf.columns = pd.MultiIndex.from_tuples(
                 [(i[0], 'Other Indigenous government services') if i[1] == 'Other aboriginal government services' else i
                  for i in hist_gfcf.columns])
@@ -632,8 +632,8 @@ class IOTables:
                                                  'Endogenizing.xlsx')
             with data_file.open('rb') as f:
                 endo = pd.read_excel(f)
-        elif self.year in [2022]:
-            data_file = files(__name__).joinpath('Data', 'Concordances', '2022',
+        elif self.year in [2022, 2023]:
+            data_file = files(__name__).joinpath('Data', 'Concordances', '2022-2023',
                                                  'Endogenizing.xlsx')
             with data_file.open('rb') as f:
                 endo = pd.read_excel(f)
@@ -1056,45 +1056,50 @@ class IOTables:
         self.Y_exio = io.Y.copy('deep')
 
         try:
-            io.satellite.S
+            io.satellite.F
             version_exio = '3.8'
         except AttributeError:
-            version_exio = '3.9'
-
-        if version_exio == '3.9':
             try:
-                self.S_exio = pd.concat(
-                    [io.air_emissions.S, io.nutrients.S, io.water.S, io.land.S, io.material.S, io.energy.S, io.employment.S,
-                     io.factor_inputs.S])
-                self.F_exio = pd.concat(
-                    [io.air_emissions.F, io.nutrients.F, io.water.F, io.land.F, io.material.F, io.energy.F, io.employment.F,
-                     io.factor_inputs.F])
-                self.FY_exio = pd.concat(
-                    [io.air_emissions.F_Y, io.nutrients.F_Y, io.water.F_Y, io.land.F_Y, io.material.F_Y, io.energy.F_Y,
-                     io.employment.F_Y, io.factor_inputs.F_Y])
-                # millions euros to euros for environmental outputs
-                self.S_exio.loc[[i for i in self.S_exio.index if i not in (io.employment.S.index.tolist() +
-                                                                           io.factor_inputs.S.index.tolist())]] /= 1000000
-                self.unit_exio = pd.concat(
-                    [io.air_emissions.unit, io.nutrients.unit, io.water.unit, io.land.unit, io.material.unit, io.energy.unit,
-                     io.employment.unit, io.factor_inputs.unit])
-                self.unit_exio.columns = ['Unit']
-            # the 2022 reference year of EXIOBASE has no land and energy modules, unlike all other reference years
+                io.deforestation.F
+                version_exio = '3.11'
             except AttributeError:
-                self.S_exio = pd.concat(
-                    [io.air_emissions.S, io.nutrients.S, io.water.S, io.material.S, io.employment.S, io.factor_inputs.S])
-                self.F_exio = pd.concat(
-                    [io.air_emissions.F, io.nutrients.F, io.water.F, io.material.F, io.employment.F, io.factor_inputs.F])
-                self.FY_exio = pd.concat(
-                    [io.air_emissions.F_Y, io.nutrients.F_Y, io.water.F_Y, io.material.F_Y, io.employment.F_Y,
-                     io.factor_inputs.F_Y])
-                # millions euros to euros for environmental outputs
-                self.S_exio.loc[[i for i in self.S_exio.index if i not in (io.employment.S.index.tolist() +
-                                                                           io.factor_inputs.S.index.tolist())]] /= 1000000
-                self.unit_exio = pd.concat(
-                    [io.air_emissions.unit, io.nutrients.unit, io.water.unit, io.material.unit, io.employment.unit,
-                     io.factor_inputs.unit])
-                self.unit_exio.columns = ['Unit']
+                version_exio = '3.9/3.10'
+
+        if version_exio == '3.9/3.10':
+            self.S_exio = pd.concat(
+                [io.air_emissions.S, io.nutrients.S, io.water.S, io.land.S, io.material.S, io.energy.S, io.employment.S,
+                 io.factor_inputs.S])
+            self.F_exio = pd.concat(
+                [io.air_emissions.F, io.nutrients.F, io.water.F, io.land.F, io.material.F, io.energy.F, io.employment.F,
+                 io.factor_inputs.F])
+            self.FY_exio = pd.concat(
+                [io.air_emissions.F_Y, io.nutrients.F_Y, io.water.F_Y, io.land.F_Y, io.material.F_Y, io.energy.F_Y,
+                 io.employment.F_Y, io.factor_inputs.F_Y])
+            # millions euros to euros for environmental outputs
+            self.S_exio.loc[[i for i in self.S_exio.index if i not in (io.employment.S.index.tolist() +
+                                                                       io.factor_inputs.S.index.tolist())]] /= 1000000
+            self.unit_exio = pd.concat(
+                [io.air_emissions.unit, io.nutrients.unit, io.water.unit, io.land.unit, io.material.unit, io.energy.unit,
+                 io.employment.unit, io.factor_inputs.unit])
+            self.unit_exio.columns = ['Unit']
+
+        elif version_exio == '3.11':
+            self.S_exio = pd.concat(
+                [io.air_emissions.S, io.nutrients.S, io.water.S, io.land.S, io.deforestation.S, io.material.S,
+                 io.energy.S, io.employment.S, io.factor_inputs.S])
+            self.F_exio = pd.concat(
+                [io.air_emissions.F, io.nutrients.F, io.water.F, io.land.F, io.deforestation.F, io.material.F,
+                 io.energy.F, io.employment.F, io.factor_inputs.F])
+            self.FY_exio = pd.concat(
+                [io.air_emissions.F_Y, io.nutrients.F_Y, io.water.F_Y, io.land.F_Y, io.deforestation.F_Y,
+                 io.material.F_Y, io.energy.F_Y, io.employment.F_Y, io.factor_inputs.F_Y])
+            # millions euros to euros for environmental outputs
+            self.S_exio.loc[[i for i in self.S_exio.index if i not in (io.employment.S.index.tolist() +
+                                                                       io.factor_inputs.S.index.tolist())]] /= 1000000
+            self.unit_exio = pd.concat(
+                [io.air_emissions.unit, io.nutrients.unit, io.water.unit, io.land.unit, io.deforestation.unit,
+                 io.material.unit, io.energy.unit, io.employment.unit, io.factor_inputs.unit])
+            self.unit_exio.columns = ['Unit']
 
         elif version_exio == '3.8':
             self.S_exio = io.satellite.S.copy()
@@ -1194,8 +1199,8 @@ class IOTables:
             with data_file.open('rb') as f:
                 conc = pd.read_excel(f)
 
-        elif self.year in [2022]:
-            data_file = files(__name__).joinpath('Data', 'Concordances', '2022', 'HS-IOIC.xlsx')
+        elif self.year in [2022, 2023]:
+            data_file = files(__name__).joinpath('Data', 'Concordances', '2022-2023', 'HS-IOIC.xlsx')
             with data_file.open('rb') as f:
                 conc = pd.read_excel(f)
 
@@ -1260,6 +1265,12 @@ class IOTables:
         # also some issue with the Nickel import of Manitoba for the year 2014. Mismatch between SUTs and the merchandise trade database -> fix to US
         self.imports.loc(axis=0)['MB', 'US', 'Nickel ores and concentrates'] = (
             self.imports.loc(axis=0)['MB', 'US', 'Nickel ores and concentrates'].fillna(1))
+        if self.year == 2023:
+            # Mismatch between SUTs and the merchandise trade database -> in 2022 was basically 55/45 between US and JP imports
+            self.imports.loc(axis=0)['ON', 'US', 'Radioactive ores and concentrates'] = (
+                self.imports.loc(axis=0)['ON', 'US', 'Radioactive ores and concentrates'].fillna(0.55))
+            self.imports.loc(axis=0)['ON', 'JP', 'Radioactive ores and concentrates'] = (
+                self.imports.loc(axis=0)['ON', 'JP', 'Radioactive ores and concentrates'].fillna(0.45))
 
         # get average origin of imports for each commodity for Canada according to exiobase
         canadian_imports_exio = pd.concat([self.Z_exio.loc[:, 'CA'],
@@ -1275,8 +1286,8 @@ class IOTables:
             data_file = files(__name__).joinpath('Data', 'Concordances', '2014-2021', 'IOIC_EXIOBASE.xlsx')
             with data_file.open('rb') as f:
                 ioic_exio = pd.read_excel(f, 'commodities')
-        elif self.year in [2022]:
-            data_file = files(__name__).joinpath('Data', 'Concordances', '2022', 'IOIC_EXIOBASE.xlsx')
+        elif self.year in [2022, 2023]:
+            data_file = files(__name__).joinpath('Data', 'Concordances', '2022-2023', 'IOIC_EXIOBASE.xlsx')
             with data_file.open('rb') as f:
                 ioic_exio = pd.read_excel(f, 'commodities')
         ioic_exio = ioic_exio[2:].drop('IOIC Detail level - EXIOBASE', axis=1).set_index(
@@ -1408,8 +1419,8 @@ class IOTables:
             data_file = files(__name__).joinpath('Data', 'Concordances', '2014-2021', 'IOIC_EXIOBASE.xlsx')
             with data_file.open('rb') as f:
                 ioic_exio = pd.read_excel(f, 'commodities')
-        elif self.year in [2022]:
-            data_file = files(__name__).joinpath('Data', 'Concordances', '2022', 'IOIC_EXIOBASE.xlsx')
+        elif self.year in [2022, 2023]:
+            data_file = files(__name__).joinpath('Data', 'Concordances', '2022-2023', 'IOIC_EXIOBASE.xlsx')
             with data_file.open('rb') as f:
                 ioic_exio = pd.read_excel(f, 'commodities')
         ioic_exio = ioic_exio[2:].drop('IOIC Detail level - EXIOBASE', axis=1).set_index(
@@ -1527,6 +1538,11 @@ class IOTables:
             self.link_openio_exio_Y /= 1.3696
             if self.endogenizing:
                 self.link_openio_exio_K /= 1.3696
+        elif self.year == 2023:
+            self.link_openio_exio_A /= 1.4597
+            self.link_openio_exio_Y /= 1.4597
+            if self.endogenizing:
+                self.link_openio_exio_K /= 1.4597
 
     def remove_abroad_enclaves(self):
         """
@@ -1675,8 +1691,8 @@ class IOTables:
             data_file = files(__name__).joinpath('Data', 'Concordances', '2014-2021', 'NPRI_concordance.xlsx')
             with data_file.open('rb') as f:
                 concordance = pd.read_excel(f, self.level_of_detail)
-        elif self.year in [2022]:
-            data_file = files(__name__).joinpath('Data', 'Concordances', '2022', 'NPRI_concordance.xlsx')
+        elif self.year in [2022, 2023]:
+            data_file = files(__name__).joinpath('Data', 'Concordances', '2022-2023', 'NPRI_concordance.xlsx')
             with data_file.open('rb') as f:
                 concordance = pd.read_excel(f, self.level_of_detail)
         concordance = concordance.set_index('NAICS 6 Code')
@@ -1778,8 +1794,8 @@ class IOTables:
             data_file = files(__name__).joinpath('Data', 'Concordances', '2014-2021', 'GHG_concordance.xlsx')
             with data_file.open('rb') as f:
                 concordance = pd.read_excel(f, self.level_of_detail)
-        elif self.year in [2022]:
-            data_file = files(__name__).joinpath('Data', 'Concordances', '2022', 'GHG_concordance.xlsx')
+        elif self.year in [2022, 2023]:
+            data_file = files(__name__).joinpath('Data', 'Concordances', '2022-2023', 'GHG_concordance.xlsx')
             with data_file.open('rb') as f:
                 concordance = pd.read_excel(f, self.level_of_detail)
         concordance.set_index('GHG codes', inplace=True)
@@ -1851,7 +1867,7 @@ class IOTables:
 
         # Only odd years from 2009 to 2017
         match_year_data = {2014: 2015, 2015: 2015, 2016: 2015, 2017: 2017, 2018: 2017, 2019: 2019, 2020: 2019,
-                           2021: 2021, 2022: 2021}
+                           2021: 2021, 2022: 2021, 2023: 2021}
         year_for_water = match_year_data[self.year]
 
         # select the year of the data
@@ -1861,7 +1877,7 @@ class IOTables:
         water_use.VALUE *= 1000
 
         # huge mess to deal with the change in classification for year 2022
-        if self.year == 2022:
+        if self.year in [2022, 2023]:
             replacements = {'BS312200': 'BS312A00',
                             'BS332100': 'BS332B00',
                             'BS334100': 'BS334C00',
@@ -2045,8 +2061,8 @@ class IOTables:
             data_file = files(__name__).joinpath('Data', 'Concordances', '2014-2021', 'Energy_concordance.xlsx')
             with data_file.open('rb') as f:
                 concordance = pd.read_excel(f, self.level_of_detail)
-        elif self.year in [2022]:
-            data_file = files(__name__).joinpath('Data', 'Concordances', '2022', 'Energy_concordance.xlsx')
+        elif self.year in [2022, 2023]:
+            data_file = files(__name__).joinpath('Data', 'Concordances', '2022-2023', 'Energy_concordance.xlsx')
             with data_file.open('rb') as f:
                 concordance = pd.read_excel(f, self.level_of_detail)
         concordance.set_index('NRG codes', inplace=True)
@@ -2119,8 +2135,8 @@ class IOTables:
             data_file = files(__name__).joinpath('Data', 'Concordances', '2014-2021', 'concordance_metals.json')
             with data_file.open('r', encoding='utf-8') as f:
                 dict_data = json.load(f)
-        elif self.year in [2022]:
-            data_file = files(__name__).joinpath('Data', 'Concordances', '2022', 'concordance_metals.json')
+        elif self.year in [2022, 2023]:
+            data_file = files(__name__).joinpath('Data', 'Concordances', '2022-2023', 'concordance_metals.json')
             with data_file.open('r', encoding='utf-8') as f:
                 dict_data = json.load(f)
 
@@ -2170,8 +2186,8 @@ class IOTables:
             data_file = files(__name__).joinpath('Data', 'Concordances', '2014-2021', 'openIO_IW_concordance.xlsx')
             with data_file.open('rb') as f:
                 concordance = pd.read_excel(f, 'Total')
-        elif self.year in [2022]:
-            data_file = files(__name__).joinpath('Data', 'Concordances', '2022', 'openIO_IW_concordance.xlsx')
+        elif self.year in [2022, 2023]:
+            data_file = files(__name__).joinpath('Data', 'Concordances', '2022-2023', 'openIO_IW_concordance.xlsx')
             with data_file.open('rb') as f:
                 concordance = pd.read_excel(f, 'Total')
         concordance.set_index('OpenIO flows', inplace=True)
@@ -2620,8 +2636,8 @@ class IOTables:
             data_file = files(__name__).joinpath('Data', 'Concordances', '2014-2021', 'concordance_HFCs.json')
             with data_file.open('r') as f:
                 industry_mapping = json.load(f)
-        elif self.year in [2022]:
-            data_file = files(__name__).joinpath('Data', 'Concordances', '2022', 'concordance_HFCs.json')
+        elif self.year in [2022, 2023]:
+            data_file = files(__name__).joinpath('Data', 'Concordances', '2022-2023', 'concordance_HFCs.json')
             with data_file.open('r') as f:
                 industry_mapping = json.load(f)
 
@@ -2644,7 +2660,7 @@ class IOTables:
         mass_conversion_factors = {"kg": 1, "t": 1000, "kt": 1000000}
         hfcs['numberValue'] = hfcs['unit'].map(mass_conversion_factors).mul(hfcs['numberValue'])
 
-        if self.year != 2022:
+        if self.year not in [2022, 2023]:
             hfcs = hfcs.loc[(hfcs['measure'] == 'Net emissions/removals') & (hfcs['year'] == self.year),
                             ['category', 'gas', 'numberValue']]
         else:
@@ -2740,7 +2756,7 @@ class IOTables:
         for livestock in unique_livestocks:
             if len(set(water_conso['Livestock'].loc[
                            water_conso['Livestock'].loc[:, 'Livestock Category'] == livestock, 'Year'])) == 1:
-                for year in [2014, 2015, 2016, 2017, 2018, 2019, 2020, 2022]:
+                for year in [2014, 2015, 2016, 2017, 2018, 2019, 2020, 2022, 2023]:
                     df = water_conso['Livestock'].loc[
                         water_conso['Livestock'].loc[:, 'Livestock Category'] == livestock].loc[
                         water_conso['Livestock'].loc[:, 'Year'] == 2021].copy('deep')
@@ -2779,7 +2795,7 @@ class IOTables:
             water_conso['Crop'][water_conso['Crop'].loc[:, 'Crop Category'] == 'Total'].index)
         water_conso['Crop'] = water_conso['Crop'].drop(['Crop Category'], axis=1)
         # select year
-        if self.year == 2022:
+        if self.year in [2022, 2023]:
             water_conso['Crop'] = water_conso['Crop'].loc[:, ['Code product Open IO'] +
                                                              [i for i in water_conso['Crop'].columns if str(2021) in i]]
         else:
@@ -2791,11 +2807,11 @@ class IOTables:
         for comm in water_conso['Crop'].loc[:, 'Code product Open IO']:
             df = self.V.loc(axis=0)[:, {i[0]: i[1] for i in self.commodities}[comm]].sum(1)
             df /= df.sum()
-            if self.year != 2022:
+            if self.year not in [2022, 2023]:
                 df *= water_conso['Crop'].loc[
                     water_conso['Crop'].loc[:, 'Code product Open IO'] == comm, 'Water consumption (m3) ' + str(
                         self.year)].iloc[0]
-            elif self.year == 2022:
+            elif self.year in [2022, 2023]:
                 df *= water_conso['Crop'].loc[
                     water_conso['Crop'].loc[:, 'Code product Open IO'] == comm, 'Water consumption (m3) ' + str(
                         2021)].iloc[0]
@@ -2824,8 +2840,8 @@ class IOTables:
             data_file = files(__name__).joinpath('Data', 'Concordances', '2014-2021', 'IOIC_EXIOBASE.xlsx')
             with data_file.open('rb') as f:
                 ioic_exio = pd.read_excel(f, 'commodities')
-        elif self.year in [2022]:
-            data_file = files(__name__).joinpath('Data', 'Concordances', '2022', 'IOIC_EXIOBASE.xlsx')
+        elif self.year in [2022, 2023]:
+            data_file = files(__name__).joinpath('Data', 'Concordances', '2022-2023', 'IOIC_EXIOBASE.xlsx')
             with data_file.open('rb') as f:
                 ioic_exio = pd.read_excel(f, 'commodities')
         ioic_exio = ioic_exio[2:].drop('IOIC Detail level - EXIOBASE', axis=1).set_index('Unnamed: 1').fillna(0)
@@ -2980,7 +2996,7 @@ class IOTables:
                 starting_line = 11
                 starting_line_values = 16
 
-            elif self.year in [2018, 2019, 2020, 2021, 2022]:
+            elif self.year in [2018, 2019, 2020, 2021, 2022, 2023]:
                 starting_line = 3
                 starting_line_values = 7
 
@@ -3162,7 +3178,7 @@ class IOTables:
                 [list(self.matching_dict.keys()), ['Volatile Organic Compounds (VOCs)'], ['Air']]),
                               columns=[('Photochemical ozone formation', 'kgNOxeq'),
                                        ('Photochemical ozone formation, human health', 'DALY'),
-                                       ('Photochemical ozone formation, ecosystem quality', 'PDF.m2.yr')])
+                                       ('Photochemical ozone formation, ecosystem quality', 'PDF.m2.yr')], dtype=float)
             foo.index = foo.index.values
 
             foo.loc[:, [('Photochemical ozone formation', 'kgNOxeq')]] = 0.18
