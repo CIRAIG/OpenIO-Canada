@@ -163,8 +163,11 @@ acidification or the impact of climate change on human health and biodiversity.
 
 Since the GHG emissions are only provided by a more aggregated level than the classification of openIO-Canada (GHGs for 
 115 industries vs 240 industries with the detail level of supply and use accounts), the GHG emissions were distributed 
-proportionate to the sales. For example, if “Wheat” represents 5% of the sales of “Crop production” then “Wheat” gets 
-5% of all CO2, CH4 and N2O emissions of “Crop production”.
+proportionate to the purchase of fuels. For example, if “Gold and silver ore mining” represents 25% of the total consumption of 
+fuels by the sectors belonging to “Metal ore mining”, then “Gold and silver ore mining” gets 25% of all CO2, CH4 and N2O emissions 
+of “Metal ore mining”. Note that when then applying the technology industry construct, the emissions are then distributed
+to commodities belonging to a sector by market shares. So if "Gold" represents 80% of the sales of "Gold and silver ore mining",
+then it is attributed 80% of the GHG emissions.
 
 Physical accounts also provide the GHG emissions for households, which they separate in two categories: “Motor fuels and
 lubricants”, which mainly pertains to emissions of using one’s car and “Heating, lighting and appliances” which 

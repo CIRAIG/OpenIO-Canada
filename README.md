@@ -1,48 +1,53 @@
-## _OpenIO-Canada v2.11.1_
+## _OpenIO-Canada v2.12_
 
 Python class creating Multi-Regional symmetric Environmentally Extended Input-Output (MREEIO) tables for Canada. OpenIO-Canada 
 operates at the provincial level (13 provinces). It can thus be used to compare the environmental impacts of value chains
 or consumption by households from any specific province.
 
-The database covers reference years from 2014 to 2022.
+The database covers reference years from 2014 to 2023.
 
 OpenIO-Canada covers 492 commodities, 33 GHGs, around 300 pollutants in 3 compartments (air, water and soil), 
-67 mineral resources, water consumption, energy use and plastic waste pollution.
+67 mineral resources, water consumption and energy use.
 
 OpenIO-Canada is connected to the Exiobase global MRIO database to model value chains happening outside Canada.
 
-**_IMPORTANT_** While openIO-Canada v2.11.1 CAN operate with Exiobase versions 3.9.4, 3.9.5, 3.9.6, 3.10.1, 3.10.2 we do NOT recommend 
-using these versions of Exiobase, as there are significant mistakes in the modeling of the mining sector. This triggers
-a drastic overestimation of Canada's own footprint, through its imports of minerals (notably through the American imports).
+**_IMPORTANT_** While openIO-Canada v2.12 CAN operate with Exiobase versions 3.9.4, 3.9.5, 3.9.6, 3.10.1, 3.10.2 we do NOT recommend 
+using these versions of Exiobase, as there are significant mistakes in the modeling of the mining sector. Instead use the
+latest available version from v3.11.2.
+
+Only interested in the emission factors of the latest year? You can access them already extracted here: https://doi.org/10.5281/zenodo.5553376
 
 ### Getting started
 
 Clone the repository (or download it) and install the different libraries required to run this Python class (requirements.txt).<br>
-Note that we recommend working with version **3.9** of Python as we can ensure it works for that specific version.<br>
 Go to the doc folder and start with the Running_openIO-Canada.ipynb file to generate the IO tables. You can then explore 
 how to use openIO-Canada with the other notebooks.
 
 ### Carbon footprint per capita estimates
-Using openIO-Canada v2.11.1 (with capitals endogenized) and population estimates from StatCan, we can derive carbon 
-footprints per capita for all 13 provinces of Canada, and Canada as a whole, from 2014 to 2022, following a consumption approach.
+Using openIO-Canada v2.12 (with capitals endogenized) and population estimates from StatCan, we can derive carbon 
+footprints per capita for all 13 provinces of Canada, and Canada as a whole, from 2014 to 2023, following a consumption approach.
 
 <img src="images/consumption_footprints.png" width="600"/>
 
-We can see that the national carbon footprint per capita is around 19tCO2eq, even though it slightly decreased during the
-COVID years (2019, 2020 & 2021). We can also note that there was virtually no progress nationally from 2014 to 2022. 
-Per province, it follows a similar trend of virtually no progress. Three provinces stand out. Alberta significantly reduced
-its enormous carbon footprint per capita from 34tCO2eq to 24tCO2eq, even though it is still one of the worst in Canada. 
-On the other hand, both Québec and British Columbia in 2022 had their worst carbon footprint by far in over 8 years.
+We can see that the national carbon footprint per capita is around 15.5tCO2eq, which represents its lowest level since 2014.
+Similar trends can be observed across provinces, with 2023 often being the year with the lowest per capita carbon footprint.
+In particular, let's highlight the per capita carbon footprint of Alberta, which decreased from 32tCO2eq/hab. to 20tCO2eq, below
+Saskatchewan and Nova Scotia.
+These decreases should most likely be due to two factors:
+- there was a surge in population in 2023 across Canada (1.3 million more inhabitants), resulting in a drop in per capita
+carbon footprint
+- Electric power generation emissions plunged acros provinces. One notable exception is Ontario which switch some of its
+nuclear power generation for natural gas power plant, which increased its electricity power generation emissions by nearly 50%.
 
 We can also look at the same results, but through a territorial approach.
 
 <img src="images/territorial_footprints.png" width="600"/>
 
-The national carbon footprint following a territorial approach is also around 20tCO2eq. This time however, we can see a small
-decrease of that footprint over time. This could be explained by a greening of the operations throughout Canada, although 
-such a greening procedure would have most likely triggered a decrease of the consumption footprint as well. This thus 
-rather seems to indicate that Canada delocalized a part of its production, instead relying on imports. <br>
-Regarding provinces, we can see that the worst of the national production exclusively happens in Alberta and Saskatchewan.
+The national carbon footprint following a territorial approach is around 17tCO2eq. 2023 is also the year with the lowest
+territorial GHG emissions since 2014. This is once again driven by decreased across the board, but more importantly, in
+Alberta and Saskatchewan which both have tremendous per capita footprint, due to petroleum extraction activities. Except
+for these two provinces, the territorial approach yields a smaller carbon footprint than the consumption one, highlighting
+than other provinces are mostly importers of GHG emissions, rather than producers/exporters.
 
 
 ### Classification detail
@@ -92,13 +97,16 @@ maxime.agez@polymtl.ca
 ### Citation
 https://doi.org/10.5281/zenodo.8200655
 
+## 📊 Community Adoption
+
 ### Scientific articles using openIO-Canada
+- Antoine Théron, Guillaume Escoffier, Jean-François Bussières (2026). Estimation des gaz à effet de serre générés par les médicaments en établissement de santé: comparaison de deux méthodes, Annales Pharmaceutiques Françaises, ISSN 0003-4509,https://doi.org/10.1016/j.pharma.2026.08.001.
 - Santiago Zuluaga, Shoshanna Saxe (2025), Leveraging building permit data for large-scale embodied carbon and circularity assessment of residential building construction, Environ. Res.: Infrastruct. Sustain. 5 035015. https://doi.org/10.1088/2634-4505/adfc95
 - Wambersie, L., & Ouellet-Plamondon, C. (2024). Developing a comprehensive account of embodied emissions within the Canadian construction sector. Journal of Industrial Ecology, 1–14. https://doi.org/10.1111/jiec.13548
 - Yoffe, H., et al. (2024). Mapping construction sector greenhouse gas emissions: a crucial step in sustainability meeting increasing housing demands. Environmental research - Infrastructure and sustainability. https://doi.org/10.1088/2634-4505/ad546a
-- Anne de Bortoli, Maxime Agez (2023), Environmentally-extended input-output analyses efficiently sketch large-scale environmental transition plans: Illustration by Canada's road industry, Journal of Cleaner Production, Volume 388, 2023, 136039, ISSN 0959-6526, https://doi.org/10.1016/j.jclepro.2023.136039.
+- Anne de Bortoli, Maxime Agez (2023). Environmentally-extended input-output analyses efficiently sketch large-scale environmental transition plans: Illustration by Canada's road industry, Journal of Cleaner Production, Volume 388, 2023, 136039, ISSN 0959-6526, https://doi.org/10.1016/j.jclepro.2023.136039.
 
-## 📊 Community & Industry Adoption
+### Public and private organizations reports using openIO-Canada
 
 The openIO-Canada database is utilized by public and private organizations for carbon accounting and environmental modeling.
 
@@ -108,6 +116,9 @@ The openIO-Canada database is utilized by public and private organizations for c
 | **RECYC-QUÉBEC**                           | Circular Economy Modeling     | [2025 Study](https://www.recyc-quebec.gouv.qc.ca/sites/default/files/documents/etude-reemploi-aviseo.pdf) / [2025 Report](https://www.recyc-quebec.gouv.qc.ca/sites/default/files/documents/rapport-indice-circularite2025.pdf) |
 | **Ville de Montréal**                      | Community Footprint Esimating | [Official Report](https://portail-m4s.s3.montreal.ca/pdf/ciraig_vdm_inventaire_ges_conso_2017.pdf)                                                                                                                              |
 | **Public Services and Procurement Canada** | Procurement Footprinting      | [Official Report](https://canadacommons.ca/artifacts/21670110/carbon-footprint-of-procurements-by-public-services-and-procurement-canada/22570299/)                                                                             |
+| **Treasury Board Secretariat of Canada**   | Procurement Footprinting      | [Official Report](https://ciraig.org/wp-content/uploads/CIRAIG_TBS_GHG_Footprint_Procurement_final_w_exec_summary_EN.pdf)                                                                             |
+| **Réseau universitaire québécois en développement durable (RUQDD)**                                 | Methodological Guide          | [Official Report](https://doi.org/10.60918/23208)                                                                             |
+
 
 
 
