@@ -1,0 +1,14 @@
+name: openiocanada-env
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.15.2
+  - numpy=2.5.4
+  - pandas=3.1.1
+  - pymrio=0.7.0
+  - country_converter=0.7.4
+  - openpyxl=3.1.5
+  - scipy=1.18.1
+  - fsspec
+  - regex

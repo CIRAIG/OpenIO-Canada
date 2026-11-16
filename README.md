@@ -19,7 +19,7 @@ Only interested in the emission factors of the latest year? You can access them 
 
 ### Getting started
 
-Clone the repository (or download it) and install the different libraries required to run this Python class (requirements.txt).<br>
+Clone the repository (or download it) and install the different libraries required to run this Python class (Environment.yaml).<br>
 Go to the doc folder and start with the Running_openIO-Canada.ipynb file to generate the IO tables. You can then explore 
 how to use openIO-Canada with the other notebooks.
 
